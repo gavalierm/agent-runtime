@@ -84,7 +84,7 @@ Budič ho z textu pre model odstráni a dá do značky `odpoveď="..."`.
 |---|---|---|---|
 | `odpoveď: čakám` | pokyn alebo otázka, autor na odpovedi stojí | zobudí | budič autora zobudí |
 | `odpoveď: nečakám` | len `reply.sh --necakam`, most Taskera a ranný súhrn, výsledok autor prečíta pri ďalšom ťahu | zobudí | ide bez budenia |
-| `odpoveď: na vedomie` | hlásenie, výsledok, potvrdenie | nebudí, drží do ďalšej dávky | nepíše sa |
+| `odpoveď: na vedomie` | hlásenie, výsledok, potvrdenie | nebudí, ide s ďalšou dávkou, po behu vlákna alebo po lehote | nepíše sa |
 | bez riadku | staré skripty, ručný zápis | zobudí | ako doteraz |
 
 | skript | predvolene | prepínače |
@@ -117,16 +117,29 @@ vtedy, keď má tú istú tému ako odoslaná správa s `čakám` mladšia než
 <hodnota pôvodnej správy>`, ktorý `reply.sh` opíše z `processed`. Bez
 oboch sa správa drží.
 
-Držaná správa ostáva v `inbox`, nič sa nemaže. Ide pod nadpisom
-"Na vedomie, N správ bez budenia" s najbližšou dávkou do toho istého
-vlákna (najviac 10 správ, každá do 4 000 B, zvyšok s cestou do
-`processed`). Ranný súhrn je `nečakám`, držané správy hlavného vlákna
-idú s ním. Držané správy vlákna témy čakajú na budiacu správu do toho
-istého vlákna, ranný súhrn ide do hlavného. Správa `na vedomie` staršia
-než 24 h neostane ležať: `morning.mjs` ju pri behu presunie zo schránky
+Držaná správa ostáva v `inbox`, kým nejde. Ide pod nadpisom
+"Na vedomie, N správ bez budenia" (najviac 10 správ, každá do 4 000 B,
+zvyšok s cestou do `processed`) a to dvoma cestami (úloha 518):
+
+1. S najbližšou budiacou dávkou do toho istého vlákna.
+2. Sama ako dávka len z držaných správ, keď je vlákno voľné a platí
+   jedno z dvoch. Vlákno je teplé: jeho posledný beh skončil najviac
+   `AGENT_HELD_WARM_S` (10 min) dozadu, kontext je v cache a volanie
+   modelu je lacné. Čas berie budič z poľa `latestRunCompletedAt` riadku
+   vlákna v `/api/orchestration/shell`, `null` alebo neplatný čas nie je
+   teplé. Alebo lehota: najstaršia držaná správa skupiny čaká dlhšie než
+   `AGENT_HELD_MAX_S` (12 h).
+
+Budiaca skupina má prednosť pred skupinou len z držaných správ, držaná
+dávka tak budiacu nezdrží. Držané správy vlákna témy idú do vlákna témy.
+Ranný súhrn je `nečakám`, držané správy hlavného vlákna idú s ním, ak ich
+nedoručila niektorá z ciest vyššie. Poistka: správa `na vedomie` staršia
+než 24 h neostane ležať, `morning.mjs` ju pri behu presunie zo schránky
 agenta do `processed` a súhrn nesie časť "Držané správy na vedomie
 staršie než 24 h" (agent, odosielateľ, téma, prvý riadok, nová cesta).
-Bez takej správy časť v súhrne nie je. Vlákna tém sa tým nebudia.
+Zachytí správu len pri výpadku budiča alebo vlákne, ktoré bolo
+12 h trvalo zaneprázdnené. Bez takej správy časť v súhrne nie je.
+Vlákna tém sa tým nebudia.
 Schránky na odnos: `AGENT_SWEEP_BOXES` (zoznam cez dvojbodku), inak
 vlastná schránka a priečinky z `AGENT_REPLY_ROUTE_<meno>`
 (`AGENT_REPLY_ROUTE_<meno>`), na serveri adam a boris. Journal: `držím N na vedomie`, pri odoslaní `poslané N (M na
@@ -136,7 +149,7 @@ sa neposiela, práca z nej je nový pokyn `ask_agent.sh`.
 Správa Taskera ("Tasker: úloha #N"), na ktorej úlohe agent po zápise správy
 sám zapísal nečinnú (`quiet 0`) udalosť svojho aktéra `human:<agent>`
 (budič číta `events` v `taskerDb` len na čítanie), nebudí a ide na vedomie
-s najbližšou budiacou dávkou do toho istého vlákna. Chýbajúca alebo
+ako držaná správa (časť vyššie). Chýbajúca alebo
 nečitateľná databáza správanie nemení, správa budí. Chyba 24. 10. 2026,
 úloha 499: agent komentár operátora prečítal sám a budič ho o minútu zobudil
 tou istou správou.
@@ -518,6 +531,8 @@ prostredia. `reply.sh` si `runtime.env` agenta načíta sám.
 | `AGENT_ROUTE_CMD` | `/opt/agent-rules/bin/tk` | zápis trasy do Taskera, prázdne vypne |
 | `AGENT_RULES_REPO` | `/opt/agent-rules` | klon repa pravidiel pre ranný súhrn |
 | `AGENT_BATCH_WAIT_S`, `AGENT_BATCH_MAX_WAIT_S` | 30, 120 | tiché okno dávky |
+| `AGENT_HELD_WARM_S` | 600 | držaná správa na vedomie odíde sama, keď posledný beh vlákna skončil najviac toľko sekúnd dozadu |
+| `AGENT_HELD_MAX_S` | 43200 | držaná správa na vedomie odíde sama, keď čaká dlhšie (menej než 24 h poistky `morning.mjs`) |
 | `T3_URL` | `http://127.0.0.1:3773` | adresa T3 servera, napríklad `https://host.example.ts.net:8802`; vlákna založené cez MCP ju nededia, patrí do `runtime.env` |
 | `T3_TOKEN_FILE` | `~/.config/<meno>/t3_token` | token T3 (600) |
 | `TASKER_HOME`, `TASKER_DB`, `TASKER_BIN` | `~/.tasker`, `$TASKER_HOME/tasker.db`, `/opt/tasker/bin/tasker` | Tasker |

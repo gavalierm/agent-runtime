@@ -26,7 +26,11 @@
 //    bez riadku. Správa `odpoveď: na vedomie` budí, len keď agent na
 //    odpoveď k jej kľúču čaká (route.mjs sent, inak riadok `k správe:`),
 //    inak ostáva v inboxe a ide pod nadpisom "Na vedomie" s najbližšou
-//    dávkou do toho istého vlákna, nikdy sama.
+//    budiacou dávkou do toho istého vlákna. Sama odíde ako dávka len
+//    z držaných správ (najviac 10), keď je vlákno voľné a platí jedno:
+//    posledný beh vlákna skončil najviac AGENT_HELD_WARM_S dozadu (teplé
+//    vlákno, kontext je v cache) alebo najstaršia držaná správa čaká
+//    dlhšie než AGENT_HELD_MAX_S (úloha 518). Budiaca skupina má prednosť.
 //    Správa Taskera, na ktorej úlohe agent po jej zápise sám zapísal nečinnú
 //    (quiet 0) udalosť, nebudí a ide na vedomie (chyba 24. 10. 2026, úloha 499).
 //    Dávka odíde až po tichom okne AGENT_BATCH_WAIT_S od poslednej
@@ -177,6 +181,8 @@ function closeTaskerDb(cache) {
 // Budí správa čakám, nečakám a správa bez riadku. Správa na vedomie budí
 // len ako odpoveď (`k:` v hlavičke) na správu, na ktorú agent čaká
 // (route.mjs sent), inak podľa riadku `k správe: čakám`, inak sa drží.
+// Držaná správa ide s budiacou dávkou alebo sama po behu či po lehote
+// (heldDue).
 // Správa Taskera, na ktorej úlohe agent po jej zápise sám zapísal nečinnú
 // udalosť, nebudí a ide na vedomie (úloha 499).
 export function classify(cfg, name, cache = {}) {
@@ -192,6 +198,18 @@ export function classify(cfg, name, cache = {}) {
     if (taskId && agentHandled(cfg, taskId, statSync(file).mtimeMs, cache)) wake = false;
   }
   return { wake, mode };
+}
+
+// Skupina len z držaných správ odíde sama, keď je vlákno teplé (posledný beh
+// skončil najviac cfg.heldWarmMs dozadu, modelu sa kontext číta z cache) alebo
+// keď najstaršia držaná správa čaká dlhšie než cfg.heldMaxMs (úloha 518).
+// Čas behu null alebo neplatný vlákno za teplé nepovažuje.
+export function heldDue(cfg, g, now) {
+  if (!g.held.length) return false;
+  const oldest = Math.min(...g.held.map((e) => e.mtime));
+  if (now - oldest > cfg.heldMaxMs) return true;
+  const done = Date.parse(g.thread?.latestRunCompletedAt ?? "");
+  return Number.isFinite(done) && now - done <= cfg.heldWarmMs;
 }
 
 export async function tick(cfgIn, client, { now = Date.now() } = {}) {
@@ -331,9 +349,11 @@ export async function tick(cfgIn, client, { now = Date.now() } = {}) {
     let heldTotal = 0;
     let chosen = null;
     const label = (g, text) => (g.threadId === threadId ? text : `${g.threadId}: ${text}`);
-    for (const g of groups.values()) {
+    // Budiaca skupina má prednosť, skupina len z držaných správ ide až po nej.
+    const ordered = [...groups.values()].sort((a, b) => (b.wake.length > 0) - (a.wake.length > 0));
+    for (const g of ordered) {
       heldTotal += g.held.length;
-      let files;
+      let files = [];
       if (g.wake.length) {
         const newest = Math.max(...g.wake.map((e) => e.mtime));
         const oldest = Math.min(...g.wake.map((e) => e.mtime));
@@ -342,7 +362,7 @@ export async function tick(cfgIn, client, { now = Date.now() } = {}) {
           continue;
         }
         files = g.wake.slice(0, MAX_BATCH).map((e) => e.name);
-      } else {
+      } else if (!heldDue(cfg, g, now)) {
         if (g.held.length) reasons.push(label(g, `držím ${g.held.length} na vedomie`));
         continue;
       }

@@ -89,6 +89,8 @@ export function inboxConfig(env = {}) {
   return {
     batchWaitMs: num("AGENT_BATCH_WAIT_S", 30) * 1000,
     batchMaxWaitMs: num("AGENT_BATCH_MAX_WAIT_S", 120) * 1000,
+    heldWarmMs: num("AGENT_HELD_WARM_S", 600) * 1000,
+    heldMaxMs: num("AGENT_HELD_MAX_S", 43200) * 1000,
   };
 }
 

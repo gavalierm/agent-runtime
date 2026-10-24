@@ -16,9 +16,9 @@ const DAY_MS = 24 * 3600 * 1000;
 // Držané správy na vedomie staršie než 24 h: presunie ich zo schránky
 // agenta do processed a vráti zoznam pre súhrn. Schránky berie z
 // cfg.sweepBoxes, bez nich (cfg bez poľa) nerobí nič.
-// poistka: správa na vedomie, ktorú budič 24 h nedoručil, lebo do jej vlákna
-// neprišla budiaca dávka. Jadro je doručenie správ na vedomie v driver.mjs
-// (úloha 518).
+// poistka: zachytí správu na vedomie len pri výpadku budiča alebo vlákne,
+// ktoré bolo 12 h trvalo zaneprázdnené. Jadro je doručenie po behu vlákna
+// alebo po lehote 12 h v driver.mjs (úloha 518).
 export function sweepHeld(cfg, now = Date.now()) {
   const out = [];
   for (const box of cfg.sweepBoxes ?? []) {

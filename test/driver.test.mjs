@@ -15,7 +15,9 @@ function setup(t3) {
   const state = join(root, "state");
   mkdirSync(state);
   writeFileSync(join(state, "thread_id"), "thr-adam\n");
-  const cfg = { box, state, t3Url: t3.url, pollMs: 10 };
+  // heldWarmMs -Infinity: držané správy po behu nechodia sama, tieto testy skúšajú
+  // triedenie a držanie. Doručenie po behu a po lehote je v driver_held.test.mjs.
+  const cfg = { box, state, t3Url: t3.url, pollMs: 10, heldWarmMs: -Infinity };
   const client = new T3Client({ url: t3.url, token: t3.token, timeoutMs: 3000 });
   let n = 0;
   const put = (name, text) => {
