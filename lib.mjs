@@ -5,7 +5,7 @@
 // s lístkom z POST /api/auth/websocket-ticket a správami
 // Request/Chunk/Ack/Exit/Ping/Pong z Effect RPC.
 import { createHash, randomUUID } from "node:crypto";
-import { appendFileSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -15,6 +15,14 @@ const HOME = process.env.HOME || homedir();
 // Nastavenie agenta z prostredia. Runtime nesie meno agenta (AGENT_NAME,
 // predvolene agent) a z neho odvodí cesty. Ostatné premenné AGENT_* ich
 // prepíšu, zoznam je v README.md.
+function defaultWorkRepos(home) {
+  const repos = ["tasker", "agent-rules", "agent-runtime"].map((d) => join(home, d));
+  try {
+    for (const d of readdirSync(home)) if (!repos.includes(join(home, d)) && existsSync(join(home, d, "PERSONA.md"))) repos.push(join(home, d));
+  } catch { /* domovský priečinok sa nedá čítať */ }
+  return repos;
+}
+
 export function config(env = process.env) {
   const name = env.AGENT_NAME || "agent";
   const pick = (key, fallback) => env[`AGENT_${key}`] || fallback;
@@ -44,6 +52,11 @@ export function config(env = process.env) {
     routeCmd: env.AGENT_ROUTE_CMD ?? "/opt/agent-rules/bin/tk",
     // Klon repa pravidiel, z ktorého ranný súhrn číta nové rozhodnutia (úloha 470).
     rulesRepo: env.AGENT_RULES_REPO || "/opt/agent-rules",
+    // Repá, z ktorých ranný súhrn počíta commity za 24 h po autorovi (workSection).
+    // Predvolene tri repá a každý priečinok pod domovským, ktorý nesie PERSONA.md (klon agenta).
+    workRepos: env.AGENT_WORK_REPOS
+      ? env.AGENT_WORK_REPOS.split(",").map((x) => x.trim()).filter(Boolean)
+      : defaultWorkRepos(home),
     pollMs: Number(pick("POLL_S", 5)) * 1000,
     // Sledovač čistého kontextu ostatných vlákien T3 (clear_watch.mjs), na
     // jednom T3 serveri zapnutý len v budiči jedného agenta.

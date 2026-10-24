@@ -506,6 +506,7 @@ prostredia. `reply.sh` si `runtime.env` agenta načíta sám.
 | `AGENT_REPLY_PREFIX` | meno agenta | predpona mena odpovede |
 | `AGENT_INBOX_ONLY` | prázdne | mená cez dvojbodku: odpoveď im ide len do ich schránky (`/var/lib/<meno>/inbox`), nie do `outbox` |
 | `AGENT_SWEEP_BOXES` | vlastná schránka a priečinky z `AGENT_REPLY_ROUTE_*` | schránky pre ranný súhrn |
+| `AGENT_WORK_REPOS` | /root/tasker, agent-rules, agent-runtime a a klony agentov s PERSONA.md pod domovským priečinkom (čiarka) | repá, z ktorých ranný súhrn počíta commity za 24 h |
 | `AGENT_ROUTE_CMD` | `/opt/agent-rules/bin/tk` | zápis trasy do Taskera, prázdne vypne |
 | `AGENT_RULES_REPO` | `/opt/agent-rules` | klon repa pravidiel pre ranný súhrn |
 | `AGENT_BATCH_WAIT_S`, `AGENT_BATCH_MAX_WAIT_S` | 30, 120 | tiché okno dávky |

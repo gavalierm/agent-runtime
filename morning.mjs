@@ -6,6 +6,7 @@
 // do svojho vlákna. Spúšťa ho agent-morning.timer.
 // Keď `tasker summary` zlyhá, správa nesie chybu, súhrn neodpadne potichu.
 import { execFileSync, spawnSync } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 import { existsSync, readFileSync, renameSync } from "node:fs";
 import { basename, join } from "node:path";
 import { config, inboxEntries, log, parseHeader, parseName, writeInbox } from "./lib.mjs";
@@ -75,6 +76,64 @@ export function decisionsSection(cfg, git = (a) => execFileSync("git", a, { enco
   return lines;
 }
 
+// Rozloženie práce za 24 h (úloha 513): z tabuľky `work` Taskera počet úloh a relácií
+// po agentovi a projekte, z gitu commity po autorovi v cfg.workRepos. DB sa otvára len na
+// čítanie, `git` je vstrekovaný kvôli testu, nič sa nezapisuje. Chyba vráti riadok, nie výnimku.
+export function workSection(cfg, now = Date.now(), deps = {}) {
+  const git = deps.git || ((a) => execFileSync("git", a, { encoding: "utf8", timeout: 30_000 }));
+  const lines = ["", "Rozloženie práce za 24 h:", ""];
+  try {
+    const db = new DatabaseSync(cfg.taskerDb, { readOnly: true });
+    let rows;
+    try {
+      rows = db.prepare(
+        `SELECT w.agent AS agent, COALESCE(NULLIF(t.project, ''), 'bez projektu') AS project,
+                w.task_id AS task_id, w.thread AS thread
+           FROM work w LEFT JOIN tasks t ON t.id = w.task_id
+          WHERE w.since >= ? ORDER BY w.agent, project, w.task_id`).all(now - 24 * 3600_000);
+    } finally { db.close(); }
+    const groups = new Map();
+    for (const r of rows) {
+      const k = `${r.agent}\u0000${r.project}`;
+      const g = groups.get(k) || { agent: r.agent, project: r.project, tasks: new Set(), threads: new Set() };
+      g.tasks.add(r.task_id);
+      if (r.thread) g.threads.add(r.thread);
+      groups.set(k, g);
+    }
+    lines.push("Úlohy a relácie podľa agenta a projektu:");
+    if (!groups.size) lines.push("- žiadna práca");
+    for (const g of groups.values()) {
+      const ids = [...g.tasks].sort((a, b) => a - b);
+      const more = ids.length > 10 ? ", ďalšie" : "";
+      lines.push(`- ${g.agent}, ${g.project}: ${g.tasks.size} úloh, ${g.threads.size} relácií (${ids.slice(0, 10).join(", ")}${more})`);
+    }
+  } catch (e) {
+    lines.push(`Úlohy a relácie: čítanie databázy Taskera zlyhalo: ${(e.message || "").toString().trim().slice(0, 300)}`);
+  }
+  const authors = new Map();
+  for (const repo of cfg.workRepos || []) {
+    if (!existsSync(repo)) continue;
+    try {
+      for (const a of git(["-C", repo, "log", "--since=24 hours ago", "--format=%an"]).split("\n").map((l) => l.trim()).filter(Boolean)) {
+        const m = authors.get(a) || new Map();
+        m.set(basename(repo), (m.get(basename(repo)) || 0) + 1);
+        authors.set(a, m);
+      }
+    } catch (e) {
+      lines.push(`Commity: git log v ${repo} zlyhal: ${(e.stderr || e.message || "").toString().trim().slice(0, 200)}`);
+    }
+  }
+  lines.push("", "Commity za 24 h podľa autora:");
+  if (!authors.size) lines.push("- žiadne");
+  for (const a of [...authors.keys()].sort()) {
+    const m = authors.get(a);
+    const total = [...m.values()].reduce((x, y) => x + y, 0);
+    lines.push(`- ${a}: ${total} (${[...m].sort().map(([r, n]) => `${r} ${n}`).join(", ")})`);
+  }
+  lines.push("", "Porovnaj s rolami v roles/agents.md, prácu mimo roly agenta hlás operátorovi a presuň.");
+  return lines;
+}
+
 export function build(cfg, run = execFileSync, now = Date.now(), deps = {}) {
   let tasker;
   try {
@@ -93,6 +152,7 @@ export function build(cfg, run = execFileSync, now = Date.now(), deps = {}) {
     tasker,
     ...heldSection(sweepHeld(cfg, now)),
     ...decisionsSection(cfg, deps.git, deps.check),
+    ...workSection(cfg, now, deps),
   ].join("\n");
 }
 
