@@ -55,10 +55,10 @@ test("most: správa pre agenta dostane tému zo zoznamu tém jeho schránky, Bor
   // Zoznam hlavného vlákna s touto témou pre agenta nesmie platiť.
   setTopic(cfg, "projekt_a", "thr-adam-k");
   assert.match((await bridgeTick(cfg, agents)).reason, /most začína/);
-  task.run(1, "Pre agenta", "", "todo", "agent", "projekt_a");
-  task.run(2, "Pre Borisa", "", "todo", "boris", "projekt_a");
-  ev.run(1, "human:operator", "created", null, "todo", null);
-  ev.run(2, "human:operator", "created", null, "todo", null);
+  task.run(1, "Pre agenta", "", "handoff", "agent", "projekt_a");
+  task.run(2, "Pre Borisa", "", "handoff", "boris", "projekt_a");
+  ev.run(1, "human:operator", "created", null, "handoff", null);
+  ev.run(2, "human:operator", "created", null, "handoff", null);
   const r = await bridgeTick(cfg, agents);
   assert.equal(r.written, 2);
   assert.match(s.read(s.agent)[0].n, /^tasker-projekt_a-\d{8}-\d{6}-/);
@@ -121,10 +121,10 @@ test("most: agent s enabled=1 v Taskeri správu nedostane, enabled=0 áno, bez t
   const agents = [{ name: "boris", box: s.boris }, { name: "adam", box: s.adam }];
   await bridgeTick(cfg, agents);
   db.exec("INSERT INTO agents VALUES ('boris', 1), ('adam', 0)");
-  task.run(1, "Pre Borisa", "", "todo", "boris", null);
-  task.run(2, "Pre Adama", "", "todo", "adam", null);
-  ev.run(1, "human:operator", "created", null, "todo", null);
-  ev.run(2, "human:operator", "created", null, "todo", null);
+  task.run(1, "Pre Borisa", "", "handoff", "boris", null);
+  task.run(2, "Pre Adama", "", "handoff", "adam", null);
+  ev.run(1, "human:operator", "created", null, "handoff", null);
+  ev.run(2, "human:operator", "created", null, "handoff", null);
   const r = await bridgeTick(cfg, agents);
   assert.equal(r.written, 1);
   assert.deepEqual(s.read(s.boris), []);
@@ -140,23 +140,23 @@ test("most: úloha agenta s enabled=0 bez mosta ide vlastníkovi do jeho schrán
   await bridgeTick(cfg, agents);
   db.exec("INSERT INTO agents VALUES ('boris', 0), ('adam', 0), ('dev', 0), ('kvapka', 1)");
   setTopic(cfg, "proj", "thr-p");
-  task.run(1, "Pre dev", "Telo", "todo", "dev", "proj");
-  task.run(2, "Pre kvapku", "", "todo", "kvapka", null);
-  ev.run(1, "human:operator", "created", null, "todo", null);
+  task.run(1, "Pre dev", "Telo", "handoff", "dev", "proj");
+  task.run(2, "Pre kvapku", "", "handoff", "kvapka", null);
+  ev.run(1, "human:operator", "created", null, "handoff", null);
   ev.run(1, "human:operator", "assigned", null, null, "dev");
-  ev.run(2, "human:operator", "created", null, "todo", null);
+  ev.run(2, "human:operator", "created", null, "handoff", null);
   const r = await bridgeTick(cfg, agents);
   assert.equal(r.written, 1, "jedna správa na úlohu, dispečerov agent s enabled=1 nič");
   const [m] = s.read(s.adam);
   assert.match(m.n, /^tasker-proj-\d{8}-\d{6}-/);
-  assert.match(m.t, /^odpoveď: nečakám\nTasker: úloha #1 pre agenta dev, ktorý je vypnutý a nemá most, nikto ju nespustí\.\nOdkaz: http:\/\/127\.0\.0\.1:8801\/tasks\/1\nNázov: Pre dev\nStav: todo\nProjekt: proj\n/);
+  assert.match(m.t, /^odpoveď: nečakám\nTasker: úloha #1 pre agenta dev, ktorý je vypnutý a nemá most, nikto ju nespustí\.\nOdkaz: http:\/\/127\.0\.0\.1:8801\/tasks\/1\nNázov: Pre dev\nStav: handoff\nProjekt: proj\n/);
   assert.match(m.t, /Detail: AGENT_NAME=dev \/opt\/agent-rules\/bin\/tk task show 1 --json/);
   assert.doesNotMatch(m.t, /runuser/);
   assert.deepEqual(s.read(s.boris), []);
   // Komentár iného autora na úlohe vypnutého agenta nesie text komentára.
   comment.run(1, "operator", "Prosím rýchlo.");
   ev.run(1, "human:operator", "comment", null, null, null);
-  db.prepare("UPDATE tasks SET status = 'todo' WHERE id = 1").run();
+  db.prepare("UPDATE tasks SET status = 'handoff' WHERE id = 1").run();
   assert.equal((await bridgeTick(cfg, agents)).written, 1);
   assert.match(s.read(s.adam).map((m) => m.t).join("\n"), /Posledný komentár \(operator,[^)]*\):\nProsím rýchlo\./);
   db.close();
@@ -169,7 +169,7 @@ test("most: komentár cudzieho človeka na koncovej úlohe alebo úlohe bez rie�
   await bridgeTick(cfg, agents);
   db.exec("INSERT INTO agents VALUES ('boris', 0), ('adam', 0)");
   task.run(1, "Hotová", "", "done", "boris", null);
-  task.run(2, "Nikoho", "", "todo", null, null);
+  task.run(2, "Nikoho", "", "handoff", null, null);
   task.run(3, "Beží", "", "in_progress", "boris", null);
   task.run(4, "Zrušená", "", "cancelled", "boris", null);
   comment.run(1, "operator", "Ešte jedna vec.");
@@ -188,7 +188,7 @@ test("most: komentár cudzieho človeka na koncovej úlohe alebo úlohe bez rie�
   assert.equal(own.length, 2);
   assert.match(own.join("\n"), /^odpoveď: nečakám\nTasker: úloha #1, komentár od operator nikoho nezobudí \(stav done, riešiteľ boris\)\.\n/m);
   assert.match(own.join("\n"), /Ešte jedna vec\./);
-  assert.match(own.join("\n"), /komentár od operator nikoho nezobudí \(stav todo, riešiteľ nikto\)\./);
+  assert.match(own.join("\n"), /komentár od operator nikoho nezobudí \(stav handoff, riešiteľ nikto\)\./);
   assert.match(own.join("\n"), /Prácu z neho zadaj novou úlohou alebo úlohu otvor \(tasker reopen\), ak treba\./);
   assert.equal(s.read(s.boris).length, 1);
   db.close();
@@ -201,7 +201,7 @@ test("tick: done zavreté agentom sa do dávky nerátajú, needs_human ide ako s
   await taskerTick(cfg);
   for (let i = 1; i <= 6; i++) {
     db.prepare("INSERT INTO tasks VALUES (?, 't', '', 'done', 'dev', NULL)").run(10 + i);
-    ev.run(10 + i, "human:adam", "created", null, "todo", null);
+    ev.run(10 + i, "human:adam", "created", null, "handoff", null);
     ev.run(10 + i, "human:adam", "status", "in_progress", "done", null);
   }
   db.prepare("INSERT INTO tasks VALUES (30, 'čaká', '', 'needs_human', 'dev', NULL)").run();
@@ -229,7 +229,7 @@ test("tick: dávka s needs_human alebo failed budí (čakám), dávka len z done
   assert.equal(first, 1);
   for (let i = 21; i <= 27; i++) {
     db.prepare("INSERT INTO tasks VALUES (?, 't', '', 'done', 'dev', NULL)").run(i);
-    ev.run(i, "human:operator", "created", null, "todo", null);
+    ev.run(i, "human:operator", "created", null, "handoff", null);
     ev.run(i, "run:1", "status", "in_progress", "done", null);
   }
   // Úlohy založil operátor, nie vlastník: done sa neposiela. Založené vlastníkom a zavreté behom idú.
@@ -237,7 +237,7 @@ test("tick: dávka s needs_human alebo failed budí (čakám), dávka len z done
   assert.equal(r2.written, 0);
   for (let i = 31; i <= 37; i++) {
     db.prepare("INSERT INTO tasks VALUES (?, 't', '', 'done', 'dev', NULL)").run(i);
-    ev.run(i, "human:adam", "created", null, "todo", null);
+    ev.run(i, "human:adam", "created", null, "handoff", null);
     ev.run(i, "run:1", "status", "in_progress", "done", null);
   }
   const r3 = await taskerTick(cfg);

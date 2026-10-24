@@ -81,7 +81,7 @@ test("detect: výzva nasledujúca po tool_result sa nepovažuje za novú, nástr
 });
 
 test("hlásenie nezobudí agenta: úloha založená agentom pre seba (created, assigned) nespustí most", () => {
-  const ev = (o) => ({ assignee: "adam", status: "todo", actor: "human:adam", ...o });
+  const ev = (o) => ({ assignee: "adam", status: "handoff", actor: "human:adam", ...o });
   assert.equal(bridgeTrigger(ev({ kind: "created" }), "adam"), null);
   assert.equal(bridgeTrigger(ev({ kind: "assigned", detail: "adam" }), "adam"), null);
 });

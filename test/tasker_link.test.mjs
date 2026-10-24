@@ -7,7 +7,7 @@ import { render, renderBridge, renderOrphan, renderDeadComment, taskLink } from 
 process.env.TASKER_WEB_URL = "https://tasker.example.ts.net:8801";
 const URL7 = "https://tasker.example.ts.net:8801/tasks/7";
 const cfg = { taskerHome: "/h/.tasker" };
-const task = { id: 7, title: "t", status: "todo", assignee: "boris" };
+const task = { id: 7, title: "t", status: "handoff", assignee: "boris" };
 const ev = { task_id: 7, to_status: "done", from_status: "in_progress", actor: "x", at: 0 };
 const comment = { author: "operator", created_at: 0, body: "ahoj" };
 

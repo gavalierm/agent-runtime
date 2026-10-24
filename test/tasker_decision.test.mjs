@@ -32,13 +32,13 @@ function setup() {
 
 const msgs = (box) => readdirSync(join(box, "inbox")).map((n) => readFileSync(join(box, "inbox", n), "utf8"));
 
-// Komentár človeka na needs_human zapíše Tasker ako comment a hneď status needs_human -> todo.
+// Komentár človeka na needs_human zapíše Tasker ako comment a hneď status needs_human -> handoff.
 function humanComment(db, id, author, body, at = 5) {
   db.prepare("INSERT INTO comments (task_id, author_kind, author, body, created_at) VALUES (?, 'human', ?, ?, ?)").run(id, author, body, at);
   const ev = db.prepare("INSERT INTO events (task_id, at, actor, kind, from_status, to_status) VALUES (?, ?, ?, ?, ?, ?)");
   ev.run(id, at, `human:${author}`, "comment", null, null);
-  ev.run(id, at, `human:${author}`, "status", "needs_human", "todo");
-  db.prepare("UPDATE tasks SET status = 'todo' WHERE id = ?").run(id);
+  ev.run(id, at, `human:${author}`, "status", "needs_human", "handoff");
+  db.prepare("UPDATE tasks SET status = 'handoff' WHERE id = ?").run(id);
 }
 
 test("most: komentár operator na needs_human dá Adamovi správu čakám so zapíš rozhodnutie", async () => {

@@ -21,7 +21,7 @@ function setup() {
     CREATE TABLE events (id INTEGER PRIMARY KEY, task_id INTEGER, run_id INTEGER, at INTEGER NOT NULL,
       actor TEXT NOT NULL, kind TEXT NOT NULL, from_status TEXT, to_status TEXT, detail TEXT, quiet INTEGER NOT NULL DEFAULT 0);
     INSERT INTO tasks VALUES (1, 'S témou', 'x', 'dev', 'projekt_b', NULL), (2, 'Bez témy', 'x', 'dev', 'inyprojekt', NULL), (3, 'Bez projektu', 'x', 'dev', NULL, NULL);
-    INSERT INTO events (task_id, at, actor, kind, to_status) VALUES (1, 1, 'tasker', 'status', 'todo');`);
+    INSERT INTO events (task_id, at, actor, kind, to_status) VALUES (1, 1, 'tasker', 'status', 'handoff');`);
   return { cfg, db, box };
 }
 

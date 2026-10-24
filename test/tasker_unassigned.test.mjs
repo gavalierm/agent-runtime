@@ -1,4 +1,4 @@
-// Most: úloha bez riešiteľa, ktorú Tasker sám presunul blocked -> todo, ide
+// Most: úloha bez riešiteľa, ktorú Tasker sám presunul blocked -> unassigned, ide
 // zakladateľovi, ak je to agent s mostom (chyba 23. 10. 2026, úloha 427).
 // Len DB a schránky v tmp, agents sa predáva explicitne, živá cesta sa nečíta.
 import { test } from "node:test";
@@ -41,8 +41,9 @@ function setup() {
 const msgs = (box) => readdirSync(join(box, "inbox")).map((n) => readFileSync(join(box, "inbox", n), "utf8"));
 
 function unblock(db, id, actor = "tasker") {
-  db.prepare("INSERT INTO events (task_id, at, actor, kind, from_status, to_status) VALUES (?, 5, ?, 'status', 'blocked', 'todo')").run(id, actor);
-  db.prepare("UPDATE tasks SET status = 'todo' WHERE id = ?").run(id);
+  const st = db.prepare("SELECT assignee FROM tasks WHERE id = ?").get(id).assignee ? "handoff" : "unassigned";
+  db.prepare("INSERT INTO events (task_id, at, actor, kind, from_status, to_status) VALUES (?, 5, ?, 'status', 'blocked', ?)").run(id, actor, st);
+  db.prepare("UPDATE tasks SET status = ? WHERE id = ?").run(st, id);
 }
 
 test("most: odblokovaná úloha bez riešiteľa dá zakladateľovi adam jednu správu nečakám, druhý beh nič", async () => {
@@ -90,7 +91,7 @@ test("most: zakladateľ boris dostane správu do svojej schránky, nie Adam", as
   assert.match(msgs(borisBox)[0], /^odpoveď: nečakám\nTasker: úloha #4, ktorú si založil, je odblokovaná/);
 });
 
-test("most: prechod blocked -> todo, ktorý neurobil tasker, správu nedá", async () => {
+test("most: prechod blocked -> unassigned, ktorý neurobil tasker, správu nedá", async () => {
   const { cfg, db, agents, box } = setup();
   await bridgeTick(cfg, agents);
   unblock(db, 1, "human:operator");

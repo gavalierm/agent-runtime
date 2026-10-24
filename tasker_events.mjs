@@ -27,16 +27,21 @@
 // (mená oddelené ":", agent vo vlákne T3 s enabled=0 v Taskeri) pošle
 // ako správu tasker-<čas>.md s riadkom `odpoveď: nečakám` (budí, výsledok
 // je stav úlohy) do /var/lib/<agent>/inbox. Spúšťa ju
-// založenie, pridelenie a návrat do todo (reopen, odblokovanie, koniec
+// založenie, pridelenie a návrat do handoff (reopen, odblokovanie, koniec
 // čakania waiting okrem tasker resume samotného agenta, nie koniec
-// ohlásenej práce in_progress -> todo), keď je
-// úloha v todo, a komentár iného autora, keď úloha nie je koncová. Správa
+// ohlásenej práce in_progress -> handoff), keď je
+// úloha v handoff, a komentár iného autora, keď úloha nie je koncová.
+// Stav todo v Taskeri zanikol (úloha 496): úloha vlákna T3 je v handoff.
+// Po úspešnom zápise správy mosta zapíše most do Taskera doručenie
+// (`tasker delivered`, evidencia odovzdania, D0168). Poistka: udalosť
+// handoff_stale (doctor, handoff bez tasker start po 10 minútach) pošle
+// riešiteľovi správu znova a ohlási ju zakladateľovi a vlastníkovi mosta. Správa
 // mosta dostane tému podľa projektu zo zoznamu tém schránky agenta. Agenta
 // s enabled=1 v tabuľke agents most preskočí (spúšťa ho dispečer).
 // Úlohu, ktorú nikto nezobudí, pošle most vlastníkovi (cfg.box): úloha
 // vypnutého agenta bez mosta a komentár človeka (nie vlastníka ani
 // riešiteľa) na koncovej úlohe alebo úlohe bez riešiteľa. Úloha bez riešiteľa,
-// ktorú Tasker sám presunul blocked -> todo (actor tasker, všetky blokéry
+// ktorú Tasker sám presunul blocked -> unassigned (actor tasker, všetky blokéry
 // hotové), ide jej zakladateľovi, ak je to agent s mostom (creator
 // human:<agent>, enabled nie 1), ako `nečakám`. Kurzor mosta je
 // $AGENT_STATE/tasker_bridge_last_id. Rozhodnutie v DECISIONS.md
@@ -44,6 +49,7 @@
 //
 // Použitie: tasker_events.mjs [--once]
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { config, ensureDir, log, writeInbox } from "./lib.mjs";
@@ -61,6 +67,16 @@ async function openDb(path) {
   const db = new DatabaseSync(path, { readOnly: true });
   db.exec("PRAGMA busy_timeout=5000");
   return db;
+}
+
+// Zapíše do Taskera, že správa o úlohe v handoff je v schránke riešiteľa (`tasker delivered`, úloha 496).
+// Chyba zápisu správu nezdrží (úloha zostane bez evidencie, doctor to ohlási). Bez `cfg.routeCmd` (testy) nič.
+export function recordDelivered(cfg, taskId, agent, via = "inbox") {
+  if (!cfg.routeCmd) return false;
+  try {
+    const r = spawnSync(cfg.routeCmd, ["delivered", String(taskId), "--to", String(agent), "--via", via], { env: { ...process.env, AGENT_NAME: cfg.name ?? "agent" }, timeout: 5000, stdio: "ignore" });
+    return r.status === 0;
+  } catch { return false; }
 }
 
 // Adresa webu Taskera (premenná TASKER_WEB_URL, napríklad cez Tailscale).
@@ -209,46 +225,46 @@ export function liveWork(db, taskId, now = Date.now()) {
   } catch { return false; }
 }
 
-// opts.liveWork: na úlohe beží ohlásená práca, prechod do todo nikoho nezobudí.
+// opts.liveWork: na úlohe beží ohlásená práca, prechod do handoff nikoho nezobudí.
 export function bridgeTrigger(ev, agent, opts = {}) {
   if (ev.assignee !== agent) return null;
   if (ev.kind === "comment") {
     if (ev.actor === `human:${agent}` || TERMINAL.has(ev.status)) return null;
     return "comment";
   }
-  if (ev.status !== "todo") return null;
+  if (ev.status !== "handoff") return null;
   // Úloha, ktorú agent založil alebo pridelil sám sebe, ho nebudí.
   if ((ev.kind === "created" || ev.kind === "assigned") && ev.actor === `human:${agent}`) return null;
   if (ev.kind === "created") return "created";
-  // Prechod do todo, ktorý spravil sám agent (jeho komentár vráti needs_human
-  // do todo), ho nebudí, a ani keď na úlohe už beží práca. Chyba 24. 10. 2026:
+  // Prechod do handoff, ktorý spravil sám agent (jeho komentár vráti needs_human
+  // do handoff), ho nebudí, a ani keď na úlohe už beží práca. Chyba 24. 10. 2026:
   // úloha 491 zobudila hlavné vlákno vlastným komentárom, hoci ju robil
   // sub-agent (úloha 492).
   // Koniec blokovania alebo čakania, ktorý urobil Tasker, budí vždy: práca
   // ohlásená pred blokovaním patrí relácii, ktorá už môže byť preč. Chyba
-  // 24. 10. 2026: úloha 491 po done blokéra 493 stála v todo, nikto nevedel.
+  // 24. 10. 2026: úloha 491 po done blokéra 493 stála v poradí bez riešiteľa, nikto nevedel.
   const unblocked = ev.actor === "tasker" && (ev.from_status === "blocked" || ev.from_status === "waiting");
-  if (ev.kind === "status" && ev.to_status === "todo" && (ev.actor === `human:${agent}` || (opts.liveWork && !unblocked))) return null;
+  if (ev.kind === "status" && ev.to_status === "handoff" && (ev.actor === `human:${agent}` || (opts.liveWork && !unblocked))) return null;
   if (ev.kind === "assigned" && ev.detail === agent) return "assigned";
-  if (ev.kind === "status" && ev.to_status === "todo") {
+  if (ev.kind === "status" && ev.to_status === "handoff") {
     // Koniec čakania, ktorý agent urobil sám (tasker resume), ho nebudí.
     if (ev.from_status === "waiting" && ev.actor === `human:${agent}`) return null;
-    // in_progress -> todo je koniec ohlásenej práce agenta (tasker work --stop,
+    // in_progress -> handoff je koniec ohlásenej práce agenta (tasker work --stop,
     // uplynutý čas), nie úloha na rade. Chyba 24. 10. 2026: úloha 476 prišla
     // ako "na rade" po vlastnom work_stop, doručená až po jej zavretí.
     if (ev.from_status === "in_progress") return null;
-    return "todo";
+    return "handoff";
   }
   return null;
 }
 
-// Úloha bez riešiteľa, ktorú Tasker sám presunul blocked -> todo (všetky
+// Úloha bez riešiteľa, ktorú Tasker sám presunul blocked -> unassigned (všetky
 // blokéry hotové): nikto ju nespustí, preto o nej vie zakladateľ. Zakladateľ
 // je agent s mostom (creator `human:<meno>`) a nie je spúšťaný dispečerom
 // (enabled=1). Chyba 23. 10. 2026: úloha 427 stála 52 minút.
 export function unassignedFounder(ev, agents, enabled = null) {
   if (ev.assignee || ev.kind !== "status" || ev.actor !== "tasker") return null;
-  if (ev.from_status !== "blocked" || ev.to_status !== "todo" || ev.status !== "todo") return null;
+  if (ev.from_status !== "blocked" || ev.to_status !== "unassigned" || ev.status !== "unassigned") return null;
   const agent = agents.find((a) => ev.creator === `human:${a.name}`);
   if (!agent || enabled?.get(agent.name) === 1) return null;
   return agent;
@@ -257,7 +273,7 @@ export function unassignedFounder(ev, agents, enabled = null) {
 export function renderUnassigned(task, agent, cfg) {
   const tasker = `AGENT_NAME=${agent.name} ${TK}`;
   return [
-    `Tasker: úloha #${task.id}, ktorú si založil, je odblokovaná a nemá riešiteľa (blocked -> todo).`,
+    `Tasker: úloha #${task.id}, ktorú si založil, je odblokovaná a nemá riešiteľa (blocked -> unassigned).`,
     taskLink(task.id),
     `Názov: ${task.title}`,
     `Stav: ${task.status}`,
@@ -272,8 +288,9 @@ export function renderUnassigned(task, agent, cfg) {
 }
 
 export function renderBridge(task, triggers, comment, cfg) {
-  const why = triggers.includes("comment") && triggers.length === 1
-    ? `nový komentár (${comment?.author ?? "?"})` : "úloha je v poradí";
+  const why = triggers.includes("stale") ? "odovzdanie si neprevzal (tasker start), posielam správu znova"
+    : triggers.includes("comment") && triggers.length === 1
+      ? `nový komentár (${comment?.author ?? "?"})` : "úloha je v poradí";
   const tasker = `AGENT_NAME=${task.assignee} ${TK}`;
   const lines = [
     `Tasker: úloha #${task.id} pre teba, ${why}.`,
@@ -295,14 +312,28 @@ export function renderBridge(task, triggers, comment, cfg) {
   return lines.join("\n");
 }
 
+// poistka: správa zakladateľovi úlohy a vlastníkovi mosta, že odovzdanie (handoff) riešiteľ do 10 minút neprevzal.
+export function renderStale(task, ev, role) {
+  return [
+    `Tasker: odovzdanie úlohy #${task.id} agentovi ${task.assignee} nikto neprevzal (${ev.detail ?? "bez detailu"}).`,
+    taskLink(task.id),
+    `Názov: ${task.title}`,
+    ...(task.project ? [`Projekt: ${task.project}`] : []),
+    `Komu: ${role}. Riešiteľovi som poslal správu znova.`,
+    "",
+    `Detail: tasker task show ${task.id} --json`,
+  ].join("\n");
+}
+
 // Operátor, ktorého komentár z webu Taskera nesie rozhodnutie (autor
 // komentára v Taskeri). Zoznam mien oddelených ":" v TASKER_OPERATORS.
 export function operatorActors(env = process.env) {
   return new Set((env.TASKER_OPERATORS || "operator").split(":").filter(Boolean).map((n) => `human:${n}`));
 }
 
-// Komentár operátora na úlohe v needs_human. Tasker ho dá sám do todo (SPEC 7.6),
-// udalosť príde ako dvojica comment a status needs_human -> todo toho istého aktéra.
+// Komentár operátora na úlohe v needs_human. Tasker ho dá sám do poradia (SPEC 7.6),
+// udalosť príde ako dvojica comment a status needs_human -> queued|scheduled|handoff|unassigned toho istého aktéra.
+export const READY_STATES = new Set(["queued", "scheduled", "handoff", "unassigned"]);
 export function renderDecision(task, comment, cfg) {
   const tasker = `AGENT_NAME=${cfg.name ?? "agent"} ${TK}`;
   const lines = [
@@ -371,7 +402,7 @@ export async function bridgeTick(cfg, agents = externalAgents()) {
       SELECT e.id, e.task_id, e.actor, e.kind, e.from_status, e.to_status, e.detail, t.assignee, t.status,
         (SELECT c.actor FROM events c WHERE c.task_id = e.task_id AND c.kind = 'created' ORDER BY c.id LIMIT 1) AS creator
       FROM events e JOIN tasks t ON t.id = e.task_id
-      WHERE e.id > ? AND e.id <= ? AND e.quiet = 0 AND e.kind IN ('created', 'assigned', 'status', 'comment')
+      WHERE e.id > ? AND e.id <= ? AND e.quiet = 0 AND e.kind IN ('created', 'assigned', 'status', 'comment', 'handoff_stale')
       ORDER BY e.id`).all(last, max);
     // Stav agentov v Taskeri (enabled): bez tabuľky agents (staré testy) sa
     // most správa ako doteraz.
@@ -386,11 +417,13 @@ export async function bridgeTick(cfg, agents = externalAgents()) {
     const opComment = new Map();
     const decisions = new Map();
     const unassigned = new Map();
+    const stale = new Map();
     for (const ev of rows) {
+      if (ev.kind === "handoff_stale") stale.set(ev.task_id, ev);
       const founder = unassignedFounder(ev, agents, enabled);
       if (founder) unassigned.set(ev.task_id, founder);
       if (ev.kind === "comment" && operators.has(ev.actor)) opComment.set(ev.task_id, ev.actor);
-      else if (ev.kind === "status" && ev.from_status === "needs_human" && ev.to_status === "todo"
+      else if (ev.kind === "status" && ev.from_status === "needs_human" && READY_STATES.has(ev.to_status)
         && opComment.get(ev.task_id) === ev.actor) decisions.set(ev.task_id, ev.actor);
       const agent = agents.find((a) => a.name === ev.assignee);
       if (agent) {
@@ -422,6 +455,27 @@ export async function bridgeTick(cfg, agents = externalAgents()) {
       const task = getTask.get(id);
       const comment = x.triggers.includes("comment") ? getComment.get(id) : null;
       names.push(`${x.agent.name}/${writeInbox(x.agent.box, "tasker", renderBridge(task, x.triggers, comment, cfg), topicFor({ ...cfg, box: x.agent.box, topicsFile: x.agent.box === cfg.box ? cfg.topicsFile : undefined }, task.project, id, db), "nečakám")}`);
+      // Evidencia odovzdania: správa je v schránke riešiteľa (jadro D0168). Len pre úlohu v handoff.
+      if (task.status === "handoff") recordDelivered(cfg, id, x.agent.name);
+    }
+    // poistka: handoff bez tasker start po 10 minútach (udalosť handoff_stale z doctora). Riešiteľovi pošlem správu
+    // znova, zakladateľovi a vlastníkovi mosta ohlásim zlyhanie odovzdania.
+    const creatorOf = db.prepare("SELECT actor FROM events WHERE task_id = ? AND kind = 'created' ORDER BY id LIMIT 1");
+    for (const [id, ev] of stale) {
+      const task = getTask.get(id);
+      if (!task || task.status !== "handoff") continue;
+      const assignee = agents.find((a) => a.name === task.assignee);
+      if (assignee && enabled?.get(assignee.name) !== 1 && !byTask.has(id)) {
+        names.push(`${assignee.name}/${writeInbox(assignee.box, "tasker", renderBridge(task, ["stale"], null, cfg), topicFor({ ...cfg, box: assignee.box, topicsFile: assignee.box === cfg.box ? cfg.topicsFile : undefined }, task.project, id, db), "nečakám")}`);
+        recordDelivered(cfg, id, assignee.name);
+      }
+      const founder = agents.find((a) => creatorOf.get(id)?.actor === `human:${a.name}`);
+      const told = new Set([task.assignee]);
+      if (founder && !told.has(founder.name)) {
+        told.add(founder.name);
+        names.push(`${founder.name}/${writeInbox(founder.box, "tasker", renderStale(task, ev, "zakladateľ"), topicFor({ ...cfg, box: founder.box, topicsFile: founder.box === cfg.box ? cfg.topicsFile : undefined }, task.project, id, db), "nečakám")}`);
+      }
+      if (!told.has(owner)) names.push(`${owner}/${writeInbox(cfg.box, "tasker", renderStale(task, ev, "vlastník mosta"), topicFor(cfg, task.project, id, db), "nečakám")}`);
     }
     const lastBy = db.prepare("SELECT author, body, created_at FROM comments WHERE task_id = ? AND author = ? ORDER BY id DESC LIMIT 1");
     for (const [id, x] of orphans) {

@@ -28,8 +28,8 @@ function taskerDb(path) {
     CREATE TABLE runs (id INTEGER PRIMARY KEY, task_id INTEGER, agent_summary TEXT);
     CREATE TABLE events (id INTEGER PRIMARY KEY, task_id INTEGER, run_id INTEGER, at INTEGER NOT NULL,
       actor TEXT NOT NULL, kind TEXT NOT NULL, from_status TEXT, to_status TEXT, detail TEXT, quiet INTEGER NOT NULL DEFAULT 0);
-    INSERT INTO tasks VALUES (1, 'Prvá', 'todo', 'dev', NULL), (2, 'Druhá', 'todo', 'dev', NULL);
-    INSERT INTO events (task_id, at, actor, kind, from_status, to_status) VALUES (1, 1, 'tasker', 'status', 'todo', 'needs_human');`);
+    INSERT INTO tasks VALUES (1, 'Prvá', 'handoff', 'dev', NULL), (2, 'Druhá', 'handoff', 'dev', NULL);
+    INSERT INTO events (task_id, at, actor, kind, from_status, to_status) VALUES (1, 1, 'tasker', 'status', 'handoff', 'needs_human');`);
   return db;
 }
 
@@ -40,12 +40,12 @@ test("tasker_events: prvý beh začne od konca, potom pošle len needs_human a f
   assert.match((await taskerTick(cfg)).reason, /začínam od udalosti 1/);
   assert.deepEqual(readdirSync(join(box, "inbox")), []);
   const ins = db.prepare("INSERT INTO events (task_id, at, actor, kind, from_status, to_status) VALUES (?, ?, ?, ?, ?, ?)");
-  ins.run(1, 2, "run:5", "status", "todo", "in_progress");
+  ins.run(1, 2, "run:5", "status", "handoff", "in_progress");
   ins.run(1, 3, "run:5", "status", "in_progress", "needs_human");
   ins.run(2, 4, "tasker", "comment", null, null);
   ins.run(2, 5, "tasker", "status", "in_progress", "failed");
-  ins.run(2, 6, "tasker", "status", "failed", "todo");
-  db.prepare("INSERT INTO events (task_id, at, actor, kind, from_status, to_status, quiet) VALUES (2, 7, 'human:operator', 'status', 'todo', 'failed', 1)").run();
+  ins.run(2, 6, "tasker", "status", "failed", "handoff");
+  db.prepare("INSERT INTO events (task_id, at, actor, kind, from_status, to_status, quiet) VALUES (2, 7, 'human:operator', 'status', 'handoff', 'failed', 1)").run();
   db.prepare("INSERT INTO runs (task_id, agent_summary) VALUES (1, 'Chýba heslo k API.')").run();
   const r = await taskerTick(cfg);
   assert.equal(r.written, 2);
@@ -61,8 +61,8 @@ test("tasker_events: prvý beh začne od konca, potom pošle len needs_human a f
   // Prechod do done ide na vedomie, len keď úlohu založil agent sám.
   db.prepare("INSERT INTO tasks VALUES (3, 'Moja', 'in_progress', 'boris', NULL), (4, 'Cudzia', 'in_progress', 'boris', NULL)").run();
   const ev = db.prepare("INSERT INTO events (task_id, at, actor, kind, from_status, to_status, detail) VALUES (?, ?, ?, ?, ?, ?, ?)");
-  ev.run(3, 7, "human:adam", "created", null, "todo", null);
-  ev.run(4, 8, "human:operator", "created", null, "todo", null);
+  ev.run(3, 7, "human:adam", "created", null, "handoff", null);
+  ev.run(4, 8, "human:operator", "created", null, "handoff", null);
   ev.run(3, 9, "human:boris", "status", "in_progress", "done", "Kľúč pridaný.");
   ev.run(4, 10, "human:boris", "status", "in_progress", "done", null);
   const r2 = await taskerTick(cfg);
@@ -91,17 +91,17 @@ test("tasker_events most: úloha agenta vo vlákne ide do jeho schránky raz, cu
   assert.match((await bridgeTick(cfg, agents)).reason, /most začína od udalosti 1/);
   const task = db.prepare("INSERT INTO tasks VALUES (?, ?, ?, ?, ?)");
   const ev = db.prepare("INSERT INTO events (task_id, at, actor, kind, to_status, detail) VALUES (?, 2, ?, ?, ?, ?)");
-  task.run(1, "Nový kľúč", "Pridaj deploy kľúč.", "todo", "boris");
-  ev.run(1, "human:adam", "created", "todo", null);
+  task.run(1, "Nový kľúč", "Pridaj deploy kľúč.", "handoff", "boris");
+  ev.run(1, "human:adam", "created", "handoff", null);
   ev.run(1, "human:adam", "assigned", null, "boris");
-  task.run(2, "Cudzia", "", "todo", "dev");
-  ev.run(2, "human:adam", "created", "todo", null);
+  task.run(2, "Cudzia", "", "handoff", "dev");
+  ev.run(2, "human:adam", "created", "handoff", null);
   task.run(3, "Čaká na blokér", "", "blocked", "boris");
   ev.run(3, "human:adam", "created", "blocked", null);
   task.run(4, "Hotová", "", "done", "boris");
   ev.run(4, "human:adam", "comment", null, null);
-  task.run(5, "Import", "", "todo", "boris");
-  db.prepare("INSERT INTO events (task_id, at, actor, kind, to_status, quiet) VALUES (5, 2, 'human:operator', 'created', 'todo', 1)").run();
+  task.run(5, "Import", "", "handoff", "boris");
+  db.prepare("INSERT INTO events (task_id, at, actor, kind, to_status, quiet) VALUES (5, 2, 'human:operator', 'created', 'handoff', 1)").run();
   let r = await bridgeTick(cfg, agents);
   assert.equal(r.written, 1);
   const [f] = readdirSync(join(borisBox, "inbox"));
@@ -119,8 +119,8 @@ test("tasker_events most: úloha agenta vo vlákne ide do jeho schránky raz, cu
   assert.equal((await bridgeTick(cfg, agents)).written, 0);
   db.prepare("INSERT INTO comments (task_id, author_kind, author, body, created_at) VALUES (1, 'human', 'adam', 'Aj druhý server.', 4)").run();
   ev.run(1, "human:adam", "comment", null, null);
-  db.prepare("UPDATE tasks SET status = 'todo' WHERE id = 3").run();
-  ev.run(3, "tasker", "status", "todo", null);
+  db.prepare("UPDATE tasks SET status = 'handoff' WHERE id = 3").run();
+  ev.run(3, "tasker", "status", "handoff", null);
   r = await bridgeTick(cfg, agents);
   assert.equal(r.written, 2);
   const all = readdirSync(join(borisBox, "inbox")).map((n) => readFileSync(join(borisBox, "inbox", n), "utf8")).join("\n");
