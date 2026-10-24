@@ -1,0 +1,14 @@
+# Prechody úloh Taskera do needs_human a failed do schránky agenta (tu príklad
+# adam). Systémová služba pod rootom ako agent-driver@<agent>.service, README.md.
+[Unit]
+Description=Agent, udalosti Taskera do schranky
+
+[Service]
+Environment=AGENT_NAME=adam
+EnvironmentFile=-%h/.config/adam/runtime.env
+ExecStart=/usr/bin/env node %h/agent-runtime/tasker_events.mjs
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

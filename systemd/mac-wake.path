@@ -1,0 +1,10 @@
+# Sleduje schránku agenta na Macu (tu príklad cyril) na serveri. Inštaluje
+# správca agentov do /etc/systemd/system/ spolu s mac-wake.service (README.md).
+[Unit]
+Description=Schránka agenta na Macu, budenie Macu
+
+[Path]
+PathChanged=/var/lib/cyril/inbox
+
+[Install]
+WantedBy=paths.target

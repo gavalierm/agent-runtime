@@ -1,0 +1,10 @@
+# Ranný súhrn Taskera do schránky agenta (tu príklad adam). Spúšťa ho
+# agent-morning.timer. Meno agenta nesie AGENT_NAME.
+[Unit]
+Description=Agent, ranny suhrn do schranky
+
+[Service]
+Type=oneshot
+Environment=AGENT_NAME=adam
+EnvironmentFile=-%h/.config/adam/runtime.env
+ExecStart=/usr/bin/env node %h/agent-runtime/morning.mjs

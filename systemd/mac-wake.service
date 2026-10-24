@@ -1,0 +1,8 @@
+# Pri správe "odpoveď: čakám" zavolá webhook T3 na Macu ako agent cyril.
+[Unit]
+Description=Zobudenie agenta na Macu webhookom T3
+
+[Service]
+Type=oneshot
+Environment=MAC_WAKE_AGENT=cyril
+ExecStart=%h/agent-runtime/mac_wake.sh

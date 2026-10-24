@@ -1,0 +1,11 @@
+# Každý deň o 7:00 bratislavského času spustí agent-morning.service.
+# Persistent dobehne súhrn, ktorý zmeškal vypnutý stroj.
+[Unit]
+Description=Agent, ranny suhrn o 7:00
+
+[Timer]
+OnCalendar=*-*-* 07:00:00 Europe/Bratislava
+Persistent=true
+
+[Install]
+WantedBy=timers.target
