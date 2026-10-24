@@ -1,0 +1,5 @@
+#!/bin/bash
+# Pred commitom prejde všetky súbory repa na mená a adresy (lib/public_check.mjs).
+# Zapnutie: git config core.hooksPath .githooks
+cd "$(git rev-parse --show-toplevel)" || exit 1
+node lib/public_check.mjs || exit 1
