@@ -1,0 +1,13 @@
+#!/bin/bash
+# Hook pre-commit repa agenta. Zapína ho v klone
+#   git config core.hooksPath .githooks
+# Zábrana proti konfliktu main s otvorenou vetvou (lib/open_branch_guard.sh
+# repa agent-rules). Skript je v nasadenom klone pravidiel, bez neho hook
+# len varuje.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+guard=/opt/agent-rules/lib/open_branch_guard.sh
+if [ -f "$guard" ]; then
+    bash "$guard" || exit 1
+else
+    echo "Varovanie: chýba $guard, kontrola otvorených vetiev preskočená." >&2
+fi
