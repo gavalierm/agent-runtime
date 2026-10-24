@@ -133,6 +133,14 @@ vlastná schránka a priečinky z `AGENT_REPLY_ROUTE_<meno>`
 vedomie)`. Na správu `na vedomie` sa neodpovedá, potvrdenie "prevzaté"
 sa neposiela, práca z nej je nový pokyn `ask_agent.sh`.
 
+Správa Taskera ("Tasker: úloha #N"), na ktorej úlohe agent po zápise správy
+sám zapísal nečinnú (`quiet 0`) udalosť svojho aktéra `human:<agent>`
+(budič číta `events` v `taskerDb` len na čítanie), nebudí a ide na vedomie
+s najbližšou budiacou dávkou do toho istého vlákna. Chýbajúca alebo
+nečitateľná databáza správanie nemení, správa budí. Chyba 24. 10. 2026,
+úloha 499: agent komentár operátora prečítal sám a budič ho o minútu zobudil
+tou istou správou.
+
 Dávka s budiacou správou odíde až po tichom okne `AGENT_BATCH_WAIT_S`
 (30 s) od poslednej budiacej správy, najviac `AGENT_BATCH_MAX_WAIT_S`
 (120 s) od prvej, správy tesne za sebou tak idú jedným ťahom. `0` okno

@@ -27,6 +27,8 @@
 //    odpoveď k jej kľúču čaká (route.mjs sent, inak riadok `k správe:`),
 //    inak ostáva v inboxe a ide pod nadpisom "Na vedomie" s najbližšou
 //    dávkou do toho istého vlákna, nikdy sama.
+//    Správa Taskera, na ktorej úlohe agent po jej zápise sám zapísal nečinnú
+//    (quiet 0) udalosť, nebudí a ide na vedomie (chyba 24. 10. 2026, úloha 499).
 //    Dávka odíde až po tichom okne AGENT_BATCH_WAIT_S od poslednej
 //    budiacej správy, najviac AGENT_BATCH_MAX_WAIT_S od prvej.
 //    Správa s trasou (route.mjs, odpoveď na správu z vlákna témy) ide do
@@ -50,7 +52,7 @@
 // to isté commandId by zlyhalo navždy). Chyba spojenia číslo nemení.
 //
 // Použitie: driver.mjs [--once]
-import { readFileSync, renameSync, rmSync, existsSync } from "node:fs";
+import { readFileSync, renameSync, rmSync, existsSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -139,14 +141,57 @@ export function renderBatch(box, names, replyCmd, notes = {}, held = []) {
   return parts.join("\n\n");
 }
 
+// Databáza Taskera len na čítanie, synchrónne. ExperimentalWarning modulu
+// node:sqlite v Node 22 tu nič nenesie.
+function openTaskerDb(path) {
+  const emit = process.emitWarning;
+  process.emitWarning = (w, ...a) => (String(w).includes("SQLite") ? undefined : emit.call(process, w, ...a));
+  try {
+    const { DatabaseSync } = process.getBuiltinModule("node:sqlite");
+    const db = new DatabaseSync(path, { readOnly: true });
+    db.exec("PRAGMA busy_timeout=500");
+    return db;
+  } finally { process.emitWarning = emit; }
+}
+
+// Napísal agent na úlohe po čase `since` (ms) nečinnú (quiet 0) udalosť? Databázu
+// otvorí najviac raz na priechod (`cache`). Chýbajúca alebo nečitateľná
+// databáza, meno agenta či cesta k nej: nie, správa budí ako doteraz.
+function agentHandled(cfg, taskId, since, cache) {
+  if (!cfg.name || !cfg.taskerDb) return false;
+  try {
+    if (cache.db === undefined) cache.db = existsSync(cfg.taskerDb) ? openTaskerDb(cfg.taskerDb) : null;
+    if (!cache.db) return false;
+    return !!cache.db.prepare("SELECT 1 FROM events WHERE task_id = ? AND actor = ? AND quiet = 0 AND at > ? LIMIT 1").get(taskId, `human:${cfg.name}`, since);
+  } catch {
+    closeTaskerDb(cache);
+    cache.db = null;
+    return false;
+  }
+}
+
+function closeTaskerDb(cache) {
+  try { cache.db?.close(); } catch {}
+}
+
 // Budí správa čakám, nečakám a správa bez riadku. Správa na vedomie budí
 // len ako odpoveď (`k:` v hlavičke) na správu, na ktorú agent čaká
 // (route.mjs sent), inak podľa riadku `k správe: čakám`, inak sa drží.
-export function classify(cfg, name) {
-  const { mode, original, meta } = parseHeader(readFileSync(join(cfg.box, "inbox", name), "utf8"));
-  if (mode !== "na vedomie") return { wake: true, mode };
-  const w = waitingFor(cfg, name, Date.now(), meta?.k || null);
-  return { wake: w === null ? original === "čakám" : w, mode };
+// Správa Taskera, na ktorej úlohe agent po jej zápise sám zapísal nečinnú
+// udalosť, nebudí a ide na vedomie (úloha 499).
+export function classify(cfg, name, cache = {}) {
+  const file = join(cfg.box, "inbox", name);
+  const { mode, original, meta, body } = parseHeader(readFileSync(file, "utf8"));
+  let wake = true;
+  if (mode === "na vedomie") {
+    const w = waitingFor(cfg, name, Date.now(), meta?.k || null);
+    wake = w === null ? original === "čakám" : w;
+  }
+  if (wake) {
+    const taskId = taskerTaskId(name, body);
+    if (taskId && agentHandled(cfg, taskId, statSync(file).mtimeMs, cache)) wake = false;
+  }
+  return { wake, mode };
 }
 
 export async function tick(cfgIn, client, { now = Date.now() } = {}) {
@@ -271,15 +316,17 @@ export async function tick(cfgIn, client, { now = Date.now() } = {}) {
     // Správy podľa vlákna a podľa toho, či budia. Držané patria vláknu
     // z trasy, strop držania platí na vlákno.
     const groups = new Map();
+    const dbCache = {};
     for (const e of entries) {
       const { threadId: tid, thread: t, note, via } = await target(e.name);
       if (blocked && tid === (blocked.inflight.threadId ?? threadId)) continue;
       const g = groups.get(tid) ?? { threadId: tid, thread: t, wake: [], held: [], notes: {}, via: {} };
-      (classify(cfg, e.name).wake ? g.wake : g.held).push(e);
+      (classify(cfg, e.name, dbCache).wake ? g.wake : g.held).push(e);
       if (note) g.notes[e.name] = note;
       if (via) g.via[e.name] = via;
       groups.set(tid, g);
     }
+    closeTaskerDb(dbCache);
     const reasons = [];
     let heldTotal = 0;
     let chosen = null;
