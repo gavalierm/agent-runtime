@@ -31,6 +31,8 @@ Operátor píše do vlákna priamo z T3 desktopu alebo mobilu.
 | `systemd/` | šablóna budiča `agent-driver@.service`, jednotky udalostí Taskera a ranného súhrnu, `tmpfiles.d` schránky a drop-in `t3code.service` |
 | `test/` | `node --test 'test/*.test.mjs'`, falošný T3 server bez závislostí |
 | `lib/public_check.mjs` | kontrola mien a adries pred commitom a pushom (`.githooks/pre-push`) |
+| `hooks/` | hooky relácie claude (časť Hooky relácie): `identity`, `no_operator_commands`, `objection_fix`, `own_rule_scope`, `reply_guard`, `rules_delta`, `tasker_work`, `todo_after_comment`, `idle_wake`, `topic_task`, testy v `test/<hook>.test.mjs` |
+| `lib/agent_env.mjs`, `lib/agent_name.mjs`, `lib/deny.mjs`, `lib/tasker_read.mjs` | knižnice hookov: hodnoty z `runtime.env` agenta, meno agenta, zamietnutie s riadkom "Správny postup:" (D0141), čítanie úloh Taskera |
 
 Node 22.13 alebo novší, bez npm závislostí.
 
@@ -503,6 +505,40 @@ rootom v `/etc/systemd/system/`, všetci agenti zdieľajú jeden T3 server
   cez `AGENT_REPLY_ROUTE_boris` v svojom `runtime.env`.
 - Ďalší agenti sa zriaďujú skriptom `agent_vlakno.sh` (nižšie).
 
+## Hooky relácie
+
+Hooky bežia v procese `claude` agenta, nie v budiči, preto `runtime.env` nie
+je načítaný. Hook si ho prečíta sám (`hookEnv` v `lib/agent_env.mjs`):
+`AGENT_RUNTIME_ENV` (cesta k súboru), inak `~/.config/<agent>/runtime.env`,
+agent je `TASKER_USER`, `AGENT_NAME`, inak nadpis `# Meno` z `PERSONA.md`
+v `CLAUDE_PROJECT_DIR` alebo `cwd`. Premenná procesu má prednosť pred
+súborom, prázdna ho neprekryje. Bez súboru dostane hook predvolené hodnoty,
+mená ani adresy v kóde nie sú. Správanie hookov nezávisí od mena operátora:
+text pre model ho berie z `AGENT_OPERATOR_NAME` (bez neho slovo "operátor").
+
+| hook | udalosť | čo robí |
+|---|---|---|
+| `identity.mjs` | SessionStart | ohlási identitu z `PERSONA.md` a vloží pravidlá rolí z `roles/<slug>.md` klonu repa pravidiel |
+| `rules_delta.mjs` | UserPromptSubmit | vloží zmenu `global/` a `env/<prostredie>/` klonu repa pravidiel od posledného videného HEAD (s `AR_ROZHODNUTIA=1` aj `rozhodnutia/`) |
+| `tasker_work.mjs` | UserPromptSubmit, PreToolUse (Agent, zapisujúce nástroje), SubagentStop | ohlási prácu na úlohe Taskera (`tk work N`), prevezme úlohu v poradí, zámok úlohy držanej inou reláciou |
+| `own_rule_scope.mjs` | PreToolUse (Write, Edit, MultiEdit) | prvý zápis nového textu do `CLAUDE.md` alebo `PERSONA.md` repa agenta sa zamietne s otázkou, či to nepatrí do repa pravidiel |
+| `reply_guard.mjs` | Stop | odpoveď operátorovi: strop viet a slov, meno na prvom riadku, mŕtvy alebo lokálny odkaz, zmienka úlohy Taskera bez odkazu, s `AR_ROZHODNUTIA=1` aj "Čaká na teba" a nezapísané rozhodnutie |
+| `no_operator_commands.mjs` | Stop | odpoveď bez príkazu shellu pre operátora a bez položky "Čaká na teba", ktorú urobí agent |
+| `objection_fix.mjs` | Stop | uznaná chyba alebo námietka sa nezaobíde bez `chyba.sh` a commitu súboru, ktorý agenta riadi |
+| `todo_after_comment.mjs` | Stop | úloha agenta s jeho komentárom nesmie ostať v poradí |
+| `idle_wake.mjs`, `topic_task.mjs` | Stop, PostToolUse | zbytočné zobudenie a úloha vo vlákne témy (časti vyššie) |
+
+Zapojenie: `node <runtime>/hooks/<hook>.mjs` v `settings.json` používateľa
+(udalosť podľa tabuľky, `matcher` `^(Write|Edit|MultiEdit)$` pre
+`own_rule_scope`, `^(Agent|Task)$` a zapisujúce nástroje pre `tasker_work`).
+Server zapája hooky skriptom `env/server/install.sh` repa pravidiel, Mac
+nasadením `env/mac/settings.json` toho istého repa s klonom tohto repa
+v `~/Work/agent-runtime`. Hooky vedia o repe pravidiel len cez klon
+(`AGENT_RULES_REPO`, predvolene `/opt/agent-rules`, na Macu
+`~/Work/agent-rules`) a obal `tk` (`AGENT_TK`, inak `bin/tk` v tom klone).
+Testy hookov sú `test/<hook>.test.mjs`, `test/agent_env.test.mjs`
+a `test/deny.test.mjs`, všetky bežia s `HOME` v tmp a bez živého Taskera.
+
 ## Premenné prostredia
 
 Premenné čítajú služby z `EnvironmentFile` (`runtime.env`) a skripty z
@@ -529,14 +565,19 @@ prostredia. `reply.sh` si `runtime.env` agenta načíta sám.
 | `AGENT_SWEEP_BOXES` | vlastná schránka a priečinky z `AGENT_REPLY_ROUTE_*` | schránky pre ranný súhrn |
 | `AGENT_WORK_REPOS` | /root/tasker, agent-rules, agent-runtime a a klony agentov s PERSONA.md pod domovským priečinkom (čiarka) | repá, z ktorých ranný súhrn počíta commity za 24 h |
 | `AGENT_ROUTE_CMD` | `/opt/agent-rules/bin/tk` | zápis trasy do Taskera, prázdne vypne |
-| `AGENT_RULES_REPO` | `/opt/agent-rules` | klon repa pravidiel pre ranný súhrn |
+| `AGENT_RULES_REPO` | `/opt/agent-rules` (Mac `~/Work/agent-rules`) | klon repa pravidiel pre ranný súhrn a hooky (`identity`, `rules_delta`, `tasker_work`, `todo_after_comment`); `AR_CLONE` ho prekryje (skúšky) |
+| `AGENT_TK` | `$AGENT_RULES_REPO/bin/tk` | obal `tasker` pre `tasker_work.mjs` |
+| `AGENT_OPERATOR_NAME` | `operátor` | meno operátora v textoch hookov pre model, tvary s príponami `-ovi` a `-a` ("Oskarovi", "Oskara") |
+| `AGENT_RUNTIME_ENV` | `~/.config/<agent>/runtime.env` | súbor, z ktorého hooky čítajú premenné, keď ich proces `claude` nemá |
+| `AR_ROZHODNUTIA` | prázdne | `1` zapne v `reply_guard.mjs` kontrolu "Čaká na teba" a nezapísaného rozhodnutia a v `rules_delta.mjs` sledovanie `rozhodnutia/` |
+| `AR_STATE`, `AR_ENV`, `REPLY_GUARD_NO_NET` | stav v `~/.local/state/agent-rules`, `server` alebo `mac`, prázdne | skúšky a stroje bez siete: priečinok stavu hookov, názov prostredia v `rules_delta.mjs`, `1` vypne kontrolu odkazov v `reply_guard.mjs` |
 | `AGENT_BATCH_WAIT_S`, `AGENT_BATCH_MAX_WAIT_S` | 30, 120 | tiché okno dávky |
 | `AGENT_HELD_WARM_S` | 600 | držaná správa na vedomie odíde sama, keď posledný beh vlákna skončil najviac toľko sekúnd dozadu |
 | `AGENT_HELD_MAX_S` | 43200 | držaná správa na vedomie odíde sama, keď čaká dlhšie (menej než 24 h poistky `morning.mjs`) |
 | `T3_URL` | `http://127.0.0.1:3773` | adresa T3 servera, napríklad `https://host.example.ts.net:8802`; vlákna založené cez MCP ju nededia, patrí do `runtime.env` |
 | `T3_TOKEN_FILE` | `~/.config/<meno>/t3_token` | token T3 (600) |
 | `TASKER_HOME`, `TASKER_DB`, `TASKER_BIN` | `~/.tasker`, `$TASKER_HOME/tasker.db`, `/opt/tasker/bin/tasker` | Tasker |
-| `TASKER_WEB_URL` | `http://127.0.0.1:8801` | adresa webu Taskera v odkazoch správ, napríklad `https://host.example.ts.net:8801` |
+| `TASKER_WEB_URL` | `http://127.0.0.1:8801` | adresa webu Taskera v odkazoch správ a v hookoch (`reply_guard`, `tasker_read`), napríklad `https://host.example.ts.net:8801` |
 | `TASKER_SELF` | `AGENT_NAME` | vlastník mostu z Taskera |
 | `TASKER_EXTERNAL_AGENTS` | prázdne | agenti s vláknom T3 (cez dvojbodku), ktorým most posiela úlohy |
 | `TASKER_OPERATORS` | `operator` | mená ľudí (cez dvojbodku), ktorých komentár nesie rozhodnutie |
@@ -547,7 +588,7 @@ prostredia. `reply.sh` si `runtime.env` agenta načíta sám.
 | `AGENT_GH_MACHINE` | (povinné) | strojový účet GitHubu s kľúčmi `/root/.ssh/<účet>_<meno>` |
 | `AGENT_GH_EMAIL` | (povinné) | e-mail autora commitov (noreply účtu) |
 | `AGENT_HOST` | (povinné) | označenie stroja v autorovi commitov, `<Meno> (<stroj>)` |
-| `AGENT_TASKER_USER` | (povinné) | používateľ, pod ktorým bežia behy úloh a prehliadač |
+| `AGENT_TASKER_USER` | (povinné) | používateľ, pod ktorým bežia behy úloh a prehliadač; hooky: `own_rule_scope.mjs` kontroluje `/home/<používateľ>/agenti/<agent>/`, `tasker_read.mjs` hľadá DB v `/home/<používateľ>/.tasker/tasker.db`, keď nie je `TASKER_DB` ani `TASKER_HOME` |
 | `AGENT_INBOX_GROUP` | `agent-inbox` | skupina schránok v `tmpfiles.d` |
 | `AGENT_BROWSER_USER`, `AGENT_BROWSER_INST` | `AGENT_TASKER_USER`, `~/.cache/agent-browser` | prehliadač |
 | `GH_CLIENT_ID` | (povinné pre `github_device_login.sh`) | client id aplikácie OAuth |
