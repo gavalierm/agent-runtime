@@ -15,6 +15,8 @@
 // 3. Dozor: keď beh skončil pádom, po odstupe pošle do vlákna pokyn
 //    pokračovať, najviac AGENT_WAKE_MAX za AGENT_WAKE_WINDOW_S, potom
 //    výstraha. Limit predplatného nie je pád, budič čaká na reset.
+//    poistka: zobudenie po páde a prerušenie stojaceho behu (stalledStep),
+//    zlyhanie jadra je mimo našich repov (supervise.mjs).
 // 4. Po riadnom behu, ktorého odpoveď končí riadkom HOTOVO-KONTEXT
 //    [spanok|pokracuj <kľúč>], začne čistý kontext.
 // 5. Schránka: keď vo vlákne nebeží beh, nečaká schválenie ani limit,

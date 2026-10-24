@@ -86,6 +86,9 @@ export function lastAgentText(detail, runId) {
 // a beh stál 52 minút, správy budiča čakali v rade. Položka running
 // (príkaz, sub-agent) beh drží nažive, čaká sa aj na schválenie a na vlákno.
 // Vráti { runId, idleMs } alebo null.
+// poistka: beh, ktorý Claude Code alebo T3 nechal otvorený bez ťahu. Jadro je
+// Claude Code (na notifikáciu vydá ťah) a T3 (beh ukončí), oboje mimo našich
+// repov, úloha sa preto nezakladá.
 export function stalledRun(t, detail, now, thresholdMs) {
   const runId = t?.activeRunId;
   if (!runId || t.pendingRuntimeRequest || t.blockedOnThreadWait) return null;
@@ -208,6 +211,8 @@ export async function superviseStep(cfg, client, threadId, t, now) {
     const reset = t.usageLimitResetAt ? Date.parse(t.usageLimitResetAt) : NaN;
     if (!(reset <= now)) return { block: `limit predplatného do ${t.usageLimitResetAt ?? "neznámo"}` };
     if (s.judgedRunId === runId) return null;
+    // poistka: T3 po resete limitu nepokračoval sám. Jadro je
+    // UsageLimitRecoveryWorker v T3, mimo našich repov.
     // T3 vie po resete pokračovať sám (UsageLimitRecoveryWorker), dáme mu čas.
     if (now < reset + cfg.limitGraceMs) return { block: "limit skončil, čakám, či T3 pokračuje sám" };
     await dispatchText(client, threadId, "limit", [runId], LIMIT_TEXT);
@@ -216,6 +221,9 @@ export async function superviseStep(cfg, client, threadId, t, now) {
     return { action: "limit", runId };
   }
 
+  // poistka: opakované zobudenie po páde behu (chyba poskytovateľa, zabitý
+  // proces claude, reštart T3). Jadro je beh, ktorý dobehne riadne, padá
+  // mimo našich repov (API, T3), úloha sa preto nezakladá.
   let crash = kind === "crash";
   if (kind === "interrupted" && cfg.wakeOnInterrupt && s.judgedRunId !== runId) {
     crash = !interruptRequested(await client.threadDetail(threadId), runId);
@@ -319,6 +327,8 @@ export async function rotationStep(cfg, client, threadId, t, now) {
       }
     } catch (e) {
       if (!e.rejected) throw e;
+      // poistka: T3 odmietol /clear, čistý kontext ide náhradným novým vláknom.
+      // Jadro je /clear v T3, mimo našich repov.
       alert(cfg, `vlákno ${threadId}: T3 odmietol /clear (${e.message.slice(0, 200)}), čistý kontext robím novým vláknom.`);
       rot.phase = "launch";
       rot.launchCommandId = stableId("agent-rotate", rot.oldThreadId, rot.fromRunId);

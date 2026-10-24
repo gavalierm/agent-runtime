@@ -12,6 +12,9 @@
 // Správa `odpoveď="na vedomie"` (hlásenie, nepíše sa na ňu) sa nepočíta.
 // Pri akejkoľvek chybe kód 0 bez výstupu, hook nikdy neblokuje.
 //
+// poistka: zobudenie bez práce. Jadro je odosielateľ a budič, ktoré budia len
+// správou, z ktorej plynie práca (úloha 519).
+//
 // Prostredie: AGENT_NAME (inak "# Meno" z PERSONA.md v cwd), IDLE_WAKE_STATE
 // (predvolene ~/.local/state/idle_wake), IDLE_WAKE_TK (test, nahradí
 // /opt/agent-rules/bin/tk).
