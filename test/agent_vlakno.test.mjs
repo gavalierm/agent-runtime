@@ -32,7 +32,7 @@ function setup() {
   writeFileSync(log, "");
   mkdirSync(join(R, "root/.config/adam"), { recursive: true });
   writeFileSync(join(R, "root/.config/adam/github_agent_token"), GH_TOKEN + "\n", { mode: 0o600 });
-  writeFileSync(join(R, "root/.config/adam/runtime.env"), "AGENT_REPLY_ROUTE_boris=/var/lib/boris/inbox\n", { mode: 0o600 });
+  writeFileSync(join(R, "root/.config/adam/runtime.env"), "AGENT_REPLY_ROUTE_boris=/var/lib/boris/inbox\nAGENT_OPERATOR_NAME=Oskar\nTASKER_WEB_URL=https://host.example.ts.net:8801\n", { mode: 0o600 });
   mkdirSync(join(R, "root/.ssh"), { recursive: true });
   mkdirSync(join(R, "etc/systemd/system"), { recursive: true });
   writeFileSync(join(R, "etc/systemd/system/agent-driver@.service"), "[Service]\n");
@@ -137,6 +137,9 @@ test("prvý beh zriadi všetko, druhý nič nezmení", () => {
     "AGENT_REPLY_ROUTE_adam=/var/lib/adam/inbox",
     "AGENT_RUNTIME_MODE=full-access",
     `TASKER_HOME=${join("/home", "tasker-svc", ".tasker")}`,
+    "AGENT_TASKER_USER=tasker-svc",
+    "AGENT_OPERATOR_NAME=Oskar",
+    "TASKER_WEB_URL=https://host.example.ts.net:8801",
     "",
   ].join("\n"));
   assert.equal(mode(join(R, `root/.config/${NAME}/t3_token`)), "600");

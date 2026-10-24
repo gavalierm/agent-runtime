@@ -188,8 +188,14 @@ AGENT_REPLY_CMD="AGENT_NAME=$name $RUNTIME_DIR/reply.sh"
 AGENT_REPLY_ROUTE_$MANAGER=/var/lib/$MANAGER/inbox
 AGENT_RUNTIME_MODE=full-access
 TASKER_HOME=$TASKER_HOME
+AGENT_TASKER_USER=$TASKER_USER
 EOF
   )
+  # Hodnoty pre hooky relácie (hooks/, README časť Hooky relácie): meno operátora
+  # a adresa webu Taskera sú spoločné, vezmú sa zo správcu, ak ich má.
+  for k in AGENT_OPERATOR_NAME TASKER_WEB_URL; do
+    grep "^$k=" "$MGR_CFG/runtime.env" >> "$CFG/runtime.env" 2>/dev/null || true
+  done
   chmod 600 "$CFG/runtime.env"; did "$CFG/runtime.env"
 fi
 

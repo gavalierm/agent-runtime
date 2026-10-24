@@ -536,7 +536,7 @@ nasadením `env/mac/settings.json` toho istého repa s klonom tohto repa
 v `~/Work/agent-runtime`. Hooky vedia o repe pravidiel len cez klon
 (`AGENT_RULES_REPO`, predvolene `/opt/agent-rules`, na Macu
 `~/Work/agent-rules`) a obal `tk` (`AGENT_TK`, inak `bin/tk` v tom klone).
-Testy hookov sú `test/<hook>.test.mjs`, `test/agent_env.test.mjs`
+`agent_vlakno.sh` zapíše novému agentovi `AGENT_TASKER_USER` a skopíruje `AGENT_OPERATOR_NAME` a `TASKER_WEB_URL` z `runtime.env` správcu. Testy hookov sú `test/<hook>.test.mjs`, `test/agent_env.test.mjs`
 a `test/deny.test.mjs`, všetky bežia s `HOME` v tmp a bez živého Taskera.
 
 ## Premenné prostredia
