@@ -4,11 +4,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, chmodSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, chmodSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { taskNumber, taskNumbers } from "../hooks/tasker_work.mjs";
+import { taskNumber, taskNumbers, sameSession } from "../hooks/tasker_work.mjs";
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), "../hooks/tasker_work.mjs");
 
@@ -378,4 +378,54 @@ test("zámok pri prevzatí: work relácie A živý, schránka s úlohou N v B, p
   run(sb2, a(prompt(inboxMsg("úloha #505 pre teba"))));
   assert.equal(runRaw(sb2, a(bash())), null);
   assert.deepEqual(sb2.calls(), ["adam start 505", "adam work 505 --thread de9b0663"]);
+});
+
+// Replay úlohy 595 (25. 10. 2026): po /clear dostala relácia nové session_id a transcript
+// jedného id je symlink na druhý. Relácia toho istého vlákna nie je cudzí držiteľ.
+function symlinkTask595(sb, holder) {
+  writeFileSync(join(sb.dir, "task-595.json"), JSON.stringify({ id: 595, status: "in_progress", assignee: "adam", events: [ev(1, "work", `start until ${FAR} thread ${holder}`, "adam")] }));
+  const proj = join(sb.dir, "proj");
+  mkdirSync(proj, { recursive: true });
+  writeFileSync(join(proj, "c7ab4d1f.jsonl"), "");
+  symlinkSync("c7ab4d1f.jsonl", join(proj, "d278bc54.jsonl"));
+  return { ...pre("úloha 595", "tu1"), session_id: "c7ab4d1f", transcript_path: join(proj, "c7ab4d1f.jsonl") };
+}
+
+test("zámok: relácia toho istého vlákna po /clear (symlink transcriptu) úlohu neblokuje (replay úlohy 595)", () => {
+  const sb = sandbox();
+  const input = symlinkTask595(sb, "d278bc54");
+  assert.equal(runRaw(sb, input), null);
+  assert.deepEqual(sb.calls(), ["adam work 595 --thread c7ab4d1f"]);
+});
+
+test("zámok: držiteľ bez symlinku na transcript tejto relácie ostáva cudzí", () => {
+  const sb = sandbox();
+  const input = symlinkTask595(sb, "zzzz");
+  assert.equal(runRaw(sb, input).permissionDecision, "deny");
+  assert.deepEqual(sb.calls(), []);
+});
+
+test("zámok pri prevzatí: držiteľ s transcriptom prepojeným symlinkom nie je cudzí", () => {
+  const sb = sandbox();
+  const input = symlinkTask595(sb, "d278bc54");
+  const b = (x) => ({ ...x, session_id: "c7ab4d1f", transcript_path: input.transcript_path });
+  run(sb, b(prompt("úloha 595")));
+  assert.equal(runRaw(sb, b(bash())), null);
+  assert.deepEqual(sb.calls(), ["adam work 595 --thread c7ab4d1f"]);
+});
+
+test("sameSession: rovnaké id, symlink v oboch smeroch, chýbajúci súbor", () => {
+  const dir = mkdtempSync(join(tmpdir(), "same-"));
+  writeFileSync(join(dir, "c7ab4d1f.jsonl"), "");
+  symlinkSync("c7ab4d1f.jsonl", join(dir, "d278bc54.jsonl"));
+  writeFileSync(join(dir, "0241cda7.jsonl"), "");
+  symlinkSync("0241cda7.jsonl", join(dir, "9d9daf59.jsonl"));
+  assert.equal(sameSession("x", "x", dir), true);
+  assert.equal(sameSession("d278bc54", "c7ab4d1f", dir), true);
+  assert.equal(sameSession("c7ab4d1f", "d278bc54", dir), true);
+  assert.equal(sameSession("9d9daf59", "0241cda7", dir), true);
+  assert.equal(sameSession("0241cda7", "9d9daf59", dir), true);
+  assert.equal(sameSession("c7ab4d1f", "0241cda7", dir), false);
+  assert.equal(sameSession("c7ab4d1f", "zzzz", dir), false);
+  assert.equal(sameSession("zzzz", "yyyy", dir), false);
 });

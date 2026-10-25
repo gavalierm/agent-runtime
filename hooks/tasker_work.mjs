@@ -49,6 +49,9 @@
 // sa neprevezme (bez `start`, komentára a `work`), nástroj prejde a hook
 // vypíše additionalContext, kto úlohu drží. Chyba čítania
 // Taskera, neplatný JSON alebo záznam bez `thread` zámok nespustí (fail open).
+// Relácia toho istého vlákna po /clear (T3 dá nové session_id, transcript jedného
+// id je symlink na druhý) nie je cudzia (sameSession). Chyba 25. 10. 2026 pri
+// úlohe 595: vlastné vlákno po /clear ohlásilo, že úlohu drží jeho stará relácia.
 //
 // Meno agenta: AGENT_NAME, inak "# Meno" z PERSONA.md v projekte (malými).
 // Obal `tk` je AGENT_TK, inak `bin/tk` v klone repa pravidiel (rulesRepo
@@ -56,7 +59,7 @@
 // zadaného príkazu s TASKER_USER v prostredí.
 // Stav: ${XDG_CACHE_HOME:-$HOME/.cache}/agent-rules/tasker_work/<relácia>/<tool_use_id>.
 
-import { readFileSync, writeFileSync, renameSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, mkdirSync, readdirSync, rmSync, realpathSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -170,7 +173,7 @@ function writeTool(input) {
   try {
     const t = JSON.parse(tk(agent, ["task", "show", n, "--json"]));
     // Zámok (úloha 510): úlohu drží iná relácia, bez `start`, komentára aj `work`, hlásenie bez zamietnutia nástroja.
-    const h = foreignHolder(t.events, input.session_id);
+    const h = foreignHolder(t.events, input.session_id, Date.now(), ownCheck(input));
     if (h) {
       process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext:
         `Úlohu ${n} drží relácia ${h.thread} do ${new Date(h.until).toISOString()} (udalosť work v Taskeri). Táto relácia ${input.session_id} ju neprevzala (bez tasker start a work). Nechaj ju tej relácii alebo počkaj na jej koniec (\`tk task show ${n} --json\`).` } }));
@@ -187,8 +190,25 @@ function writeTool(input) {
   tasker(agent, [n, "--thread", String(input.session_id)]);
 }
 
+// Rovnaká relácia: rovnaké id, alebo transcripty oboch id v priečinku `dir` ukazujú na ten istý
+// súbor (po /clear je jeden symlink na druhý). Chyba realpath: cudzia (fail open).
+export function sameSession(a, b, dir) {
+  if (String(a) === String(b)) return true;
+  try {
+    return realpathSync(join(dir, `${a}.jsonl`)) === realpathSync(join(dir, `${b}.jsonl`));
+  } catch { return false; }
+}
+
+// Porovnanie držiteľa s touto reláciou: podľa priečinka transcriptu, bez neho len reťazce.
+function ownCheck(input) {
+  const session = String(input.session_id);
+  if (!input.transcript_path) return (t) => t === session;
+  const dir = dirname(String(input.transcript_path));
+  return (t) => sameSession(t, session, dir);
+}
+
 // Živá práca inej relácie na úlohe z udalostí Taskera: { thread, until } alebo null.
-export function foreignHolder(events, session, nowMs = Date.now()) {
+export function foreignHolder(events, session, nowMs = Date.now(), isOwn = (t) => t === String(session)) {
   const held = new Map(); // aktér -> { thread, until }
   const ordered = [...(events || [])].sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
   for (const e of ordered) {
@@ -201,7 +221,7 @@ export function foreignHolder(events, session, nowMs = Date.now()) {
     } else if (e.kind === "work_stop") held.delete(e.actor);
     else if (["done", "cancelled", "needs_human", "waiting"].includes(e.to_status)) held.clear();
   }
-  for (const h of held.values()) if (h.thread && h.thread !== String(session) && h.until > nowMs) return h;
+  for (const h of held.values()) if (h.thread && !isOwn(h.thread) && h.until > nowMs) return h;
   return null;
 }
 
@@ -210,7 +230,7 @@ function lockedByOther(input, agent, ns) {
   for (const n of ns) {
     let t;
     try { t = JSON.parse(tk(agent, ["task", "show", String(n), "--json"])); } catch { continue; }
-    const h = foreignHolder(t?.events, input.session_id);
+    const h = foreignHolder(t?.events, input.session_id, Date.now(), ownCheck(input));
     if (!h) continue;
     denyTool(
       `Úlohu ${n} drží relácia ${h.thread} do ${new Date(h.until).toISOString()} (udalosť work v Taskeri). Sub-agent z relácie ${input.session_id} by ju robil súbežne s ňou.`,
