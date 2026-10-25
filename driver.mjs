@@ -17,6 +17,8 @@
 //    výstraha. Limit predplatného nie je pád, budič čaká na reset.
 //    poistka: zobudenie po páde a prerušenie stojaceho behu (stalledStep),
 //    zlyhanie jadra je mimo našich repov (supervise.mjs).
+//    Požiadavka na schválenie staršia než STUCK_ALERT_S sa ohlási raz
+//    (stuck.mjs, úloha 562).
 // 4. Po riadnom behu, ktorého odpoveď končí riadkom HOTOVO-KONTEXT
 //    [spanok|pokracuj <kľúč>], začne čistý kontext.
 // 5. Schránka: keď vo vlákne nebeží beh, nečaká schválenie ani limit,
@@ -66,6 +68,7 @@ import { alert, config, serial, ensureDir, inboxConfig, inboxEntries, log, parse
 import { CLEAR_TEXT, contextStep, rotationStep, stalledStep, superviseStep, threadActive } from "./supervise.mjs";
 import { messageTopic, readTopics, routeFor, topicsPath, waitingFor } from "./route.mjs";
 import { agentStates, watchStep } from "./clear_watch.mjs";
+import { stuckStep } from "./stuck.mjs";
 
 const NAME = "driver";
 const MAX_BATCH = 20;
@@ -262,6 +265,10 @@ export async function tick(cfgIn, client, { now = Date.now() } = {}) {
   if (!threadId) return { sent: 0, reason: `chýba ${join(cfg.state, "thread_id")}, spusti start_agent.mjs` };
 
   const thread = await client.thread(threadId);
+
+  // Visiaca požiadavka na schválenie (stuck.mjs, úloha 562). Chyba ohlásenia
+  // schránku nezdrží.
+  try { await stuckStep(cfg, client, thread, now, { agent: cfg.name }); } catch (e) { log(`${cfg.name}-${NAME}`, `dozor schválenia: ${e.message}`); }
 
   const rot = await rotationStep(cfg, client, threadId, thread, now);
   if (rot?.block) return { sent: 0, reason: rot.block };

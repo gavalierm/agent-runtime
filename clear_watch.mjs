@@ -23,9 +23,10 @@
 // druhého agenta.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { alert, readJson, stableId, threadBusy, writeJsonAtomic } from "./lib.mjs";
+import { alert, log, readJson, stableId, threadBusy, writeJsonAtomic } from "./lib.mjs";
 import { CLEAR_TEXT, interruptStalled, classifyEnd, lastAgentText, usedTokensOfRun } from "./supervise.mjs";
 import { afterClearText, decideClear, markConsumed } from "./kontext.mjs";
+import { stuckStep } from "./stuck.mjs";
 
 function statePath(cfg) { return join(cfg.state, "clear_watch.json"); }
 
@@ -112,6 +113,12 @@ export async function watchStep(cfg, client, { now = Date.now() } = {}) {
   for (const t0 of threads) {
     const t = { ...t0, archived: false };
     if (skip.has(t.id) || t.archivedAt || t.deletedAt) continue;
+    // Visiaca požiadavka na schválenie (stuck.mjs): ohlási sa raz na id,
+    // chyba ohlásenia priechod nezastaví.
+    try {
+      const stuck = await stuckStep(cfg, client, t, now);
+      if (stuck) out.push(stuck);
+    } catch (e) { log(`${cfg.name}-clear-watch`, `dozor schválenia: ${e.message}`); }
     // Stojaci beh (supervise.mjs stalledRun): preruší sa raz na beh. Vlákno
     // s položkou running (sub-agent, príkaz) stalledRun nepreruší.
     if (t.activeRunId && st.interrupted[t.id] !== t.activeRunId) {

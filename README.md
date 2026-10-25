@@ -20,6 +20,7 @@ Operátor píše do vlákna priamo z T3 desktopu alebo mobilu.
 | `route.mjs` | trasa odpovede: id správy (`k:`) -> vlákno odosielateľa v `routes.json`, budič podľa nej doručí odpoveď do vlákna témy; zoznam tém `topics.json` (`topic set`) |
 | `driver.mjs` | budič: `inbox` do vlákna cez T3 (`message.dispatch`), nikdy do bežiaceho behu, spracované do `processed`; volá dozor a čistý kontext |
 | `supervise.mjs` | dozor nad posledným behom vlákna a čistý kontext (`/clear` v tom istom vlákne) na slovo agenta |
+| `stuck.mjs` | dozor visiacej požiadavky na schválenie vo vlákne T3: výstraha a správa do schránky iného agenta (časť Dozor) |
 | `clear_watch.mjs` | čistý kontext (`/clear`) na slovo agenta vo všetkých ostatných vláknach T3 servera, beží v budiči jedného agenta |
 | `tasker_events.mjs` | prechody úloh Taskera do `needs_human`, `failed` a `done` z tabuľky `events` (len čítanie) do schránky, úloha s projektom, ktorý je v zozname tém, ide do vlákna témy (`tasker-<téma>-...`), dávka viac ako `BURST` skutočne odosielaných prechodov ide jednou správou (`čakám`, keď v nej je `needs_human` alebo `failed`, inak `na vedomie`); most: úlohu agenta z `TASKER_EXTERNAL_AGENTS` a vlastníka mostu `TASKER_SELF` (predvolene `AGENT_NAME`, vlákno T3, v Taskeri `enabled=0`) pošle do `/var/lib/<agent>/inbox`, tému berie zo zoznamu tém schránky agenta, agenta s `enabled=1` (spúšťa ho dispečer) preskočí. Úloha bez riešiteľa, ktorú Tasker sám presunul `blocked` -> `unassigned` (actor `tasker`, všetky blokéry hotové), ide jej zakladateľovi (udalosť `created`, actor `human:<agent>`), ak je agent z mosta a nemá `enabled=1`, ako `nečakám` "je odblokovaná a nemá riešiteľa"; s riešiteľom sa správa ako každá úloha agenta (úloha 427, 23. 10. 2026). Úlohu vypnutého agenta bez mosta a komentár cudzieho človeka, ktorý nikoho nezobudí (koncová úloha, úloha bez riešiteľa), pošle vlastníkovi mostu do jeho schránky. Komentár operátora (`TASKER_OPERATORS`, mená cez dvojbodku, predvolene `operator`) na úlohe v `needs_human` (udalosti comment a status `needs_human` -> stav poradia toho istého aktéra) ide vlastníkovi mostu ako `čakám` "zapíš rozhodnutie" (úloha 402, U11); otázka, ktorú vlastník položil sám (`tasker ask`, status `needs_human` s detailom `ask`, actor `human:<vlastník>`), ho nebudí Po zápise správy o úlohe v `handoff` do schránky riešiteľa zapíše doručenie do Taskera (`tasker delivered`, úloha 496), poistka: udalosť `handoff_stale` z doctora pošle riešiteľovi správu znova a ohlási ju zakladateľovi a vlastníkovi mosta. |
 | `morning.mjs` | ranný súhrn `tasker summary --since 24h` do schránky |
@@ -331,6 +332,39 @@ Vlákno s položkou `running` (sub-agent, príkaz) sa nepreruší. Raz na beh,
 zapísané v `clear_watch.json` (`interrupted`), výstraha ide do `alerts.log`.
 Úloha 419.
 
+Visiaca požiadavka na schválenie (`stuck.mjs`, úloha 562). Vlákno vo
+full-access na schválenie nečaká, ale Claude Code má vstavanú kontrolu
+nebezpečného `rm` (`circuitBreaker` `dangerousRemoval`), ktorú
+`bypassPermissions` nevypne, a T3 takú požiadavku pošle človeku
+(`fullAccessOverride` `provider_check` v položke `approval_request`).
+Vlákno potom stojí, kým ju niekto nevyrieši (štyri hodiny 25. 10. 2026).
+Riadok vlákna v `shell` nesie `pendingRuntimeRequest` s `id`, `kind`
+a `createdAt`, z neho budič vezme vek, databázu T3 nečíta. Požiadavka
+staršia než `STUCK_ALERT_S` (predvolene 600 s, 0 vypne) sa ohlási raz na
+`id`:
+
+1. výstraha (`alert`: `alerts.log` a `ALERT_CMD`);
+2. správa do hlavného vlákna iného agenta skriptom `STUCK_ASK_CMD`
+   (`ask_agent.sh --hlavne <príjemca>`, text na stdin, režim `čakám`, takže
+   ho zobudí). Príjemca je `STUCK_ALERT_AGENT`, a keď visí vlákno samotného
+   príjemcu (`AGENT_NAME` budiča sa rovná príjemcovi), `STUCK_ALERT_FALLBACK`.
+   Prázdny príjemca správu vypne a ostane výstraha. Správa nesie vlákno (id
+   a názov), agenta, vek v minútach, dôvod z `approval_request`, prvých 200
+   znakov príkazu z `command_execution` s rovnakým `nativeItemRef` a pokyn
+   poslať operátorovi notifikáciu do telefónu (`PushNotification`), schváli
+   v T3. Do hlavného vlákna ide správa bez témy, lebo nová správa s témou
+   mimo zoznamu tém príjemcu skript odmietne.
+
+Hlavné vlákno agenta dozerá `tick()` (`supervise.mjs` požiadavku len
+preskakuje), vlákna tém a ostatné vlákna sledovač `clear_watch.mjs`
+(vlákna agentov z `thread_id` vynecháva), takže sledovač treba mať zapnutý
+v jednom budiči na T3 server. Stav je `$AGENT_STATE/stuck.json`
+(`reported`: id požiadavky, čas výstrahy a správy, počet pokusov), správa
+sa pri zlyhaní skriptu skúša znova, najviac päťkrát, výstraha ide raz.
+Dozor požiadavku nerieši, neschvaľuje ju ani neodmieta. Skúška
+`test/stuck.test.mjs` volá falošný skript správ a falošný T3, žiadna
+nesiaha na živý T3 ani schránky.
+
 Rozpracovaná dávka (`inflight.json`), ktorej vlákno je zaneprázdnené,
 nezdrží doručenie do iných vlákien toho agenta: `tick()` doručí dávku inej
 skupiny bez zápisu súboru (`batch` z mien, časov súborov a minúty, takže
@@ -357,6 +391,10 @@ nezopakuje.
 | `AGENT_WAKE_ON_INTERRUPT` | 1 | budiť po prerušení bez žiadosti |
 | `AGENT_LIMIT_GRACE_S` | 120 | čakanie po resete limitu |
 | `ALERT_CMD` | prázdne | príkaz pre `sh -c`, text výstrahy na stdin a v `ALERT_TEXT` |
+| `STUCK_ALERT_S` | 600 | vek požiadavky na schválenie, od ktorého sa ohlási (0 vypne) |
+| `STUCK_ALERT_AGENT` | prázdne | agent, ktorého hlavné vlákno dostane správu o visiacej požiadavke (prázdne: len výstraha); verejné repo nenesie mená, hodnotu nastaví `runtime.env` |
+| `STUCK_ALERT_FALLBACK` | prázdne | príjemca, keď visí vlákno samotného `STUCK_ALERT_AGENT` |
+| `STUCK_ASK_CMD` | `/opt/agent-rules/bin/ask_agent.sh` | skript správ, volaný ako `<skript> --hlavne <príjemca>` s textom na stdin a `AGENT_NAME` budiča (skúšky ho prepisujú falošným) |
 
 ## Čistý kontext
 

@@ -70,6 +70,7 @@ export function config(env = process.env) {
     // schránky z AGENT_REPLY_ROUTE_<meno>.
     sweepBoxes: sweepBoxes(env, pick("BOX", `/var/lib/${name}`)),
     ...superviseConfig(env),
+    ...stuckConfig(env),
     ...inboxConfig(env),
   };
 }
@@ -152,6 +153,21 @@ export function superviseConfig(env = {}) {
     limitGraceMs: num("AGENT_LIMIT_GRACE_S", 120) * 1000,
     stalledMs: num("AGENT_STALLED_S", 600) * 1000,
     alertCmd: env.ALERT_CMD || "",
+  };
+}
+
+// Dozor visiacej požiadavky na schválenie (stuck.mjs, README.md, časť Dozor).
+// Len config() ho nesie: cfg bez týchto polí (testy, tick() s holým cfg) správu
+// do schránky neposiela, bez stuckMs platí 10 minút.
+export function stuckConfig(env = {}) {
+  const sec = env.STUCK_ALERT_S === undefined || env.STUCK_ALERT_S === "" ? 600 : Number(env.STUCK_ALERT_S);
+  return {
+    stuckMs: sec * 1000,
+    // Príjemca správy je v runtime.env (verejné repo nenesie mená agentov).
+    // Prázdna hodnota vypne správu do schránky, ostane výstraha.
+    stuckAgent: env.STUCK_ALERT_AGENT ?? "",
+    stuckFallback: env.STUCK_ALERT_FALLBACK ?? "",
+    stuckAskCmd: env.STUCK_ASK_CMD ?? "/opt/agent-rules/bin/ask_agent.sh",
   };
 }
 
