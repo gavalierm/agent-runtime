@@ -11,6 +11,9 @@ import { T3Client } from "../lib.mjs";
 import { routeKey, rememberRoute, routeFor, threadForSession, sessionIds, waitingFor, setTopic, removeTopic, readTopics, topicsPath, messageTopic } from "../route.mjs";
 import { tick, classify, renderMessage } from "../driver.mjs";
 
+// Telo odpovede nesie povinné riadky Výsledok, Dôkaz a Otvorené (reply.sh).
+const TRI = "Výsledok: v\nDôkaz: d\nOtvorené: nič\n";
+
 const RUNTIME = join(dirname(fileURLToPath(import.meta.url)), "..");
 // ask_agent.sh nie je súčasť tohto repa (je v repe pravidiel, bin/), route.mjs berie z tohto
 // runtime. Testy, ktoré ho volajú, sa bez neho preskočia.
@@ -225,7 +228,7 @@ test("ask_agent.sh a reply.sh: správa do schránky adresáta a trasa z vlákna 
   assert.equal(waitingFor(cfg, `boris-${name}`, Date.now(), name), true, "ask_agent.sh predvolene čaká");
   assert.equal(routeFor(cfg, "boris-pravidla-20261019-120000.md"), null, "nová správa bez k: trasu nemá");
   // Odpoveď Borisovi z hlavného vlákna: trasu zruší.
-  r = await runIn("reply.sh", [`boris-${name}`], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-main" } }, "Ďakujem.");
+  r = await runIn("reply.sh", [`boris-${name}`], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-main" } }, "Ďakujem.\n" + TRI);
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stderr, /hlavné vlákno, bez trasy/);
   assert.equal(routeFor(cfg, `boris-${name}`, `boris-${name}`), null);
@@ -256,7 +259,7 @@ test("ask_agent.sh a reply.sh: správa do schránky adresáta a trasa z vlákna 
   assert.ok(!/dopad:/.test(readFileSync(join(borisInbox, rf), "utf8")), "odpoveď s --k dopad nenesie");
   assert.equal(waitingFor(cfg, `boris-${f}`, Date.now(), f), false, "sent sa zapíše aj bez relácie");
   // Odpoveď Cyrilovi z vlákna témy: ďalšia správa Cyrila s tou témou ide do témy.
-  r = await runIn("reply.sh", ["cyril-kanon-20261019-100000-7.md"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-tema" } }, "Hotovo.");
+  r = await runIn("reply.sh", ["cyril-kanon-20261019-100000-7.md"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-tema" } }, "Hotovo: x\n" + TRI);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(routeFor(cfg, "cyril-kanon-20261019-110000-8.md", "cyril-kanon-20261019-100000-7.md").thread, "thread:project:p1:tema");
   // Cyril má vlastnú schránku na serveri: odpoveď (reply.sh) aj nová správa idú tam, outbox je prázdny.

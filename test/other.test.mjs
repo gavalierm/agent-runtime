@@ -12,6 +12,9 @@ import { tick as taskerTick, bridgeTick } from "../tasker_events.mjs";
 import { build as morningBuild } from "../morning.mjs";
 import { start, startPrompt } from "../start_agent.mjs";
 
+// Telo odpovede nesie povinné riadky Výsledok, Dôkaz a Otvorené (reply.sh).
+const TRI = "Výsledok: v\nDôkaz: d\nOtvorené: nič\n";
+
 const RUNTIME = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 function boxDir() {
@@ -193,28 +196,28 @@ test("reply.sh: odpoveď odosielateľovi z AGENT_INBOX_ONLY ide len do jeho schr
   mkdirSync(borisInbox);
   // Budič správu presunul do processed, odpoveď opíše jej prvý riadok.
   writeFileSync(join(box, "processed", name), `odpoveď: čakám\nid: ${name}\nod: cyril\nkomu: adam\ntéma: adam_server\nAhoj\n`);
-  execFileSync(join(RUNTIME, "reply.sh"), [name], { env, input: "Hotovo." });
-  execFileSync(join(RUNTIME, "reply.sh"), ["--cakam", name], { env, input: "Ešte jedna." });
+  execFileSync(join(RUNTIME, "reply.sh"), [name], { env, input: "Hotovo: x\n" + TRI });
+  execFileSync(join(RUNTIME, "reply.sh"), ["--cakam", name], { env, input: "Ešte jedna.\n" + TRI });
   assert.equal(readdirSync(join(box, "outbox")).length, 0, "odpoveď pre Cyrila ide do jeho schránky, nie do outboxu");
   assert.equal(readdirSync(cyrilInbox).length, 2);
   const outs = readdirSync(cyrilInbox).sort().map((f) => readFileSync(join(cyrilInbox, f), "utf8"));
-  assert.equal(outs[0], `odpoveď: na vedomie\nk správe: čakám\nid: ${name}\nod: adam\nkomu: cyril\ntéma: adam_server\nk: ${name}\nHotovo.\n`, "predvolene na vedomie, k správe z processed, k: id pôvodnej");
-  assert.equal(outs[1], `odpoveď: čakám\nk správe: čakám\nid: ${name}\nod: adam\nkomu: cyril\ntéma: adam_server\nk: ${name}\nEšte jedna.\n`);
+  assert.equal(outs[0], `odpoveď: na vedomie\nk správe: čakám\nid: ${name}\nod: adam\nkomu: cyril\ntéma: adam_server\nk: ${name}\nHotovo: x\n${TRI}`, "predvolene na vedomie, k správe z processed, k: id pôvodnej");
+  assert.equal(outs[1], `odpoveď: čakám\nk správe: čakám\nid: ${name}\nod: adam\nkomu: cyril\ntéma: adam_server\nk: ${name}\nEšte jedna.\n${TRI}`);
   // Zábrana: pokyn v tele bez prepínača.
-  const guard = spawnSync(join(RUNTIME, "reply.sh"), [name], { env, input: "Úloha: pozri disk.\n", encoding: "utf8" });
+  const guard = spawnSync(join(RUNTIME, "reply.sh"), [name], { env, input: "Úloha: pozri disk.\n" + TRI, encoding: "utf8" });
   assert.equal(guard.status, 1);
   assert.match(guard.stderr, /--cakam alebo --necakam/);
   assert.equal(readdirSync(cyrilInbox).length, 2, "nič sa nezapísalo");
-  assert.equal(spawnSync(join(RUNTIME, "reply.sh"), ["--necakam", name], { env, input: "Úloha: pozri disk.\n" }).status, 0);
+  assert.equal(spawnSync(join(RUNTIME, "reply.sh"), ["--necakam", name], { env, input: "Úloha: pozri disk.\n" + TRI }).status, 0);
   // Pôvodná správa bez riadku: odpoveď má len prvý riadok.
-  execFileSync(join(RUNTIME, "reply.sh"), ["boris-20261018-120000-1.md"], { env: { ...env, AGENT_REPLY_ROUTE_boris: borisInbox }, input: "Bez pôvodu." });
-  assert.equal(readFileSync(join(borisInbox, "boris-20261018-120000-1.md".replace(/^boris-/, "adam-boris-")), "utf8"), "odpoveď: na vedomie\nid: boris-20261018-120000-1.md\nod: adam\nkomu: boris\ntéma: \nk: boris-20261018-120000-1.md\nBez pôvodu.\n");
+  execFileSync(join(RUNTIME, "reply.sh"), ["boris-20261018-120000-1.md"], { env: { ...env, AGENT_REPLY_ROUTE_boris: borisInbox }, input: "Bez pôvodu.\n" + TRI });
+  assert.equal(readFileSync(join(borisInbox, "boris-20261018-120000-1.md".replace(/^boris-/, "adam-boris-")), "utf8"), "odpoveď: na vedomie\nid: boris-20261018-120000-1.md\nod: adam\nkomu: boris\ntéma: \nk: boris-20261018-120000-1.md\nBez pôvodu.\n" + TRI);
   rmSync(join(borisInbox, "adam-boris-20261018-120000-1.md"));
   // Odpoveď odosielateľovi s kanálom ide aj do jeho schránky.
-  execFileSync(join(RUNTIME, "reply.sh"), ["boris-20261018-120000-1.md"], { env: { ...env, AGENT_REPLY_ROUTE_boris: borisInbox }, input: "Pre Borisa." });
+  execFileSync(join(RUNTIME, "reply.sh"), ["boris-20261018-120000-1.md"], { env: { ...env, AGENT_REPLY_ROUTE_boris: borisInbox }, input: "Pre Borisa.\n" + TRI });
   assert.deepEqual(readdirSync(borisInbox), ["adam-boris-20261018-120000-1.md"]);
   // Odpoveď na odpoveď predpony nehromadí.
-  execFileSync(join(RUNTIME, "reply.sh"), ["boris-adam-boris-adam-tema-20261018-120000.md"], { env: { ...env, AGENT_REPLY_ROUTE_boris: borisInbox }, input: "Znova." });
+  execFileSync(join(RUNTIME, "reply.sh"), ["boris-adam-boris-adam-tema-20261018-120000.md"], { env: { ...env, AGENT_REPLY_ROUTE_boris: borisInbox }, input: "Znova.\n" + TRI });
   assert.ok(readdirSync(borisInbox).includes("adam-boris-tema-20261018-120000.md"));
   assert.equal(spawnSync(join(RUNTIME, "reply.sh"), ["../zle"], { env, input: "x" }).status, 1);
 });
@@ -228,9 +231,9 @@ test("reply.sh pre iného agenta: AGENT_NAME určí schránku, env súbor a pred
   // Ako v nasadení: cesty len v runtime.env agenta, vlákno T3 ich nededí.
   writeFileSync(join(home, ".config/boris/runtime.env"), `AGENT_BOX=${box}\nAGENT_REPLY_ROUTE_adam=${adamInbox}\n`);
   const env = { PATH: process.env.PATH, HOME: home, AGENT_NAME: "boris", CLAUDE_PID: "" };
-  execFileSync(join(RUNTIME, "reply.sh"), ["adam-20261018-120000-1.md"], { env, input: "Od Borisa." });
+  execFileSync(join(RUNTIME, "reply.sh"), ["adam-20261018-120000-1.md"], { env, input: "Od Borisa.\n" + TRI });
   assert.deepEqual(readdirSync(join(box, "outbox")), ["adam-20261018-120000-1.md"]);
   assert.deepEqual(readdirSync(adamInbox), ["boris-adam-20261018-120000-1.md"]);
-  execFileSync(join(RUNTIME, "reply.sh"), ["adam-boris-adam-boris-tema-20261018-120000.md"], { env, input: "Znova." });
+  execFileSync(join(RUNTIME, "reply.sh"), ["adam-boris-adam-boris-tema-20261018-120000.md"], { env, input: "Znova.\n" + TRI });
   assert.ok(readdirSync(adamInbox).includes("boris-adam-tema-20261018-120000.md"));
 });

@@ -16,7 +16,7 @@ Operátor píše do vlákna priamo z T3 desktopu alebo mobilu.
 | súbor | čo robí |
 |---|---|
 | `mac_wake.sh` | pri správe `odpoveď: čakám` do schránky agenta na Macu (`MAC_WAKE_AGENT`) zavolá webhook T3 na Macu, spúšťa `systemd/mac-wake.path` |
-| `reply.sh` | agent ním odpovedá na správu zo schránky do `outbox`, odosielateľovi s kanálom aj do jeho schránky (odosielateľovi z `AGENT_INBOX_ONLY` len do jeho schránky), z vlákna témy zapíše trasu; hlavička nesie `k: <id pôvodnej>` |
+| `reply.sh` | agent ním odpovedá na správu zo schránky do `outbox`, odosielateľovi s kanálom aj do jeho schránky (odosielateľovi z `AGENT_INBOX_ONLY` len do jeho schránky), z vlákna témy zapíše trasu; hlavička nesie `k: <id pôvodnej>`; telo odmietne bez riadkov `Výsledok:`, `Dôkaz:` a `Otvorené:` |
 | `route.mjs` | trasa odpovede: id správy (`k:`) -> vlákno odosielateľa v `routes.json`, budič podľa nej doručí odpoveď do vlákna témy; zoznam tém `topics.json` (`topic set`) |
 | `driver.mjs` | budič: `inbox` do vlákna cez T3 (`message.dispatch`), nikdy do bežiaceho behu, spracované do `processed`; volá dozor a čistý kontext |
 | `supervise.mjs` | dozor nad posledným behom vlákna a čistý kontext (`/clear` v tom istom vlákne) na slovo agenta |
@@ -166,9 +166,14 @@ tou istou správou.
 Dávka s budiacou správou odíde až po tichom okne `AGENT_BATCH_WAIT_S`
 (30 s) od poslednej budiacej správy, najviac `AGENT_BATCH_MAX_WAIT_S`
 (120 s) od prvej, správy tesne za sebou tak idú jedným ťahom. `0` okno
-vypne. Zábrana v `reply.sh`: telo s riadkom `Úloha` alebo `Otázka`
+vypne. Zábrany v `reply.sh`: telo s riadkom `Úloha` alebo `Otázka`
 bez `--cakam` alebo `--necakam` odmietne. Riadok `Hotovo:` je výsledok
-a prejde.
+a tú zábranu prejde. Telo každej odpovede (aj `--cakam`, `--necakam`,
+`--vedomie` a `Hotovo:`) musí navyše niesť tri riadky, ktoré začínajú
+`Výsledok:`, `Dôkaz:` a `Otvorené:` (v ľubovoľnom poradí, za dvojbodkou
+neprázdny text, `Otvorené: nič`, keď nič neostalo). Bez ktoréhokoľvek
+skript skončí kódom 1 a na stderr dá riadok `Správny postup:` s príkladom.
+Odpoveď tak nesie výsledok, dôkaz ako príkaz s výstupom a čo je otvorené.
 
 ## Trasa odpovede do vlákna témy
 

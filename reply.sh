@@ -29,6 +29,9 @@
 # chýba záznam. Bez prepínača odmietne telo s riadkom, ktorý začína
 # `Úloha` alebo `Otázka`, to je pokyn a potrebuje --cakam alebo
 # --necakam. Riadok `Hotovo: <výsledok>` je výsledok, nie pokyn.
+# Telo musí mať riadky `Výsledok:`, `Dôkaz:` a `Otvorené:` s neprázdnou
+# hodnotou (v každom režime, aj s `Hotovo:`), inak kód 1 s riadkom
+# `Správny postup:` a príkladom.
 #
 # Použitie: reply.sh [--cakam|--necakam] <meno správy> < odpoved.md
 # Kód 0 zapísané, 1 chyba.
@@ -67,6 +70,24 @@ if [ -z "$text" ]; then
 fi
 if [ "$explicit" = 0 ] && grep -qE '^(Úloha|Otázka)' <<<"$text"; then
     echo "Telo vyzerá ako pokyn (riadok Úloha alebo Otázka), odpoveď na vedomie by adresáta nezobudila. Daj --cakam alebo --necakam. Nič som nezapísal." >&2
+    exit 1
+fi
+# Telo odpovede nesie tri riadky: Výsledok, Dôkaz a Otvorené (každý aspoň
+# raz, v ľubovoľnom poradí, hodnota za dvojbodkou neprázdna). Platí pre
+# všetky režimy vrátane riadka `Hotovo:`.
+missing=()
+for label in Výsledok Dôkaz Otvorené; do
+    grep -qE "^${label}:[[:space:]]*[^[:space:]]" <<<"$text" || missing+=("$label")
+done
+if [ "${#missing[@]}" -gt 0 ]; then
+    {
+        echo "Telo odpovede nemá neprázdny riadok: ${missing[*]}. Nič som nezapísal."
+        echo "Správny postup: telo má tri riadky, ktoré začínajú Výsledok:, Dôkaz: a Otvorené: (v ľubovoľnom poradí, za dvojbodkou text). Keď nič neostalo, napíš Otvorené: nič."
+        echo "Príklad:"
+        echo "Výsledok: reply.sh odmietne telo bez troch riadkov."
+        echo "Dôkaz: node --test v /root/agent-runtime, 0 zlyhaní."
+        echo "Otvorené: nič"
+    } >&2
     exit 1
 fi
 # Prvý riadok pôvodnej správy, budič ho presunul do processed.
