@@ -185,9 +185,9 @@ hlavného vlákna.
    kľúčom alebo témou. Záznam starší ako 30 dní vypadne.
 2. Vlákno volajúceho: `CLAUDE_CODE_SESSION_ID` v prostredí vlákna je id
    relácie claude a vlákno T3 ho má v `providerThreads[].nativeThreadRef.nativeId`
-   (detail `/bounded`). `route.mjs` prejde vlákna `thread:project:` zo shellu
-   (vlákna sub-agentov `thread:provider:` patria rodičovi, sub-agent má
-   id relácie rodiča) a nájdené id si zapamätá v `routes.json` pod
+   (detail `/bounded`). `route.mjs` prejde zo shellu všetky vlákna okrem
+   sub-agentov (`thread:provider:`, `parentThreadId`), ktoré patria rodičovi
+   (sub-agent má id relácie rodiča) a nájdené id si zapamätá v `routes.json` pod
    `sessions`. Po `/clear` má proces novú reláciu, vtedy platí
    `--resume=<id>` z príkazového riadku procesu `CLAUDE_PID`. Keď vlákno
    nenájde alebo T3 neodpovie, správa odíde bez trasy a odpoveď príde do

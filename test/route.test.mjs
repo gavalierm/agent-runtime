@@ -132,6 +132,21 @@ test("threadForSession: vlákno projektu podľa nativeThreadRef, sub-agenti sa p
   assert.deepEqual(sessionIds({}), []);
 });
 
+test("threadForSession: holé UUID vlákno sa nájde, sub-agent a potomok s rodičom nie (chyba route 25. 10. 2026)", async (t) => {
+  const t3 = await startFakeT3();
+  t.after(() => t3.close());
+  t3.addThread("thread:provider:x", { _providerThreads: [{ nativeThreadRef: { nativeId: "a" } }] });
+  t3.addThread("thread:project:y", { _providerThreads: [{ nativeThreadRef: { nativeId: "b" } }] });
+  t3.addThread("f23ea517-5acc-4f48-8a1c-000000000000", { _providerThreads: [{ nativeThreadRef: { nativeId: "9d9daf59" } }] });
+  t3.addThread("mcp:z", { parentThreadId: "mcp:rodic", _providerThreads: [{ nativeThreadRef: { nativeId: "c" } }] });
+  // Každé hľadanie s čistým stavom, výsledok sa inak zapamätá v routes.json.
+  const find = async (ids) => threadForSession(setup(t3).cfg, new T3Client({ url: t3.url, token: t3.token, timeoutMs: 3000 }), ids);
+  assert.equal(await find(["9d9daf59"]), "f23ea517-5acc-4f48-8a1c-000000000000");
+  assert.equal(await find(["a"]), null, "sub-agent patrí rodičovi");
+  assert.equal(await find(["c"]), null, "potomok s parentThreadId");
+  assert.equal(await find(["b"]), "thread:project:y");
+});
+
 test("budič: správa s trasou ide do vlákna témy, zaneprázdnené vlákno témy hlavné nezdrží", async (t) => {
   const t3 = await startFakeT3();
   t.after(() => t3.close());

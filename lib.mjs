@@ -332,14 +332,16 @@ export class T3Client {
     return T3Client.threadFromShell(await this.shell(), threadId);
   }
 
-  // Vlákno projektu, ktorého providerThreads majú nativeThreadRef.nativeId
-  // z daných id (id relácie claude). Vlákna sub-agentov (thread:provider:)
-  // a vlákna mcp: s rodičom preskočí, tie patria svojmu rodičovi. Samostatné
-  // vlákno mcp: (t3_thread_launch, napríklad vlákno témy) sa prehľadáva.
-  // Nearchivované najprv.
+  // Vlákno, ktorého providerThreads majú nativeThreadRef.nativeId z daných id
+  // (id relácie claude). Vylúči len sub-agentov (id thread:provider:) a vlákna
+  // s parentThreadId, tie patria rodičovi. Všetko ostatné sa prehľadáva:
+  // thread:project:, samostatné mcp: (t3_thread_launch, vlákno témy),
+  // thread:delegated-task: aj vlákna s holým UUID id. Chyba 25. 10. 2026:
+  // filter na prefixy vynechal holé UUID vlákno (relácia 9d9daf59) a odpoveď
+  // išla do hlavného vlákna. Nearchivované najprv.
   async threadForNativeId(ids) {
     const shell = await this.shell();
-    const rows = [...(shell.threads ?? []), ...(shell.archivedThreads ?? [])].filter((t) => t.id.startsWith("thread:project:") || (t.id.startsWith("mcp:") && !t.parentThreadId));
+    const rows = [...(shell.threads ?? []), ...(shell.archivedThreads ?? [])].filter((t) => !t.id.startsWith("thread:provider:") && !t.parentThreadId);
     for (const t of rows) {
       const detail = await this.threadDetail(t.id);
       for (const pt of detail.providerThreads ?? []) {
