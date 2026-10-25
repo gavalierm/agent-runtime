@@ -4,6 +4,7 @@
 // súborom v tmp. Nevolá živý Tasker, nepíše do živého registra ani do
 // /root/.claude. Replay 390 a 420: druhý výskyt triedy založí úlohu.
 // Spustenie: node --test test/chyba.test.mjs
+import "../lib/git_isolate.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

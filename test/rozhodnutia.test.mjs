@@ -2,6 +2,7 @@
 // priečinkoch a dočasnom repe s bare origin, skript dostane vždy
 // ROZHODNUTIA_REPO a nikdy ROZHODNI_SYNC_UNIT, takže nemá cestu na živý klon
 // ani sync. Spustenie: node --test test/rozhodnutia.test.mjs
+import "../lib/git_isolate.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";

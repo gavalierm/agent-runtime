@@ -1,5 +1,6 @@
 // rules_delta.mjs: prvý prompt len zapíše HEAD, zmena global/ alebo
 // env/<prostredie>/ ide do kontextu raz, zmena inde nie, dlhý diff sa skráti.
+import "../lib/git_isolate.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";

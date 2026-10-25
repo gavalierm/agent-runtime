@@ -1,5 +1,6 @@
 // Hook objection_fix.mjs ako proces: replay uznanej chyby bez chyba.sh (úloha 426,
 // D0142), HOME v tmp, živý Tasker ani register chýb sa nepoužijú.
+import "../lib/git_isolate.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

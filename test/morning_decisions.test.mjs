@@ -1,5 +1,6 @@
 // Ranný súhrn: nové rozhodnutia za 24 h a výstup kontroly (úloha 470, replay S9).
 // Git repo je dočasné v mkdtemp, kontrola je zástupná funkcia, nič sa nezapisuje.
+import "../lib/git_isolate.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";

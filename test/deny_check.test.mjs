@@ -2,6 +2,7 @@
 // zlyhá na hooku, ktorý zamieta mimo lib/deny.mjs a deny.sh. Helper deny.mjs
 // a hooky tohto repa testuje test/deny.test.mjs. Nevolá živý Tasker, schránky
 // ani T3. Spustenie: node --test test/deny_check.test.mjs
+import "../lib/git_isolate.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

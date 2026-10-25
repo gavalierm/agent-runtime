@@ -2,6 +2,7 @@
 // Testy no_operator_commands.mjs. Prvý prípad je odpoveď Cyrila z 15. 10. 2026,
 // ktorú operátor odmietol.
 
+import "../lib/git_isolate.mjs";
 import { findCommand, findWaitingProblem } from "../hooks/no_operator_commands.mjs";
 
 const cases = [

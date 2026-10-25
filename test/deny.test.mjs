@@ -1,6 +1,7 @@
 // Test D0141 (úloha 424): zamietnutie hooku nesie "Správny postup:". Helper
 // lib/deny.mjs a Stop hooky tohto repa (no_operator_commands, objection_fix,
 // reply_guard). Nevolá živý Tasker, schránky ani T3. Spustenie: node --test test/deny.test.mjs
+import "../lib/git_isolate.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

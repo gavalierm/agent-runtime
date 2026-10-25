@@ -1,5 +1,6 @@
 // Ranný súhrn: rozloženie práce za 24 h (úloha 513). DB je dočasná v mkdtemp, git je zástupná
 // funkcia, nič sa nečíta zo živej DB ani zo živých repí.
+import "../lib/git_isolate.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";

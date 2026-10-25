@@ -2,6 +2,7 @@
 // predponu AV_ROOT v dočasnom priečinku a príkazy curl, git (clone, fetch),
 // ssh-keygen, systemctl, systemd-tmpfiles, runuser, t3 a tasker sú podstavené.
 // Skript sám odmietne bežať s AV_ROOT, keď niektorý z nich nie je z AV_STUBS.
+import "../lib/git_isolate.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

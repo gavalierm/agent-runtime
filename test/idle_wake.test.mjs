@@ -2,6 +2,7 @@
 // Falošný tk zapisuje argumenty do súboru, stav je v mkdtemp, živý Tasker
 // ani schránka sa nedotknú. Replay: zobudenia 24. 10. 2026
 // tasker-20261024-215628-486.md a tasker-20261024-215807-1927321-350064f5.md.
+import "../lib/git_isolate.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

@@ -2,6 +2,7 @@
 // Testy objection_fix.mjs. Prvý prípad je odpoveď Cyrila z 15. 10. 2026,
 // ktorú operátor odmietol ako "len si mi dal za pravdu".
 
+import "../lib/git_isolate.mjs";
 import { verdict } from "../hooks/objection_fix.mjs";
 
 const cases = [

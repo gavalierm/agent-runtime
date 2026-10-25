@@ -5,6 +5,7 @@
 // (TASKER_DB), HOME a CLAUDE_PROJECT_DIR v tmp. Živá DB ani klon sa nepoužijú:
 // TASKER_DB ukazuje vždy na tmp a fetchTasks pri neexistujúcej výslovnej DB
 // hodí chybu.
+import "../lib/git_isolate.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
