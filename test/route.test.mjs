@@ -222,10 +222,23 @@ test("ask_agent.sh a reply.sh: správa do schránky adresáta a trasa z vlákna 
   assert.match(r.stderr, /Prepínač --necakam neexistuje.*--vedomie/);
   assert.equal(readdirSync(borisInbox).length, before, "nič sa nezapísalo");
   let f;
-  r = await run("ask_agent.sh", ["boris", "pravidla", "--vedomie", "Hlásenie"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "" } });
+  r = await run("ask_agent.sh", ["boris", "pravidla", "--vedomie", "--dopad", "Mení sa tvoj postup", "Hlásenie"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "" } });
   assert.equal(r.status, 0, r.stderr);
   f = readdirSync(borisInbox).find((x) => readFileSync(join(borisInbox, x), "utf8").includes("Hlásenie"));
   assert.match(readFileSync(join(borisInbox, f), "utf8"), /^odpoveď: na vedomie\n/);
+  assert.match(readFileSync(join(borisInbox, f), "utf8"), /téma: pravidla\ndopad: Mení sa tvoj postup\nHlásenie\n$/);
+  // Nová správa --vedomie bez --dopad: kód 1, nič sa nezapíše. S --k prejde aj bez --dopad.
+  const cnt = readdirSync(borisInbox).length;
+  for (const extra of [[], ["--dopad", "  "]]) {
+    r = await run("ask_agent.sh", ["boris", "pravidla", "--vedomie", ...extra, "Bez dopadu"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "" } });
+    assert.equal(r.status, 1, r.stderr);
+    assert.match(r.stderr, /^Správa na vedomie bez --dopad: .* Nič som neposlal\.\n$/);
+  }
+  assert.equal(readdirSync(borisInbox).length, cnt, "bez --dopad sa nič nezapísalo");
+  r = await run("ask_agent.sh", ["--vedomie", "--k", "boris-odpoved-20261019-100000-1.md", "boris", "pravidla", "Odpoveď bez dopadu"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "" } });
+  assert.equal(r.status, 0, r.stderr);
+  const rf = readdirSync(borisInbox).find((x) => readFileSync(join(borisInbox, x), "utf8").includes("Odpoveď bez dopadu"));
+  assert.ok(!/dopad:/.test(readFileSync(join(borisInbox, rf), "utf8")), "odpoveď s --k dopad nenesie");
   assert.equal(waitingFor(cfg, `boris-${f}`, Date.now(), f), false, "sent sa zapíše aj bez relácie");
   // Odpoveď Cyrilovi z vlákna témy: ďalšia správa Cyrila s tou témou ide do témy.
   r = await runIn("reply.sh", ["cyril-kanon-20261019-100000-7.md"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-tema" } }, "Hotovo.");
@@ -241,7 +254,7 @@ test("ask_agent.sh a reply.sh: správa do schránky adresáta a trasa z vlákna 
   r = await run("ask_agent.sh", ["boris", "pravidla", "Bez T3"], { env: { ...env, T3_URL: "http://127.0.0.1:1", CLAUDE_CODE_SESSION_ID: "sid-x" } });
   assert.equal(r.status, 0);
   assert.match(r.stderr, /route: .*hlavného vlákna/);
-  assert.equal(readdirSync(borisInbox).length, 3);
+  assert.equal(readdirSync(borisInbox).length, 4);
   assert.equal((await run("ask_agent.sh", ["boris", "Zla tema", "x"], { env })).status, 1);
   // Adresát bez schránky na serveri ide cez ssh, falošné ssh zlyhá.
   const fbin = join(root, "fbin");
@@ -361,14 +374,14 @@ test("route.mjs topic a ask_agent.sh: téma zo zoznamu adresáta, neznáma odmie
   assert.equal(readdirSync(join(box, "inbox")).length, 0, "nič neodišlo");
   r = await run("ask_agent.sh", ["adam", "pravidla", "K pravidlám"], { env: borisEnv });
   assert.equal(r.status, 0, r.stderr);
-  r = await run("ask_agent.sh", ["--hlavne", "--vedomie", "adam", "Do hlavného"], { env: borisEnv });
+  r = await run("ask_agent.sh", ["--hlavne", "--vedomie", "--dopad", "Mení sa X", "adam", "Do hlavného"], { env: borisEnv });
   assert.equal(r.status, 0, r.stderr);
   const names = readdirSync(join(box, "inbox")).sort();
   assert.equal(names.length, 2);
   assert.ok(names.some((n) => /^boris-pravidla-\d{8}-\d{6}-\d+\.md$/.test(n)));
   const plain = names.find((n) => /^boris-\d{8}-\d{6}-\d+\.md$/.test(n));
   assert.ok(plain, "--hlavne bez témy v mene");
-  assert.equal(readFileSync(join(box, "inbox", plain), "utf8"), `odpoveď: na vedomie\nid: ${plain}\nod: boris\nkomu: adam\ntéma: \nDo hlavného\n`);
+  assert.equal(readFileSync(join(box, "inbox", plain), "utf8"), `odpoveď: na vedomie\nid: ${plain}\nod: boris\nkomu: adam\ntéma: \ndopad: Mení sa X\nDo hlavného\n`);
   // Budič Adama: téma zo zoznamu do vlákna témy, správa bez témy do hlavného bez riadku.
   t3.addThread("thr-adam");
   const tr = await tick({ ...cfg, batchWaitMs: 0 }, new T3Client({ url: t3.url, token: t3.token, timeoutMs: 3000 }));
