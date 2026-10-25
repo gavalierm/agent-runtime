@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +35,42 @@ test("browser.sh: snímky pre dve šírky, krok click, chyba konzoly", { skip: !
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// Agenti Taskera bežia pod bežným používateľom, nie pod rootom (úloha 579).
+// Skúška (spúšťa ju root cez runuser) pustí browser.sh pod bežným používateľom:
+// Chrome beží pod ním samým, bez runuser vo vnútri skriptu. Lokálny súbor, žiadne
+// živé služby; výstupný priečinok patrí tomuto používateľovi.
+// Bežný používateľ je ten istý bUser (AGENT_BROWSER_USER alebo AGENT_TASKER_USER).
+const nonRoot = bUser;
+const readyNonRoot = ready && spawnSync("id", ["-u", nonRoot]).status === 0;
+const asNonRoot = (args, cwd) => spawnSync("runuser", ["-u", nonRoot, "--", sh, ...args],
+  { encoding: "utf8", cwd, env: { PATH: process.env.PATH, LANG: "C.UTF-8" } });
+
+test("browser.sh pod nerootom: snímka bez runuser, kód 0", { skip: !readyNonRoot && "nie je root so serverovým prehliadačom a používateľom z AGENT_BROWSER_USER" }, () => {
+  const dir = mkdtempSync(join(tmpdir(), "browser-nonroot-"));
+  try {
+    chmodSync(dir, 0o755);
+    const html = join(dir, "page.html");
+    writeFileSync(html, `<!doctype html><meta charset="utf-8"><p>pod nerootom</p>`);
+    chmodSync(html, 0o644);
+    const out = join(dir, "out");
+    mkdirSync(out);
+    spawnSync("chown", [`${nonRoot}:${nonRoot}`, out]);
+    const r = asNonRoot(["--file", html, "--width", "800", "--text", "--out", out], out);
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(r.stdout.includes(join(out, "page-800.png")), r.stdout);
+    assert.equal(readFileSync(join(out, "page-800.png")).subarray(1, 4).toString(), "PNG");
+    assert.match(readFileSync(join(out, "text-800.txt"), "utf8"), /pod nerootom/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("browser.sh pod nerootom: --user iný než volajúci skončí kódom 2 s jasnou chybou", { skip: !readyNonRoot && "nie je root so serverovým prehliadačom a používateľom z AGENT_BROWSER_USER" }, () => {
+  const r = asNonRoot(["--url", "about:blank", "--user", "nobody"], tmpdir());
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, new RegExp(`--user nobody: pod používateľom ${nonRoot} smie Chrome bežať len pod ním`));
 });
 
 test("browser.sh: neznámy argument skončí kódom 2", () => {

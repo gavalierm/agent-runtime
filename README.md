@@ -27,7 +27,7 @@ Operátor píše do vlákna priamo z T3 desktopu alebo mobilu.
 | `start_agent.mjs` | založí projekt T3 nad klonom repa a vlákno agenta, id vlákna uloží do stavu |
 | `lib.mjs` | nastavenie, schránka, klient T3 (REST na čítanie, `/ws` na príkazy) |
 | `agent_vlakno.sh`, `github_repo.sh`, `github_device_login.sh` | zriadenie agenta (kľúč, repo, klony, schránka, budič, agent v Taskeri) |
-| `browser.sh`, `browser/` | Chrome so sandboxom pod iným používateľom |
+| `browser.sh`, `browser/` | Chrome so sandboxom pod volajúcim (nie root) alebo pod iným používateľom (z roota) |
 | `secret_drop.sh`, `secret_drop.mjs` | jednorazová stránka na odovzdanie tajomstva |
 | `systemd/` | šablóna budiča `agent-driver@.service`, jednotky udalostí Taskera a ranného súhrnu, `tmpfiles.d` schránky a drop-in `t3code.service` |
 | `test/` | `node --test 'test/*.test.mjs'`, falošný T3 server bez závislostí |
@@ -702,9 +702,11 @@ priečinkom `/root/<meno>`, rovnako ako hlavný agent.
 
 ## Prehliadač
 
-`browser.sh` spustí Chrome so sandboxom pod používateľom
-`AGENT_BROWSER_USER` (agent beží pod rootom, `--no-sandbox` sa nepoužíva) a vráti
-snímky obrazovky, text stránky a chyby konzoly.
+`browser.sh` spustí Chrome so sandboxom (`--no-sandbox` sa nepoužíva) a vráti
+snímky obrazovky, text stránky a chyby konzoly. Pod rootom beží Chrome cez
+`runuser` pod používateľom `AGENT_BROWSER_USER`. Pod bežným používateľom (agenti
+Taskera) beží pod volajúcim, bez `runuser`, a `--user` iný než
+volajúci skončí kódom 2 (úloha 579).
 
 ```
 browser.sh (--url <url> | --file <html>) [--width 1440,390]

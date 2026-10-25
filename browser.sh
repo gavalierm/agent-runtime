@@ -1,9 +1,12 @@
 #!/bin/bash
-# Prehliadač pre agenta: Chrome so sandboxom pod používateľom AGENT_BROWSER_USER
-# (alebo AGENT_TASKER_USER), snímky obrazovky, text stránky a chyby konzoly.
-# Agent beží pod rootom, /root je 700 a iný používateľ doň nevidí, preto skript
-# všetko, čo prehliadač potrebuje, skopíruje do dočasného priečinka a výsledky
-# skopíruje späť.
+# Prehliadač pre agenta: Chrome so sandboxom, snímky obrazovky, text stránky
+# a chyby konzoly.
+# Pod rootom beží Chrome cez runuser pod používateľom AGENT_BROWSER_USER (alebo
+# AGENT_TASKER_USER, alebo --user), root ho so sandboxom nespustí. Pod bežným
+# používateľom (agenti Taskera) beží pod volajúcim, bez runuser;
+# predvolený je volajúci a --user iný než volajúci skončí kódom 2. Skript
+# všetko, čo prehliadač potrebuje, skopíruje do dočasného priečinka v /tmp
+# a výsledky skopíruje späť.
 #
 # Použitie: browser.sh (--url <url> | --file <html>) [--width 1440,390]
 #   [--height 900] [--full-page] [--text] [--gaps [px]]
@@ -15,11 +18,14 @@
 # --out je $AGENT_WORKDIR/.scratch/browser/<čas> (bez AGENT_WORKDIR aktuálny priečinok). Vypíše cesty k vzniknutým
 # súborom, kód 0 v poriadku, 1 chyba alebo zlyhaný krok, 2 zlé použitie.
 # Balík playwright-core sa nainštaluje do ~<používateľ>/.cache/agent-browser
-# (npm ci), znova len keď sa zmení hash browser/package-lock.json.
+# (npm ci), znova len keď sa zmení hash browser/package-lock.json. Pod
+# nerootom sú zámky inštalácie a profilu v ~<používateľ>, lebo do
+# /run/lock cudzí súbor roota nezapíše.
 #
 # Používateľ a trvalý profil (osobný agent s vlastným profilom):
 #   --user <meno>      Chrome beží pod týmto používateľom, predvolene
 #                      AGENT_BROWSER_USER alebo AGENT_TASKER_USER. Používateľ musí existovať.
+#                      Pod nerootom smie byť len volajúci.
 #   --profile <názov>  trvalý profil prehliadača (cookies, prihlásenie)
 #                      v ~<používateľ>/.local/share/agent-browser/profiles/<názov>,
 #                      práva 700. Názov má tvar [a-z0-9][a-z0-9-]*. Súčasne
@@ -35,15 +41,19 @@
 #                      predvolene 120 s.
 set -euo pipefail
 
-USER_B="${AGENT_BROWSER_USER:-${AGENT_TASKER_USER:-}}"
+ME="$(id -un)"
+if [ "$(id -u)" -eq 0 ]; then
+  USER_B="${AGENT_BROWSER_USER:-${AGENT_TASKER_USER:-}}"
+else
+  USER_B="$ME"
+fi
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT=""
 mjs_args=()
 file="" steps="" profile="" exec_script="" exec_timeout=120
 exec_args=() exec_env=()
 
-die() { echo "browser.sh: $*" >&2; exit "${2:-1}"; }
-[ "$(id -u)" -eq 0 ] || die "spúšťa sa pod rootom (runuser vyžaduje root)"
+die() { echo "browser.sh: $1" >&2; exit "${2:-1}"; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -70,6 +80,9 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$USER_B" ] || die "chýba používateľ: --user alebo AGENT_BROWSER_USER" 2
 [[ "$USER_B" =~ ^[a-z_][a-z0-9_-]*$ ]] || die "zlé meno používateľa $USER_B" 2
+if [ "$(id -u)" -ne 0 ] && [ "$USER_B" != "$ME" ]; then
+  die "--user $USER_B: pod používateľom $ME smie Chrome bežať len pod ním (iného používateľa môže zvoliť len root)" 2
+fi
 HOME_B="$(getent passwd "$USER_B" | cut -d: -f6)"
 [ -n "$HOME_B" ] && [ -d "$HOME_B" ] || die "používateľ $USER_B neexistuje" 2
 [ "$USER_B" != root ] || die "Chrome so sandboxom pod rootom nebeží, zvoľ iného používateľa" 2
@@ -86,11 +99,21 @@ fi
 OUT="${OUT:-${AGENT_WORKDIR:-$PWD}/.scratch/browser/$(date +%Y%m%d-%H%M%S)}"
 
 # env -i: prostredie roota (tokeny, cesty) sa nesmie dostať k používateľovi.
-as_b() { runuser -u "$USER_B" -- env -i HOME="$HOME_B" USER="$USER_B" PATH="$PATH" LANG="${LANG:-C.UTF-8}" "$@"; }
+# Pod nerootom beží príkaz priamo pod volajúcim (bez runuser), prostredie je rovnaké.
+if [ "$(id -u)" -eq 0 ]; then
+  as_b() { runuser -u "$USER_B" -- env -i HOME="$HOME_B" USER="$USER_B" PATH="$PATH" LANG="${LANG:-C.UTF-8}" "$@"; }
+  chown_b() { chown "$@"; }
+  LOCK_DIR=/run/lock
+else
+  as_b() { env -i HOME="$HOME_B" USER="$USER_B" PATH="$PATH" LANG="${LANG:-C.UTF-8}" "$@"; }
+  chown_b() { :; }
+  LOCK_DIR="$HOME_B/.cache"
+  mkdir -p "$LOCK_DIR"
+fi
 
 tmp="$(mktemp -d /tmp/agent-browser.XXXXXX)"
 trap 'rm -rf "$tmp"' EXIT
-chown "$USER_B":"$USER_B" "$tmp"
+chown_b "$USER_B":"$USER_B" "$tmp"
 chmod 700 "$tmp"
 
 # Inštalácia balíka, len keď sa hash zámku líši od uloženého.
@@ -100,11 +123,11 @@ want="$(sha256sum "$HERE/browser/package-lock.json" | cut -d' ' -f1)"
   if [ ! -d "$INST/node_modules/playwright-core" ] || [ "$(cat "$INST/.lock.sha256" 2>/dev/null)" != "$want" ]; then
     as_b mkdir -p "$INST"
     cp "$HERE/browser/package.json" "$HERE/browser/package-lock.json" "$INST/"
-    chown "$USER_B":"$USER_B" "$INST/package.json" "$INST/package-lock.json"
+    chown_b "$USER_B":"$USER_B" "$INST/package.json" "$INST/package-lock.json"
     as_b sh -c 'cd "$1" && rm -rf node_modules && npm ci --ignore-scripts --no-audit --no-fund' _ "$INST" >&2
     echo "$want" | as_b tee "$INST/.lock.sha256" >/dev/null
   fi
-) 9>/run/lock/agent-browser-install.lock
+) 9>"$LOCK_DIR/agent-browser-install.lock"
 
 pdir=""
 if [ -n "$profile" ]; then
@@ -115,7 +138,7 @@ if [ -n "$profile" ]; then
   as_b install -d -m 700 "$pdir"
   as_b chmod 700 "$pdir"
   # Chrome nepustí dva behy do jedného profilu, druhý beh preto hneď skončí.
-  exec 8>"/run/lock/agent-browser-profile-$USER_B-$profile.lock"
+  exec 8>"$LOCK_DIR/agent-browser-profile-$USER_B-$profile.lock"
   flock -n 8 || die "profil $profile sa práve používa"
 fi
 
@@ -126,7 +149,7 @@ if [ -n "$exec_script" ]; then
   [ "$kb" -le 51200 ] || die "priečinok $edir má $((kb / 1024)) MB, nad 50 MB ho nekopírujem" 2
   mkdir "$tmp/exec"
   cp -r --no-dereference "$edir/." "$tmp/exec/"
-  chown -R "$USER_B":"$USER_B" "$tmp"
+  chown_b -R "$USER_B":"$USER_B" "$tmp"
   envargs=(BROWSER_SESSION="$tmp/session.mjs")
   [ -z "$pdir" ] || envargs+=(BROWSER_PROFILE_DIR="$pdir")
   for n in "${exec_env[@]}"; do
@@ -153,7 +176,7 @@ if [ -n "$steps" ]; then
   if [ -f "$steps" ]; then cp "$steps" "$tmp/steps.json"; else printf '%s' "$steps" > "$tmp/steps.json"; fi
   mjs_args+=(--steps steps.json)
 fi
-chown -R "$USER_B":"$USER_B" "$tmp"
+chown_b -R "$USER_B":"$USER_B" "$tmp"
 
 rc=0
 # sh -c: $0 = INST, $1 = tmp, ďalej argumenty browser.mjs
