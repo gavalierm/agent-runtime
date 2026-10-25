@@ -4,8 +4,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, existsSync, utimesS
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFakeT3 } from "./fake_t3.mjs";
-import { T3Client } from "../lib.mjs";
-import { tick } from "../driver.mjs";
+import { T3Client, inboxConfig } from "../lib.mjs";
+import { heldDue, tick } from "../driver.mjs";
 import { rememberRoute } from "../route.mjs";
 import { sweepHeld } from "../morning.mjs";
 
@@ -39,13 +39,13 @@ function setup(t3) {
 
 const ago = (now, ms) => new Date(now - ms).toISOString();
 
-test("1: držaná správa 13 h stará, vlákno voľné, beh skončil pred 5 h: odíde po lehote", async (t) => {
+test("1: držaná správa 25 h stará, vlákno voľné, beh skončil pred 5 h: odíde po lehote", async (t) => {
   const t3 = await startFakeT3();
   t.after(() => t3.close());
   const now = Date.now();
   t3.addThread("thr-adam", { latestRunCompletedAt: ago(now, 5 * H) });
   const { cfg, client, box, put } = setup(t3);
-  put("boris-adam-x-20261019-100000-1.md", HELD, 13 * H, now);
+  put("boris-adam-x-20261019-100000-1.md", HELD, 25 * H, now);
   const r = await tick(cfg, client, { now });
   assert.equal(r.sent, 1);
   assert.equal(r.held, 1);
@@ -168,8 +168,8 @@ test("559: beh skončil pred 1 min a bol to /clear: držaná správa nejde sama"
   const r = await tick(cfg, client, { now });
   assert.equal(r.sent, 0);
   assert.equal(t3.state.messages.length, 0);
-  // Po lehote cfg.heldMaxMs odíde aj po /clear.
-  put("boris-adam-x-20261019-100001-1.md", HELD, 13 * H, now);
+  // Po lehote cfg.heldMaxMs (24 h) odíde aj po /clear.
+  put("boris-adam-x-20261019-100001-1.md", HELD, 25 * H, now);
   assert.equal((await tick(cfg, client, { now })).sent, 1);
 });
 
@@ -183,4 +183,27 @@ test("559: ten istý beh bez /clear: držaná správa odíde sama", async (t) =>
   const r = await tick(cfg, client, { now });
   assert.equal(r.sent, 1);
   assert.match(t3.state.messages[0].text, /Na vedomie, 1 správa bez budenia\./);
+});
+
+test("lehota držanej správy je predvolene 24 h: 13 h na studenom vlákne nie, 25 h áno", () => {
+  const cfg = inboxConfig({});
+  assert.equal(cfg.heldMaxMs, 24 * H);
+  const now = Date.now();
+  const g = (ageMs) => ({ held: [{ mtime: now - ageMs }], thread: { latestRunCompletedAt: ago(now, 30 * H) } });
+  assert.equal(heldDue(cfg, g(13 * H), now), false);
+  assert.equal(heldDue(cfg, g(25 * H), now), true);
+});
+
+test("sweepHeld presunie aj čerstvú správu na vedomie a nechá budiacu", () => {
+  const root = mkdtempSync(join(tmpdir(), "adam-sweep-fresh-"));
+  const box = join(root, "box");
+  for (const d of ["inbox", "processed"]) mkdirSync(join(box, d), { recursive: true });
+  const now = Date.now();
+  const put = (n, text) => { const p = join(box, "inbox", n); writeFileSync(p, text); const s = (now - 60 * 1000) / 1000; utimesSync(p, s, s); };
+  put("boris-20261019-100000-1.md", HELD);
+  put("boris-20261019-100001-2.md", "odpoveď: čakám\nBudí.\n");
+  const out = sweepHeld({ sweepBoxes: [box] }, now);
+  assert.equal(out.length, 1);
+  assert.deepEqual(readdirSync(join(box, "processed")), ["boris-20261019-100000-1.md"]);
+  assert.deepEqual(readdirSync(join(box, "inbox")), ["boris-20261019-100001-2.md"]);
 });

@@ -137,17 +137,17 @@ zvyšok s cestou do `processed`) a to dvoma cestami (úloha 518):
    len pre skupinu, ktorá by inak odišla ako teplá. Čas berie budič z poľa `latestRunCompletedAt` riadku
    vlákna v `/api/orchestration/shell`, `null` alebo neplatný čas nie je
    teplé. Alebo lehota: najstaršia držaná správa skupiny čaká dlhšie než
-   `AGENT_HELD_MAX_S` (12 h).
+   `AGENT_HELD_MAX_S` (24 h, D0176).
 
 Budiaca skupina má prednosť pred skupinou len z držaných správ, držaná
 dávka tak budiacu nezdrží. Držané správy vlákna témy idú do vlákna témy.
 Ranný súhrn je `nečakám`, držané správy hlavného vlákna idú s ním, ak ich
-nedoručila niektorá z ciest vyššie. Poistka: správa `na vedomie` staršia
-než 24 h neostane ležať, `morning.mjs` ju pri behu presunie zo schránky
-agenta do `processed` a súhrn nesie časť "Držané správy na vedomie
-staršie než 24 h" (agent, odosielateľ, téma, prvý riadok, nová cesta).
-Zachytí správu len pri výpadku budiča alebo vlákne, ktoré bolo
-12 h trvalo zaneprázdnené. Bez takej správy časť v súhrne nie je.
+nedoručila niektorá z ciest vyššie. Ranný súhrn je hlavná cesta držanej
+správy (D0176): `morning.mjs` pri behu presunie každú správu `na vedomie`
+zo schránky agenta do `processed`, bez ohľadu na jej vek, a súhrn nesie
+časť "Držané správy na vedomie, presunuté do processed" (agent,
+odosielateľ, téma, prvý riadok, nová cesta). Budič ju pošle sám až po
+24 h, teda keď ranný súhrn neprebehol. Bez takej správy časť v súhrne nie je.
 Vlákna tém sa tým nebudia.
 Schránky na odnos: `AGENT_SWEEP_BOXES` (zoznam cez dvojbodku), inak
 vlastná schránka a priečinky z `AGENT_REPLY_ROUTE_<meno>`
@@ -656,7 +656,7 @@ prostredia. `reply.sh` si `runtime.env` agenta načíta sám.
 | `AR_STATE`, `AR_ENV`, `REPLY_GUARD_NO_NET` | stav v `~/.local/state/agent-rules`, `server` alebo `mac`, prázdne | skúšky a stroje bez siete: priečinok stavu hookov, názov prostredia v `rules_delta.mjs`, `1` vypne kontrolu odkazov v `reply_guard.mjs` |
 | `AGENT_BATCH_WAIT_S`, `AGENT_BATCH_MAX_WAIT_S` | 30, 120 | tiché okno dávky |
 | `AGENT_HELD_WARM_S` | 600 | držaná správa na vedomie odíde sama, keď posledný beh vlákna skončil najviac toľko sekúnd dozadu a nebol to `/clear` |
-| `AGENT_HELD_MAX_S` | 43200 | držaná správa na vedomie odíde sama, keď čaká dlhšie (menej než 24 h poistky `morning.mjs`) |
+| `AGENT_HELD_MAX_S` | 86400 | držaná správa na vedomie odíde sama, keď čaká dlhšie; ranný súhrn ju presunie skôr (D0176) |
 | `T3_URL` | `http://127.0.0.1:3773` | adresa T3 servera, napríklad `https://host.example.ts.net:8802`; vlákna založené cez MCP ju nededia, patrí do `runtime.env` |
 | `T3_TOKEN_FILE` | `~/.config/<meno>/t3_token` | token T3 (600) |
 | `TASKER_HOME`, `TASKER_DB`, `TASKER_BIN` | `~/.tasker`, `$TASKER_HOME/tasker.db`, `/opt/tasker/bin/tasker` | Tasker |

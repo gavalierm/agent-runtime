@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Ranný súhrn: zapíše do schránky agenta správu ranny-<čas>.md so súhrnom
 // Taskera za 24 h (`tasker summary`), prvý riadok `odpoveď: nečakám`
-// (budí a vynesie držané správy na vedomie). Správy na vedomie staršie
-// než 24 h presunie do processed a vypíše v súhrne (sweepHeld). Agent z neho napíše operátorovi súhrn
+// (budí a vynesie držané správy na vedomie). Každú držanú správu na vedomie
+// presunie do processed a vypíše v súhrne (sweepHeld). Agent z neho napíše operátorovi súhrn
 // do svojho vlákna. Spúšťa ho agent-morning.timer.
 // Keď `tasker summary` zlyhá, správa nesie chybu, súhrn neodpadne potichu.
 import { execFileSync, spawnSync } from "node:child_process";
@@ -11,21 +11,17 @@ import { existsSync, readFileSync, renameSync } from "node:fs";
 import { basename, join } from "node:path";
 import { config, inboxEntries, log, parseHeader, parseName, writeInbox } from "./lib.mjs";
 
-const DAY_MS = 24 * 3600 * 1000;
-
-// Držané správy na vedomie staršie než 24 h: presunie ich zo schránky
+// Držané správy na vedomie bez ohľadu na vek: presunie ich zo schránky
 // agenta do processed a vráti zoznam pre súhrn. Schránky berie z
-// cfg.sweepBoxes, bez nich (cfg bez poľa) nerobí nič.
-// poistka: zachytí správu na vedomie len pri výpadku budiča alebo vlákne,
-// ktoré bolo 12 h trvalo zaneprázdnené. Jadro je doručenie po behu vlákna
-// alebo po lehote 12 h v driver.mjs (úloha 518).
+// cfg.sweepBoxes, bez nich (cfg bez poľa) nerobí nič. Budiace správy
+// nechá. Budič pošle držanú správu sám až po lehote 24 h, keď ranný
+// súhrn neprebehol (driver.mjs, úloha 518, D0176).
 export function sweepHeld(cfg, now = Date.now()) {
   const out = [];
   for (const box of cfg.sweepBoxes ?? []) {
     let entries;
     try { entries = inboxEntries(box); } catch { continue; }
-    for (const { name, mtime } of entries) {
-      if (now - mtime <= DAY_MS) continue;
+    for (const { name } of entries) {
       const path = join(box, "inbox", name);
       let text;
       try { text = readFileSync(path, "utf8"); } catch { continue; }
@@ -44,7 +40,7 @@ export function sweepHeld(cfg, now = Date.now()) {
 
 export function heldSection(items) {
   if (!items.length) return [];
-  const lines = ["", `Držané správy na vedomie staršie než 24 h, presunuté do processed (${items.length}):`, ""];
+  const lines = ["", `Držané správy na vedomie, presunuté do processed (${items.length}):`, ""];
   for (const i of items) lines.push(`- ${i.agent}, od ${i.sender}, téma ${i.topic}: ${i.first} (${i.path})`);
   return lines;
 }

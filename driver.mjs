@@ -33,7 +33,8 @@
 //    posledný beh vlákna skončil najviac AGENT_HELD_WARM_S dozadu a nebol to
 //    /clear (teplé vlákno, kontext je v cache; po /clear v cache nie je, lebo
 //    /clear je vlastný beh a jeho koniec by vlákno ukázal ako teplé) alebo najstaršia držaná správa čaká
-//    dlhšie než AGENT_HELD_MAX_S (úloha 518). Budiaca skupina má prednosť.
+//    dlhšie než AGENT_HELD_MAX_S (24 h, úloha 518, D0176; ranný súhrn ju
+//    presunie skôr). Budiaca skupina má prednosť.
 //    Správa Taskera, na ktorej úlohe agent po jej zápise sám zapísal nečinnú
 //    (quiet 0) udalosť, nebudí a ide na vedomie (chyba 24. 10. 2026, úloha 499).
 //    Dávka odíde až po tichom okne AGENT_BATCH_WAIT_S od poslednej
