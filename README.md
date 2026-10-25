@@ -128,8 +128,12 @@ zvyšok s cestou do `processed`) a to dvoma cestami (úloha 518):
 1. S najbližšou budiacou dávkou do toho istého vlákna.
 2. Sama ako dávka len z držaných správ, keď je vlákno voľné a platí
    jedno z dvoch. Vlákno je teplé: jeho posledný beh skončil najviac
-   `AGENT_HELD_WARM_S` (10 min) dozadu, kontext je v cache a volanie
-   modelu je lacné. Čas berie budič z poľa `latestRunCompletedAt` riadku
+   `AGENT_HELD_WARM_S` (10 min) dozadu a nebol to `/clear`, kontext je
+   v cache a volanie modelu je lacné. `/clear` je vlastný beh vlákna
+   (jeho `userMessageId` nesie text `/clear`), po ňom je kontext prázdny
+   a samostatná správa by ho drahým ťahom znova naplnila (úloha 559),
+   takže vlákno po `/clear` teplé nie je. Budič to zistí z detailu vlákna,
+   len pre skupinu, ktorá by inak odišla ako teplá. Čas berie budič z poľa `latestRunCompletedAt` riadku
    vlákna v `/api/orchestration/shell`, `null` alebo neplatný čas nie je
    teplé. Alebo lehota: najstaršia držaná správa skupiny čaká dlhšie než
    `AGENT_HELD_MAX_S` (12 h).
@@ -609,7 +613,7 @@ prostredia. `reply.sh` si `runtime.env` agenta načíta sám.
 | `AR_ROZHODNUTIA` | prázdne | `1` zapne v `reply_guard.mjs` kontrolu "Čaká na teba" a nezapísaného rozhodnutia a v `rules_delta.mjs` sledovanie `rozhodnutia/` |
 | `AR_STATE`, `AR_ENV`, `REPLY_GUARD_NO_NET` | stav v `~/.local/state/agent-rules`, `server` alebo `mac`, prázdne | skúšky a stroje bez siete: priečinok stavu hookov, názov prostredia v `rules_delta.mjs`, `1` vypne kontrolu odkazov v `reply_guard.mjs` |
 | `AGENT_BATCH_WAIT_S`, `AGENT_BATCH_MAX_WAIT_S` | 30, 120 | tiché okno dávky |
-| `AGENT_HELD_WARM_S` | 600 | držaná správa na vedomie odíde sama, keď posledný beh vlákna skončil najviac toľko sekúnd dozadu |
+| `AGENT_HELD_WARM_S` | 600 | držaná správa na vedomie odíde sama, keď posledný beh vlákna skončil najviac toľko sekúnd dozadu a nebol to `/clear` |
 | `AGENT_HELD_MAX_S` | 43200 | držaná správa na vedomie odíde sama, keď čaká dlhšie (menej než 24 h poistky `morning.mjs`) |
 | `T3_URL` | `http://127.0.0.1:3773` | adresa T3 servera, napríklad `https://host.example.ts.net:8802`; vlákna založené cez MCP ju nededia, patrí do `runtime.env` |
 | `T3_TOKEN_FILE` | `~/.config/<meno>/t3_token` | token T3 (600) |

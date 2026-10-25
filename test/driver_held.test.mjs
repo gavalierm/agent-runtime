@@ -147,3 +147,40 @@ test("dávka len z držaných má strop 10 správ", async (t) => {
   assert.equal(readdirSync(join(box, "inbox")).length, 2);
   assert.ok(!existsSync(join(cfg.state, "inflight.json")));
 });
+
+// Úloha 559 (replay 547): po čistom kontexte je /clear posledný beh vlákna,
+// jeho koniec je čerstvý, ale kontext v cache nie je.
+function lastRun(text) {
+  return {
+    latestRunId: "run-z",
+    _runs: [{ id: "run-z", status: "completed", userMessageId: "msg-z", completedAt: null }],
+    _messages: [{ id: "msg-z", role: "user", runId: "run-z", text }],
+  };
+}
+
+test("559: beh skončil pred 1 min a bol to /clear: držaná správa nejde sama", async (t) => {
+  const t3 = await startFakeT3();
+  t.after(() => t3.close());
+  const now = Date.now();
+  t3.addThread("thr-adam", { latestRunCompletedAt: ago(now, 1 * MIN), ...lastRun("/clear") });
+  const { cfg, client, put } = setup(t3);
+  put("boris-adam-x-20261019-100001-1.md", HELD, 20 * MIN, now);
+  const r = await tick(cfg, client, { now });
+  assert.equal(r.sent, 0);
+  assert.equal(t3.state.messages.length, 0);
+  // Po lehote cfg.heldMaxMs odíde aj po /clear.
+  put("boris-adam-x-20261019-100001-1.md", HELD, 13 * H, now);
+  assert.equal((await tick(cfg, client, { now })).sent, 1);
+});
+
+test("559: ten istý beh bez /clear: držaná správa odíde sama", async (t) => {
+  const t3 = await startFakeT3();
+  t.after(() => t3.close());
+  const now = Date.now();
+  t3.addThread("thr-adam", { latestRunCompletedAt: ago(now, 1 * MIN), ...lastRun("Hotovo, pokračuj.") });
+  const { cfg, client, put } = setup(t3);
+  put("boris-adam-x-20261019-100001-1.md", HELD, 20 * MIN, now);
+  const r = await tick(cfg, client, { now });
+  assert.equal(r.sent, 1);
+  assert.match(t3.state.messages[0].text, /Na vedomie, 1 správa bez budenia\./);
+});

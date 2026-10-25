@@ -28,8 +28,9 @@
 //    inak ostáva v inboxe a ide pod nadpisom "Na vedomie" s najbližšou
 //    budiacou dávkou do toho istého vlákna. Sama odíde ako dávka len
 //    z držaných správ (najviac 10), keď je vlákno voľné a platí jedno:
-//    posledný beh vlákna skončil najviac AGENT_HELD_WARM_S dozadu (teplé
-//    vlákno, kontext je v cache) alebo najstaršia držaná správa čaká
+//    posledný beh vlákna skončil najviac AGENT_HELD_WARM_S dozadu a nebol to
+//    /clear (teplé vlákno, kontext je v cache; po /clear v cache nie je, lebo
+//    /clear je vlastný beh a jeho koniec by vlákno ukázal ako teplé) alebo najstaršia držaná správa čaká
 //    dlhšie než AGENT_HELD_MAX_S (úloha 518). Budiaca skupina má prednosť.
 //    Správa Taskera, na ktorej úlohe agent po jej zápise sám zapísal nečinnú
 //    (quiet 0) udalosť, nebudí a ide na vedomie (chyba 24. 10. 2026, úloha 499).
@@ -62,7 +63,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 import { alert, config, serial, ensureDir, inboxConfig, inboxEntries, log, parseHeader, parseName, readJson, stableId, superviseConfig, T3Client, threadBusy, writeJsonAtomic } from "./lib.mjs";
-import { contextStep, rotationStep, stalledStep, superviseStep, threadActive } from "./supervise.mjs";
+import { CLEAR_TEXT, contextStep, rotationStep, stalledStep, superviseStep, threadActive } from "./supervise.mjs";
 import { messageTopic, readTopics, routeFor, topicsPath, waitingFor } from "./route.mjs";
 import { agentStates, watchStep } from "./clear_watch.mjs";
 
@@ -203,13 +204,41 @@ export function classify(cfg, name, cache = {}) {
 // Skupina len z držaných správ odíde sama, keď je vlákno teplé (posledný beh
 // skončil najviac cfg.heldWarmMs dozadu, modelu sa kontext číta z cache) alebo
 // keď najstaršia držaná správa čaká dlhšie než cfg.heldMaxMs (úloha 518).
-// Čas behu null alebo neplatný vlákno za teplé nepovažuje.
+// Čas behu null alebo neplatný vlákno za teplé nepovažuje, rovnako vlákno,
+// ktorého posledný beh bol /clear (g.afterClear, úloha 559): kontext je
+// čistý a samostatná správa by ho drahým ťahom znova naplnila.
+function isWarm(cfg, g, now) {
+  const done = Date.parse(g.thread?.latestRunCompletedAt ?? "");
+  return Number.isFinite(done) && now - done <= cfg.heldWarmMs;
+}
+
 export function heldDue(cfg, g, now) {
   if (!g.held.length) return false;
   const oldest = Math.min(...g.held.map((e) => e.mtime));
   if (now - oldest > cfg.heldMaxMs) return true;
+  if (g.afterClear) return false;
   const done = Date.parse(g.thread?.latestRunCompletedAt ?? "");
   return Number.isFinite(done) && now - done <= cfg.heldWarmMs;
+}
+
+// Posledný beh vlákna je /clear (budič ho posiela po HOTOVO-KONTEXT, sledovač
+// clear_watch.mjs aj ručne): T3 vedie /clear ako vlastný beh, jeho správa
+// userMessageId má text "/clear". Chyba čítania vlákna platí ako /clear,
+// držaná správa počká na lehotu alebo budiacu dávku.
+export async function lastRunIsClear(client, thread) {
+  if (!thread?.latestRunId) return false;
+  try {
+    const d = await client.threadDetail(thread.id);
+    const run = (d.runs ?? []).find((r) => r.id === thread.latestRunId);
+    const msg = (d.messages ?? []).find((m) => m.id === run?.userMessageId);
+    return String(msg?.text ?? "").trim() === CLEAR_TEXT;
+  } catch { return true; }
+}
+
+// Detail vlákna sa číta len pri skupine, ktorá by inak odišla ako teplá.
+async function withClearFlag(cfg, client, g, now) {
+  g.afterClear = g.held.length > 0 && isWarm(cfg, g, now) ? await lastRunIsClear(client, g.thread) : false;
+  return g;
 }
 
 export async function tick(cfgIn, client, { now = Date.now() } = {}) {
@@ -362,7 +391,7 @@ export async function tick(cfgIn, client, { now = Date.now() } = {}) {
           continue;
         }
         files = g.wake.slice(0, MAX_BATCH).map((e) => e.name);
-      } else if (!heldDue(cfg, g, now)) {
+      } else if (!heldDue(cfg, await withClearFlag(cfg, client, g, now), now)) {
         if (g.held.length) reasons.push(label(g, `držím ${g.held.length} na vedomie`));
         continue;
       }
