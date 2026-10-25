@@ -27,9 +27,41 @@ export function collectBoxes() {
     }
     return false;
   };
+  // Zatvorený details nevykreslí nič okrem svojho prvého summary.
+  const inClosedDetails = (el) => {
+    for (let e = el; e && e.nodeType === 1; e = e.parentElement) {
+      const d = e.parentElement;
+      if (d && d.tagName === "DETAILS" && !d.open) {
+        const sum = [...d.children].find((c) => c.tagName === "SUMMARY");
+        if (e !== sum) return true;
+      }
+    }
+    return false;
+  };
+  // Predkovia (aj samotný prvok), ktorí orezávajú obsah: ich políčko bez okrajov.
+  const clipsOf = (el) => {
+    const clips = [];
+    for (let e = el; e && e !== document.body && e !== document.documentElement; e = e.parentElement) {
+      const cs = getComputedStyle(e);
+      if (cs.overflowX === "visible" && cs.overflowY === "visible") continue;
+      const r = e.getBoundingClientRect();
+      clips.push({
+        x: cs.overflowX !== "visible", y: cs.overflowY !== "visible",
+        left: r.left + e.clientLeft, right: r.left + e.clientLeft + e.clientWidth,
+        top: r.top + e.clientTop, bottom: r.top + e.clientTop + e.clientHeight,
+      });
+    }
+    return clips;
+  };
+  // Riadok, ktorého políčko orezávajúci predok nepretína (zvisle aj z neho vidno
+  // menej než polovicu, políčko textu je o pár px vyššie než riadok), sa nevykreslí.
+  const clipped = (r, clips) => clips.some((c) =>
+    (c.y && Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top) < r.height / 2) ||
+    (c.x && (r.right <= c.left + 0.5 || r.left >= c.right - 0.5)));
   for (const el of document.body.querySelectorAll("*")) {
     const texts = [...el.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim());
-    if (!texts.length || hidden(el)) continue;
+    if (!texts.length || hidden(el) || inClosedDetails(el)) continue;
+    const clips = clipsOf(el);
     // Políčka samotného textu (Range), nie prvku, takže padding sa nepočíta.
     // Obdĺžniky s vrchom do 2 px patria jednému riadku a zlúčia sa.
     const lines = [];
@@ -37,7 +69,7 @@ export function collectBoxes() {
       const range = document.createRange();
       range.selectNodeContents(t);
       for (const r of range.getClientRects()) {
-        if (r.width < 1 || r.height < 1) continue;
+        if (r.width < 1 || r.height < 1 || clipped(r, clips)) continue;
         const l = lines.find((x) => Math.abs(x.top - r.top) <= 2);
         if (!l) lines.push({ top: r.top, bottom: r.bottom, left: r.left, right: r.right });
         else { l.bottom = Math.max(l.bottom, r.bottom); l.left = Math.min(l.left, r.left); l.right = Math.max(l.right, r.right); }

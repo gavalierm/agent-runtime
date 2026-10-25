@@ -59,6 +59,51 @@ test("browser.sh --gaps: nalepený pár skončí kódom 1 a zapíše sa, odsaden
   }
 });
 
+// Nevykreslený obsah (zatvorený details mimo summary, riadky za hranicou orezania
+// predka) nemá ísť do kontroly (úloha 574). Prvky sú položené tak, že by sa
+// nevykreslený text hlásil ako nalepený na viditeľný.
+const gapsRun = (body) => {
+  const dir = mkdtempSync(join(tmpdir(), "browser-gaps-"));
+  try {
+    const html = join(dir, "page.html");
+    writeFileSync(html, `<!doctype html><meta charset="utf-8"><style>body{margin:20px;font:16px/16px sans-serif}
+details,p{margin:0}.clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:200px}
+.hid{height:16px;overflow:hidden}.ok{margin-top:20px}</style>${body}`);
+    const out = join(dir, "out");
+    const r = spawnSync(sh, ["--file", html, "--gaps", "--width", "1440", "--out", out], { encoding: "utf8" });
+    return { status: r.status, stderr: r.stderr, gaps: readFileSync(join(out, "gaps-1440.txt"), "utf8") };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+};
+const skipB = { skip: !ready && "nie je root so serverovým prehliadačom" };
+
+test("browser.sh --gaps: text v zatvorenom details mimo summary sa nekontroluje", skipB, () => {
+  const r = gapsRun(`<details><summary>Hlavička</summary><p>Skrytý odsek jedna</p><p>Skrytý odsek dva</p></details><div class="ok">Odsadený pod</div>`);
+  assert.equal(r.status, 0, r.stderr + r.gaps);
+  assert.equal(r.gaps, "");
+});
+
+test("browser.sh --gaps: otvorený details sa kontroluje, summary zatvoreného tiež", skipB, () => {
+  const r = gapsRun(`<details open><summary>Hlavička otvorená</summary><p>Vidno ju</p></details>
+<details><summary>Zatvorená hlavička</summary><p>Skryté</p></details><div class="ok">Odsadený pod</div>`);
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.gaps, /Hlavička otvorená.*Vidno ju/);
+  assert.doesNotMatch(r.gaps, /Skryté/);
+});
+
+test("browser.sh --gaps: riadky za hranicou line-clamp sa nekontrolujú", skipB, () => {
+  const r = gapsRun(`<p class="clamp">Prvý riadok textu dlhého textu ktorý sa láme do viacerých riadkov a ďalší text ktorý sa láme ešte raz a ešte raz a ešte raz a potom skončí</p><div class="ok">Odsadený pod</div>`);
+  assert.equal(r.status, 0, r.stderr + r.gaps);
+  assert.equal(r.gaps, "");
+});
+
+test("browser.sh --gaps: viditeľné riadky 2 px od seba sa v orezanom predkovi stále hlásia", skipB, () => {
+  const r = gapsRun(`<div style="overflow:hidden;height:60px"><div style="line-height:16px">Horný viditeľný riadok</div><div style="margin-top:2px;line-height:16px">Dolný viditeľný riadok</div></div>`);
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.gaps, /Horný viditeľný.*Dolný viditeľný/);
+});
+
 // --- Používateľ, trvalý profil a --exec (D0163) ---
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
