@@ -30,9 +30,11 @@ Operátor píše do vlákna priamo z T3 desktopu alebo mobilu.
 | `secret_drop.sh`, `secret_drop.mjs` | jednorazová stránka na odovzdanie tajomstva |
 | `systemd/` | šablóna budiča `agent-driver@.service`, jednotky udalostí Taskera a ranného súhrnu, `tmpfiles.d` schránky a drop-in `t3code.service` |
 | `test/` | `node --test 'test/*.test.mjs'`, falošný T3 server bez závislostí |
-| `lib/public_check.mjs` | kontrola mien a adries pred commitom a pushom (`.githooks/pre-push`) |
+| `lib/public_check.mjs` | kontrola mien a adries pred commitom a pushom (`.githooks/pre-push`), slúži aj repu playbooku |
 | `hooks/` | hooky relácie claude (časť Hooky relácie): `identity`, `no_operator_commands`, `objection_fix`, `own_rule_scope`, `reply_guard`, `rules_delta`, `tasker_work`, `todo_after_comment`, `idle_wake`, `topic_task`, testy v `test/<hook>.test.mjs` |
 | `lib/agent_env.mjs`, `lib/agent_name.mjs`, `lib/deny.mjs`, `lib/tasker_read.mjs` | knižnice hookov: hodnoty z `runtime.env` agenta, meno agenta, zamietnutie s riadkom "Správny postup:" (D0141), čítanie úloh Taskera |
+| `bin/chyba.sh`, `bin/rozhodni.sh` | zápis uznanej chyby a zápis rozhodnutia, opis v časti Skripty a knižnice |
+| `lib/rozhodnutia.mjs`, `lib/deny.sh`, `lib/deny_check.mjs`, `lib/session_id.mjs`, `lib/path_check.mjs`, `lib/agent_rules.sh` | register rozhodnutí, zamietnutie pre shell, strážca zamietnutí, id relácie T3, kontrola odkazov na cesty, cesta ku klonu pravidiel |
 
 Node 22.13 alebo novší, bez npm závislostí.
 
@@ -538,6 +540,41 @@ v `~/Work/agent-runtime`. Hooky vedia o repe pravidiel len cez klon
 `~/Work/agent-rules`) a obal `tk` (`AGENT_TK`, inak `bin/tk` v tom klone).
 `agent_vlakno.sh` zapíše novému agentovi `AGENT_TASKER_USER` a skopíruje `AGENT_OPERATOR_NAME` a `TASKER_WEB_URL` z `runtime.env` správcu. Testy hookov sú `test/<hook>.test.mjs`, `test/agent_env.test.mjs`
 a `test/deny.test.mjs`, všetky bežia s `HOME` v tmp a bez živého Taskera.
+
+## Skripty a knižnice
+
+Kód, ktorý používa viac repí, žije len tu. Repo pravidiel (súkromné) a repo
+playbooku (verejné) ho nekopírujú: repo pravidiel ho berie cez tenké obaly
+a re-exporty, playbook naň odkazuje odkazom na zdroj. Nič z toho nepredpokladá,
+že leží v repe pravidiel, a nenesie mená agentov, ľudí ani strojov
+(`node lib/public_check.mjs`).
+
+| súbor | čo robí |
+|---|---|
+| `bin/rozhodni.sh` | jediný zápis rozhodnutia do `rozhodnutia/` repa s rozhodnutiami: pridelí číslo, zapíše súbor a `INDEX.md`, commitne pod menom agenta (`<Agent> (<stroj>)`), pushne, nepushnutý lokálny záznam po cudzom zápise s rovnakým číslom prečísluje, `--z-ulohy N` doplní zdroj a úlohu z Taskera, `--dry-run` nezapíše nič |
+| `lib/rozhodnutia.mjs` | register: `list`, `show`, `check`, `index`, `zapis`; exportuje aj `configure({ repo, operatori, kontroly })`, ktorým repo pravidiel doplní meno operátora a vlastné kontroly záznamov |
+| `bin/chyba.sh` | uznaná chyba agenta: zapíše riadok do registra a pri druhom výskyte tej istej triedy založí v Taskeri úlohu na kontrolu |
+| `lib/deny.sh`, `lib/deny_check.mjs` | `deny_postup` pre git hooky (dôvod a riadok "Správny postup:") a strážca, ktorý zlyhá na hooku so zamietnutím bez postupu (`denyProblems(koreň)`) |
+| `lib/session_id.mjs` | `originalId()`: pôvodné id relácie claude vlákna T3 z príkazového riadku predkov procesu |
+| `lib/path_check.mjs` | kontrola, že každá cesta v apostrofoch v `*.md` repa je v ňom alebo je uvedená v jeho `README.md` v sekcii "Čo v repe nie je" (`PATH_CHECK_ROOT` ukáže na iné repo) |
+| `lib/public_check.mjs` | kontrola mien a adries pred commitom a pushom, aj pre iné verejné repo (`PUBLIC_CHECK_ROOT`, `PUBLIC_CHECK_LIST`) |
+| `lib/agent_rules.sh` | `agent_rules_dir`: cesta ku klonu repa pravidiel |
+
+Premenné:
+
+| premenná | význam |
+|---|---|
+| `ROZHODNUTIA_REPO` | klon s priečinkom `rozhodnutia/`, `rozhodni.sh` ju vyžaduje, `rozhodnutia.mjs` z nej berie predvolený priečinok |
+| `ROZHODNUTIA_DIR` | priečinok záznamov namiesto `<ROZHODNUTIA_REPO>/rozhodnutia`, alebo parameter `--dir` |
+| `ROZHODNUTIA_LIB` | vstup `rozhodnutia.mjs`, ktorý `rozhodni.sh` volá (napríklad re-export repa pravidiel s jeho kontrolami) |
+| `ROZHODNI_SYNC_UNIT` | jednotka systemd, ktorú `rozhodni.sh` po pushi spustí, bez nej sa sync nespúšťa |
+| `ROZHODNI_STROJ`, `ROZHODNI_TASKER` | meno stroja v mene autora commitu a príkaz Taskera pre `--z-ulohy` |
+| `CHYBA_AGENT`, `CHYBA_REGISTER`, `CHYBA_TASKER` | agent, súbor registra (`~/.local/state/agent-rules/chyby.tsv`) a príkaz Taskera pre `chyba.sh` |
+| `CHYBA_REVIEWER`, `CHYBA_TASKER_USER` | riešiteľ úlohy na kontrolu (predvolene `spravca-agentov`) a používateľ Taskera na serveri (predvolene `tasker`) |
+| `AGENT_RULES` | klon repa pravidiel, z ktorého sa berie `bin/tk` (predvolene server `/opt/agent-rules`, Mac `~/Work/agent-rules`) |
+
+Testy sú `test/rozhodnutia.test.mjs`, `test/chyba.test.mjs`, `test/deny_check.test.mjs`
+a `test/path_check.test.mjs`, bežia v dočasných priečinkoch s falošným Taskerom.
 
 ## Premenné prostredia
 
