@@ -27,8 +27,8 @@
 # ťahu). Druhý riadok `k správe: <hodnota>` opíše prvý riadok pôvodnej
 # správy z processed, budič odosielateľa podľa neho rozhodne, keď mu
 # chýba záznam. Bez prepínača odmietne telo s riadkom, ktorý začína
-# `Úloha`, `Otázka` alebo `Hotovo:`, to je pokyn a potrebuje --cakam
-# alebo --necakam.
+# `Úloha` alebo `Otázka`, to je pokyn a potrebuje --cakam alebo
+# --necakam. Riadok `Hotovo: <výsledok>` je výsledok, nie pokyn.
 #
 # Použitie: reply.sh [--cakam|--necakam] <meno správy> < odpoved.md
 # Kód 0 zapísané, 1 chyba.
@@ -65,8 +65,8 @@ if [ -z "$text" ]; then
     echo "Prázdna odpoveď, nič som nezapísal." >&2
     exit 1
 fi
-if [ "$explicit" = 0 ] && grep -qE '^(Úloha|Otázka|Hotovo:)' <<<"$text"; then
-    echo "Telo vyzerá ako pokyn (riadok Úloha, Otázka alebo Hotovo:), odpoveď na vedomie by adresáta nezobudila. Daj --cakam alebo --necakam. Nič som nezapísal." >&2
+if [ "$explicit" = 0 ] && grep -qE '^(Úloha|Otázka)' <<<"$text"; then
+    echo "Telo vyzerá ako pokyn (riadok Úloha alebo Otázka), odpoveď na vedomie by adresáta nezobudila. Daj --cakam alebo --necakam. Nič som nezapísal." >&2
     exit 1
 fi
 # Prvý riadok pôvodnej správy, budič ho presunul do processed.

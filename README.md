@@ -166,8 +166,9 @@ tou istou správou.
 Dávka s budiacou správou odíde až po tichom okne `AGENT_BATCH_WAIT_S`
 (30 s) od poslednej budiacej správy, najviac `AGENT_BATCH_MAX_WAIT_S`
 (120 s) od prvej, správy tesne za sebou tak idú jedným ťahom. `0` okno
-vypne. Zábrana v `reply.sh`: telo s riadkom `Úloha`, `Otázka` alebo
-`Hotovo:` bez `--cakam` alebo `--necakam` odmietne.
+vypne. Zábrana v `reply.sh`: telo s riadkom `Úloha` alebo `Otázka`
+bez `--cakam` alebo `--necakam` odmietne. Riadok `Hotovo:` je výsledok
+a prejde.
 
 ## Trasa odpovede do vlákna témy
 
