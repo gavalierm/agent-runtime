@@ -223,9 +223,10 @@ klonov (úloha 2 v Taskeri, 19. 10. 2026).
    tému nevedie. `route.mjs remember` (`ask_agent.sh`, `reply.sh`) z vlákna
    témy zapíše tému správy, len keď v zozname ešte nie je. `topic list`
    vypíše zoznam, `topic rm <téma>` tému zmaže. `topic tasks <téma> <id>...`
-   pridá k téme koreňové úlohy (pole `tasks`): správy tasker mostu o takej úlohe
-   a všetkých jej podúlohách (reťaz `parent_id`) idú do vlákna témy pred pravidlom
-   podľa projektu. Úlohu založenú `tasker task add` vo vlákne témy zapíše do `tasks`
+   pridá k téme koreňové úlohy (pole `tasks`): správy tasker mostu o takej úlohe,
+   všetkých jej podúlohách (reťaz `parent_id`) a o úlohe, ktorú takáto úloha blokuje
+   (tabuľka `blockers`, aj cez ďalší blokér, najviac 20 úloh; nadväzujúca úloha po done
+   blokéra, úloha 560), idú do vlákna témy pred pravidlom podľa projektu. Úlohu založenú `tasker task add` vo vlákne témy zapíše do `tasks`
    sama hook `hooks/topic_task.mjs` (PostToolUse pre Bash v `.claude/settings.json`):
    vlákno nájde z relácie claude v SQLite T3 len na čítanie, z hlavného vlákna nerobí nič
    a pri chybe skončí kódom 0 bez zásahu. Vlákno mimo hlavného (nie sub-agent),

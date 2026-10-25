@@ -115,9 +115,12 @@ export function render(ev, summary) {
 
 export const BURST = 5;
 
-// Téma správy: najprv téma, ktorej pole `tasks` obsahuje úlohu alebo jej predka
-// (reťaz parent_id, najviac 20 krokov, cyklus sa preruší), potom projekt úlohy,
-// ak je v zozname tém, inak null (hlavné vlákno).
+// Téma správy: najprv téma, ktorej pole `tasks` obsahuje úlohu, jej predka (reťaz
+// parent_id) alebo jej blokéra (tabuľka blockers, aj blokér blokéra a predok blokéra),
+// najviac 20 úloh, cyklus sa preruší. Potom projekt úlohy, ak je v zozname tém,
+// inak null (hlavné vlákno). Blokér: nadväzujúca úloha po done blokéra patrí vláknu,
+// ktoré blokér viedlo (chyba 25. 10. 2026, úloha 560: úloha 529 po done 528 šla do
+// hlavného vlákna, hoci 528 viedla téma). Bez tabuľky blockers (staré DB) len predkovia.
 export function topicFor(cfg, project, taskId = null, db = null) {
   if (!cfg.box) return null;
   try {
@@ -127,13 +130,18 @@ export function topicFor(cfg, project, taskId = null, db = null) {
       const withTasks = Object.entries(topics).filter(([, v]) => Array.isArray(v?.tasks) && v.tasks.length);
       if (withTasks.length) {
         const parent = db.prepare("SELECT parent_id FROM tasks WHERE id = ?");
+        let blockers = null;
+        try { blockers = db.prepare("SELECT blocker_id FROM blockers WHERE task_id = ?"); } catch { /* staré DB bez blockers */ }
         const seen = new Set();
-        let id = Number(taskId);
-        for (let i = 0; i < 20 && id && !seen.has(id); i++) {
+        const queue = [Number(taskId)];
+        while (queue.length && seen.size < 20) {
+          const id = queue.shift();
+          if (!id || seen.has(id)) continue;
           seen.add(id);
           const hit = withTasks.find(([k, v]) => TOPIC_RE.test(k) && v.tasks.map(Number).includes(id));
           if (hit) return hit[0];
-          id = Number(parent.get(id)?.parent_id) || 0;
+          queue.push(Number(parent.get(id)?.parent_id) || 0);
+          if (blockers) for (const b of blockers.all(id)) queue.push(Number(b.blocker_id) || 0);
         }
       }
     }
