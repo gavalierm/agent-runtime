@@ -229,7 +229,10 @@ klonov (úloha 2 v Taskeri, 19. 10. 2026).
    blokéra, úloha 560), idú do vlákna témy pred pravidlom podľa projektu. Úlohu založenú `tasker task add` vo vlákne témy zapíše do `tasks`
    sama hook `hooks/topic_task.mjs` (PostToolUse pre Bash v `.claude/settings.json`):
    vlákno nájde z relácie claude v SQLite T3 len na čítanie, z hlavného vlákna nerobí nič
-   a pri chybe skončí kódom 0 bez zásahu. Vlákno mimo hlavného (nie sub-agent),
+   a pri chybe skončí kódom 0 bez zásahu. Keď z výstupu `task add` id nie je (príkaz ho
+   prefiltroval rúrou, presmeroval alebo zahodil, úloha 563), hook ho zistí cez `tk task list|show --json`:
+   úlohy z poslednej minúty, ktorých udalosť `created` je od tohto agenta (`human:<meno>`), pri `--title`
+   v úvodzovkách musí sedieť aj názov. Hlavné vlákno a sub-agent tk nevolajú. Vlákno mimo hlavného (nie sub-agent),
    ktoré tému nemá, dostane pri prvej založenej úlohe tému `<projekt>_<koniec id vlákna>`
    (úloha 492, vlákno Tasker #7 tému nemalo a správy o úlohe 486 šli do hlavného vlákna).
    Holý projekt to nie je, aby téma nepresmerovala správy všetkých úloh projektu.

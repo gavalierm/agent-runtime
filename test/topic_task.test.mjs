@@ -8,7 +8,10 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
-import { newTaskIds, newTaskProject, topicNameFor, threadsForNative, topicOfThreads, handle } from "../hooks/topic_task.mjs";
+import { newTaskIds, newTaskProject, topicNameFor, threadsForNative, topicOfThreads, handle, recentTasks } from "../hooks/topic_task.mjs";
+
+// Poistka: volanie tk, ktoré test nenahradil falošným, skončí chybou, nie živým Taskerom.
+process.env.TK_BIN = "/nonexistent/tk";
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), "../hooks/topic_task.mjs");
 const NATIVE = "11111111-1111-4111-8111-111111111111";
@@ -81,7 +84,7 @@ test("handle: dry-run nezapíše, hlavné vlákno a neznáma relácia nerobia ni
 });
 
 test("hook ako proces: pri chybe kód 0 a prázdny výstup, na cudzí príkaz tiež", () => {
-  const env = { ...process.env, AGENT_TOPICS_FILE: "/nonexistent/topics.json", AGENT_STATE: "/nonexistent" };
+  const env = { ...process.env, TK_BIN: "/nonexistent/tk", AGENT_TOPICS_FILE: "/nonexistent/topics.json", AGENT_STATE: "/nonexistent" };
   for (const input of ["nie json", JSON.stringify(add('{"id": 3, "title": "t"}')), JSON.stringify({ tool_input: { command: "ls" } })]) {
     const r = spawnSync("node", ["--no-warnings", HOOK], { input, env, encoding: "utf8" });
     assert.equal(r.status, 0);
@@ -133,4 +136,70 @@ test("téma sa nezaloží: hlavné vlákno, sub-agent, dry-run, chýbajúci zozn
   const r = await handle(addP(9, "agenti"), { ...o, topicsFile: fresh, nativeId: NOVY_NATIVE });
   assert.equal(r.created, true);
   assert.deepEqual(JSON.parse(readFileSync(fresh, "utf8")).agenti_vy1234.tasks, [9]);
+});
+
+// Falošný tk: tasks = [{ id, title, project, created_at, actor, at }]
+const NOW = 1_800_000_000_000;
+function fakeTk(tasks, calls = []) {
+  return (args) => {
+    calls.push(args.join(" "));
+    if (args[0] === "task" && args[1] === "list") return JSON.stringify(tasks.map(({ id, title, project, created_at }) => ({ id, title, project, created_at })));
+    if (args[0] === "task" && args[1] === "show") {
+      const t = tasks.find((x) => x.id === Number(args[2]));
+      return JSON.stringify({ id: t.id, events: [{ kind: "created", actor: t.actor, at: t.at ?? t.created_at }] });
+    }
+    throw new Error("neznamy prikaz");
+  };
+}
+const T = (id, o = {}) => ({ id, title: `u${id}`, project: "agenti", created_at: NOW - 5000, actor: "human:adam", ...o });
+const PIPE = "AGENT_NAME=adam /opt/agent-rules/bin/tk task add --title x --project p --json | grep -o '\"id\":[0-9]*'";
+
+test("recentTasks: len čerstvé úlohy tohto agenta, názov z --title, bez mena nič", () => {
+  const tasks = [T(1), T(2, { actor: "human:iny" }), T(3, { created_at: NOW - 600000 }), T(4, { title: "iny nazov" })];
+  assert.deepEqual(recentTasks(PIPE, { agent: "adam", now: NOW, tk: fakeTk(tasks) }).map((t) => t.id), [1, 4]);
+  assert.deepEqual(recentTasks("tk task add --title \"iny nazov\" --project p", { agent: "adam", now: NOW, tk: fakeTk(tasks) }), [{ id: 4, project: "agenti" }]);
+  assert.deepEqual(recentTasks(PIPE, { agent: null, now: NOW, tk: fakeTk(tasks) }), []);
+  assert.deepEqual(recentTasks(PIPE, { agent: "adam", now: NOW, tk: () => { throw new Error("tk padol"); } }), []);
+  assert.deepEqual(recentTasks(PIPE, { agent: "adam", now: NOW, tk: () => "nie json" }), []);
+});
+
+test("recentTasks cez TK_BIN: skript dostane AGENT_NAME agenta a príkaz task list", () => {
+  const dir = mkdtempSync(join(tmpdir(), "topic-task-tk-"));
+  const bin = join(dir, "tk");
+  writeFileSync(bin, `#!/bin/sh\necho "$AGENT_NAME $*" >> "${dir}/log"\nif [ "$2" = list ]; then echo '[{"id":7,"title":"t","project":"agenti","created_at":${NOW - 1000}}]'; else echo '{"events":[{"kind":"created","actor":"human:'"$AGENT_NAME"'","at":${NOW - 1000}}]}'; fi\n`, { mode: 0o755 });
+  const old = process.env.TK_BIN;
+  process.env.TK_BIN = bin;
+  try {
+    assert.deepEqual(recentTasks(PIPE, { agent: "adam", now: NOW }), [{ id: 7, project: "agenti" }]);
+  } finally { process.env.TK_BIN = old; }
+  assert.equal(readFileSync(join(dir, "log"), "utf8"), "adam task list --json\nadam task show 7 --json\n");
+});
+
+test("handle: výstup task add prefiltrovaný rúrou alebo zahodený, úloha sa zapíše podľa udalosti created (úloha 563)", async () => {
+  for (const stdout of ['"id":529\n', "", "529 \n   \n", "x\n"]) {
+    const s = setup();
+    const calls = [];
+    const o = { nativeId: NATIVE, dbPath: s.dbPath, topicsFile: s.topicsFile, mainFile: s.mainFile, agent: "adam", now: NOW, tk: fakeTk([T(529), T(530, { actor: "human:iny" })], calls) };
+    const input = { tool_input: { command: PIPE }, tool_response: { stdout, stderr: "" } };
+    const r = await handle(input, o);
+    // "529 " bez --json sa číta zo samotného riadku a tk sa nevolá
+    const direct = stdout.trim() === "529";
+    assert.deepEqual(r, { topic: "pravidla", ids: [529], dryRun: false, created: false }, JSON.stringify(stdout));
+    assert.deepEqual(s.topics().pravidla.tasks, [390, 529]);
+    assert.equal(calls.length > 0, !direct);
+  }
+});
+
+test("handle so zálohou: nová téma vlákna berie projekt úlohy, hlavné vlákno a sub-agent tk nevolajú, bez udalosti nič", async () => {
+  const s = setup();
+  const calls = [];
+  const o = { dbPath: s.dbPath, topicsFile: s.topicsFile, mainFile: s.mainFile, agent: "adam", now: NOW, tk: fakeTk([T(486)], calls) };
+  const input = { tool_input: { command: "tk task add --title u486 | tail -1" }, tool_response: { stdout: "" } };
+  assert.equal(await handle(input, { ...o, nativeId: MAIN_NATIVE }), null);
+  assert.equal(await handle(input, { ...o, nativeId: SUB_NATIVE }), null);
+  assert.equal(calls.length, 0);
+  assert.equal(await handle(input, { ...o, nativeId: NATIVE, tk: fakeTk([T(486, { actor: "human:iny" })]) }), null);
+  const r = await handle(input, { ...o, nativeId: NOVY_NATIVE });
+  assert.deepEqual(r, { topic: "agenti_vy1234", ids: [486], dryRun: false, created: true });
+  assert.deepEqual(s.topics().agenti_vy1234.tasks, [486]);
 });
