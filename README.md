@@ -570,7 +570,7 @@ text pre model ho berie z `AGENT_OPERATOR_NAME` (bez neho slovo "operátor").
 | `rules_delta.mjs` | UserPromptSubmit | vloží zmenu `global/` a `env/<prostredie>/` klonu repa pravidiel od posledného videného HEAD (s `AR_ROZHODNUTIA=1` aj `rozhodnutia/`) |
 | `tasker_work.mjs` | UserPromptSubmit, PreToolUse (Agent, zapisujúce nástroje), SubagentStop | ohlási prácu na úlohe Taskera (`tk work N`), prevezme úlohu v poradí, zámok úlohy držanej inou reláciou |
 | `own_rule_scope.mjs` | PreToolUse (Write, Edit, MultiEdit) | prvý zápis nového textu do `CLAUDE.md` alebo `PERSONA.md` repa agenta sa zamietne s otázkou, či to nepatrí do repa pravidiel |
-| `reply_guard.mjs` | Stop | odpoveď operátorovi: strop viet a slov, meno na prvom riadku, mŕtvy alebo lokálny odkaz, zmienka úlohy Taskera bez odkazu, s `AR_ROZHODNUTIA=1` aj "Čaká na teba" a nezapísané rozhodnutie |
+| `reply_guard.mjs` | Stop | odpoveď operátorovi: strop viet a slov, meno na prvom riadku, mŕtvy alebo lokálny odkaz, zmienka úlohy Taskera bez odkazu, položka "(rozhodnutie)" v "Čaká na teba:" bez `?` alebo s nedefinovaným A/B (`lib/human_question.mjs`, úloha 575), s `AR_ROZHODNUTIA=1` aj "Čaká na teba" a nezapísané rozhodnutie |
 | `no_operator_commands.mjs` | Stop | odpoveď bez príkazu shellu pre operátora a bez položky "Čaká na teba", ktorú urobí agent |
 | `objection_fix.mjs` | Stop | uznaná chyba alebo námietka sa nezaobíde bez `chyba.sh` a commitu súboru, ktorý agenta riadi |
 | `todo_after_comment.mjs` | Stop | úloha agenta s jeho komentárom nesmie ostať v poradí |

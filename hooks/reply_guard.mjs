@@ -56,7 +56,12 @@
 // jednou premennou v bloku env súboru settings.json (env/server/install.sh,
 // env/mac/settings.json). Bez prepínača sa správanie hooku nemení.
 
+// Dňa 25. 10. 2026 zhrnutie behu úlohy 573 znelo "Čaká na operátorovo A/B k zápisu" a operátor
+// nevedel, čo sa ho pýta (úloha 575). waitingItemProblem (lib/human_question.mjs) zastaví
+// položku "(rozhodnutie)" v "Čaká na teba:" bez vety s `?` alebo s písmenom voľby bez `A) ...`.
+
 import { execFileSync } from "node:child_process";
+import { waitingItemProblem } from "../lib/human_question.mjs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -437,6 +442,7 @@ export const POSTUPY = [
   [/^neoverená položka v návrhu/, "over položku teraz (skúška, kód, dokumentácia) a výsledok napíš do odpovede, alebo napíš, prečo sa to teraz overiť nedá, a vetu, že návrh nie je pripravený na schválenie; návrh nedávaj na schválenie s neoverenou položkou"],
   [/je localhost servera/, "nahraď adresu adresou z `tailscale serve status`: {HOST}:<port>"],
   [/^zmienka úlohy Taskera bez odkazu/, "vlož náhrady vypísané v dôvode (tvar `[úloha N]({WEB}/tasks/N)`) a odpoveď prepíš"],
+  [/^položka "Čaká na teba" \(rozhodnutie\)/, "prepíš položku ako jednu vetu končiacu `?` (vec, voľba, odporúčanie), písmeno voľby (A/B) definuj ako `A) ...`; podrobnosti a čo spôsobí každá odpoveď patria do úlohy `tasker ask <id> --body \"...\"`"],
   [/^"Čaká na teba" bez odkazu|v "Čaká na teba" v Taskeri neexistuje|v "Čaká na teba" je v stave/, ASK + "; stav práce drží Tasker, nie veta v odpovedi"],
   [/^Tasker neodpovedal/, "over Tasker `/opt/agent-rules/bin/tk task list` a odpoveď pošli znova"],
   [/^veta ".*" hlási nové rozhodnutie/, "zapíš rozhodnutie `bin/rozhodni.sh --nazov ... --kluc ...` (text na stdin) a v odpovedi uveď jeho číslo D, alebo polož otázku `tasker ask <id> --body \"...\"`; staré rozhodnutie označ číslom D alebo dátumom"],
@@ -464,7 +470,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const env = hookEnv(input);
   let cmds = null;
   if (zapnute(env) && input.transcript_path) { try { cmds = lastTurn(readFileSync(input.transcript_path, "utf8")).cmds; } catch {} }
-  const reason = replyProblem(text, name) ?? deferredCheck(text) ?? unverifiedPlan(text) ?? localLinks(text, process.platform, env.TASKER_WEB_URL)
+  const reason = waitingItemProblem(text) ?? replyProblem(text, name) ?? deferredCheck(text) ?? unverifiedPlan(text) ?? localLinks(text, process.platform, env.TASKER_WEB_URL)
     ?? taskLinks(text, env.TASKER_WEB_URL || DEFAULT_WEB)
     ?? (zapnute(env) ? (await waitingProblem(text, (ids) => fetchTasks({ ids, env })) ?? (cmds ? decisionProblem(text, cmds, env) : null)) : null)
     ?? (env.REPLY_GUARD_NO_NET === "1" ? null : deadLinks(text));
