@@ -9,11 +9,17 @@
 // a zásahy operátora za 24 h (operatorSection, úloha 605): udalosti operátora
 // a posuny poradia v Taskeri, komentáre agenta za operátora (telo začína
 // AGENT_OPERATOR_NAME) a správy operátora z webu v T3 (cfg.t3Db). Obe DB len na čítanie.
+// Hotové dáta pre report bez ručného dopytovania (úloha 607, D0179): stalledSection
+// (úlohy, ktoré v okne 24 h stáli viac ako 1 h v stave bez práce, s príčinou, a otvorené
+// needs_human s vekom), interruptedSection (behy killed a cancelled s udalosťami úlohy
+// počas behu), reposSection (klony cfg.workRepos s neprázdnym git status --short)
+// a repliesSection (správy iných agentov v processed za 24 h). Prvý riadok pokynu
+// v build(): report len z týchto dát, nástroj len na akciu, chýbajúci údaj je úloha na tento skript.
 import { execFileSync, spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
-import { existsSync, readFileSync, renameSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
-import { config, inboxEntries, log, parseHeader, parseName, writeInbox } from "./lib.mjs";
+import { NAME_RE, config, inboxEntries, log, parseHeader, parseName, writeInbox } from "./lib.mjs";
 import { operatorActors } from "./tasker_events.mjs";
 
 // Držané správy na vedomie bez ohľadu na vek: presunie ich zo schránky
@@ -228,6 +234,199 @@ export function operatorSection(cfg, now = Date.now(), deps = {}) {
   return lines;
 }
 
+// ---- Úloha 607: dáta pre report ----
+
+const IDLE_STATES = new Set(["queued", "handoff", "needs_human", "blocked", "waiting", "todo", "scheduled"]);
+const STALL_MS = 3600_000;
+const cut = (t, n) => { const x = String(t ?? "").replace(/\s+/g, " ").trim(); return x.length > n ? `${x.slice(0, n - 1)}…` : x; };
+const fmtDur = (ms) => {
+  const m = Math.round(ms / 60_000);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h} h ${String(m % 60).padStart(2, "0")} min`;
+  return `${Math.floor(h / 24)} d ${h % 24} h`;
+};
+const fmtAt = (ms) => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("sk-SK", { timeZone: "Europe/Bratislava", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  return `${p.day}. ${p.month}. ${p.hour}:${p.minute}`;
+};
+
+// Príčina stojacej úlohy: blocked block_reason a blokéri (udalosti `blocker` +N/-N), waiting dôvod
+// z udalosti `wait` (inak tasks.wait_reason), needs_human posledný komentár pred vstupom do stavu (otázka).
+function stallCause(state, start, end, ev, comments, task) {
+  const upTo = end ?? Infinity;
+  if (state === "blocked") {
+    const reasons = ev.filter((e) => e.kind === "block_reason" && e.at >= start - 5000 && e.at <= upTo);
+    const set = new Set();
+    for (const e of ev.filter((x) => x.kind === "blocker" && x.at <= upTo)) {
+      const m = /^([+-])#?(\d+)$/.exec(String(e.detail ?? "").trim());
+      if (m) m[1] === "+" ? set.add(m[2]) : set.delete(m[2]);
+    }
+    const parts = [];
+    if (set.size) parts.push(`blokér ${[...set].join(", ")}`);
+    if (reasons.length) parts.push(cut(reasons.at(-1).detail, 160));
+    return parts.join(": ") || "bez dôvodu v Taskeri";
+  }
+  if (state === "waiting") {
+    const w = ev.filter((e) => e.kind === "wait" && e.at >= start - 5000 && e.at <= upTo).at(-1);
+    return cut(w?.detail || task.wait_reason, 160) || "bez dôvodu v Taskeri";
+  }
+  if (state === "needs_human") {
+    const c = comments.filter((x) => x.created_at <= start + 5000).at(-1);
+    return c ? `otázka (${c.author}): ${cut(c.body, 160)}` : "bez komentára";
+  }
+  return "";
+}
+
+// Stojace úlohy za 24 h (úloha 607): prechody stavu (udalosti `created` a `status`) zložené do intervalov. Interval
+// v stave bez práce (IDLE_STATES) dlhší než hodina v okne ide do zoznamu s trvaním v okne a celým trvaním od vstupu.
+// Otvorené needs_human idú zvlášť s vekom od vstupu, hoci vstúpili pred oknom. Úlohy unassigned bez prechodu
+// stavu v okne sa len spočítajú. DB len na čítanie, chyba vráti riadok, nie výnimku.
+export function stalledSection(cfg, now = Date.now()) {
+  const since = now - 24 * 3600_000;
+  const lines = ["", "Úlohy, ktoré v okne 24 h stáli viac ako hodinu v stave bez práce:", ""];
+  try {
+    const db = new DatabaseSync(cfg.taskerDb, { readOnly: true });
+    let tasks, events, comments;
+    try {
+      tasks = db.prepare("SELECT id, title, status, assignee, project, wait_reason FROM tasks").all();
+      events = db.prepare("SELECT task_id, at, kind, from_status, to_status, detail FROM events WHERE task_id IS NOT NULL ORDER BY id").all();
+      comments = db.prepare("SELECT task_id, author, body, created_at FROM comments ORDER BY id").all();
+    } finally { db.close(); }
+    const byTask = (rows) => { const m = new Map(); for (const r of rows) { const a = m.get(r.task_id) || []; a.push(r); m.set(r.task_id, a); } return m; };
+    const evBy = byTask(events), cmBy = byTask(comments);
+    const found = [], openHuman = [];
+    let unassigned = 0;
+    for (const t of tasks) {
+      const ev = evBy.get(t.id) || [], cm = cmBy.get(t.id) || [];
+      const trans = ev.filter((e) => (e.kind === "created" || e.kind === "status") && e.to_status);
+      if (t.status === "unassigned" && !trans.some((e) => e.at >= since)) { unassigned++; continue; }
+      for (let i = 0; i < trans.length; i++) {
+        const state = trans[i].to_status;
+        if (!IDLE_STATES.has(state)) continue;
+        const start = trans[i].at, end = trans[i + 1]?.at ?? null;
+        const open = end === null && t.status === state;
+        if (end === null && !open) continue;
+        const inWin = Math.min(end ?? now, now) - Math.max(start, since);
+        const cause = stallCause(state, start, end, ev, cm, t);
+        const row = { t, state, start, end, inWin, cause };
+        if (open && state === "needs_human") openHuman.push(row);
+        else if (inWin > STALL_MS) found.push(row);
+      }
+    }
+    const head = (r) => `úloha ${r.t.id} ${r.state}, ${r.t.assignee || "bez riešiteľa"}, ${r.t.project || "bez projektu"}, "${cut(r.t.title, 70)}"`;
+    found.sort((a, b) => a.start - b.start);
+    if (!found.length) lines.push("- žiadne");
+    for (const r of found.slice(0, 40)) {
+      const full = (r.end ?? now) - r.start;
+      lines.push(`- ${head(r)}: v okne ${fmtDur(r.inWin)}${full - r.inWin > 60_000 ? ` (od vstupu ${fmtDur(full)})` : ""}, ${fmtAt(r.start)} až ${r.end ? fmtAt(r.end) : "doteraz"}${r.cause ? `; ${r.cause}` : ""}`);
+    }
+    if (found.length > 40) lines.push(`- ... ďalších ${found.length - 40}`);
+    lines.push("", `Otvorené needs_human (${openHuman.length}), vek od vstupu do stavu:`, "");
+    if (!openHuman.length) lines.push("- žiadne");
+    openHuman.sort((a, b) => a.start - b.start);
+    for (const r of openHuman) lines.push(`- ${head(r)}: ${fmtDur(now - r.start)} (od ${fmtAt(r.start)}); ${r.cause}`);
+    lines.push("", `Úlohy unassigned bez prechodu stavu v okne: ${unassigned} (nevypisujem, bez práce, nie stojace).`);
+  } catch (e) {
+    lines.push(`Stojace úlohy: čítanie databázy Taskera zlyhalo: ${(e.message || "").toString().trim().slice(0, 300)}`);
+  }
+  return lines;
+}
+
+const RUN_NOISE = new Set(["work", "work_stop", "delivered", "worktree", "run", "handoff_stale"]);
+// Zásah riešiteľa tesne po konci prerušeného behu (komentár ho často prerušil) patrí k behu.
+const AFTER_RUN_MS = 60_000;
+
+// Prerušené behy za 24 h (úloha 607): behy killed a cancelled, ktoré skončili v okne, s udalosťami tej úlohy
+// počas behu (komentár, zmena stavu, kto). DB len na čítanie, chyba vráti riadok.
+export function interruptedSection(cfg, now = Date.now()) {
+  const since = now - 24 * 3600_000;
+  const lines = ["", "Prerušené behy za 24 h (killed, cancelled):", ""];
+  try {
+    const db = new DatabaseSync(cfg.taskerDb, { readOnly: true });
+    let runs;
+    const evOf = new Map();
+    try {
+      runs = db.prepare(
+        `SELECT r.id AS id, r.task_id AS task_id, r.agent AS agent, r.status AS status, r.result_subtype AS sub,
+                r.started_at AS started_at, r.ended_at AS ended_at, t.title AS title
+           FROM runs r LEFT JOIN tasks t ON t.id = r.task_id
+          WHERE r.status IN ('killed', 'cancelled') AND COALESCE(r.ended_at, r.started_at) >= ? ORDER BY r.id`).all(since);
+      for (const r of runs) {
+        const cm = db.prepare("SELECT created_at, body FROM comments WHERE task_id = ? AND created_at >= ? AND created_at <= ?").all(r.task_id, r.started_at, (r.ended_at ?? now) + AFTER_RUN_MS);
+        evOf.set(r.id, db.prepare("SELECT at, actor, kind, from_status, to_status, detail FROM events WHERE task_id = ? AND at >= ? AND at <= ? ORDER BY id")
+          .all(r.task_id, r.started_at, (r.ended_at ?? now) + AFTER_RUN_MS).filter((e) => !RUN_NOISE.has(e.kind))
+          .map((e) => (e.kind === "comment" ? { ...e, detail: cm.find((c) => Math.abs(c.created_at - e.at) <= 50)?.body ?? e.detail } : e)));
+      }
+    } finally { db.close(); }
+    if (!runs.length) lines.push("- žiadne");
+    for (const r of runs) {
+      lines.push(`- beh ${r.id}, úloha ${r.task_id} "${cut(r.title, 70)}", ${r.agent}, ${r.status}${r.sub ? `/${r.sub}` : ""}, ${fmtAt(r.started_at)} až ${r.ended_at ? fmtAt(r.ended_at) : "doteraz"} (${fmtDur((r.ended_at ?? now) - r.started_at)})`);
+      const ev = evOf.get(r.id);
+      if (!ev.length) lines.push("  počas behu bez udalostí úlohy");
+      for (const e of ev.slice(0, 6)) {
+        const late = r.ended_at && e.at > r.ended_at ? `po konci behu +${Math.round((e.at - r.ended_at) / 1000)} s` : "počas behu";
+        lines.push(`  ${late} ${fmtAt(e.at)}: ${e.kind === "status" ? `stav ${e.from_status} → ${e.to_status}` : e.kind}, ${e.actor}${e.detail && e.kind !== "status" ? `, ${cut(e.detail, 80)}` : ""}`);
+      }
+      if (ev.length > 6) lines.push(`  ... ďalších ${ev.length - 6} udalostí`);
+    }
+  } catch (e) {
+    lines.push(`Prerušené behy: čítanie databázy Taskera zlyhalo: ${(e.message || "").toString().trim().slice(0, 300)}`);
+  }
+  return lines;
+}
+
+// Klony z cfg.workRepos s neprázdnym `git status --short` (úloha 607): repo a počet riadkov.
+// `git --no-optional-locks` nezapíše index. `git` je vstrekovaný kvôli testu.
+export function reposSection(cfg, deps = {}) {
+  const git = deps.git || ((a) => execFileSync("git", a, { encoding: "utf8", timeout: 30_000 }));
+  const dirty = [], errors = [];
+  let checked = 0;
+  for (const repo of cfg.workRepos || []) {
+    if (!existsSync(repo)) continue;
+    checked++;
+    try {
+      const n = git(["--no-optional-locks", "-C", repo, "status", "--short"]).split("\n").filter((l) => l.trim()).length;
+      if (n) dirty.push(`- ${basename(repo)}: riadkov ${n} (${repo})`);
+    } catch (e) {
+      errors.push(`- ${basename(repo)}: git status zlyhal: ${cut((e.stderr || e.message || "").toString(), 160)}`);
+    }
+  }
+  return ["", `Klony s neprázdnym git status --short (${dirty.length} z ${checked}):`, "", ...(dirty.length ? dirty : ["- žiadne"]), ...errors];
+}
+
+const SKIP_SENDERS = new Set(["tasker", "ranny"]);
+
+// Správy iných agentov v processed za 24 h (úloha 607): od, téma, prvý riadok Výsledok (inak prvý riadok tela)
+// a riadok Otvorené. Čas je mtime súboru (presun ho nemení). Správy tasker a ranny sa nevypisujú.
+export function repliesSection(cfg, now = Date.now()) {
+  const since = now - 24 * 3600_000;
+  const lines = ["", "Správy iných agentov v processed za 24 h:", ""];
+  const dir = join(cfg.box || "", "processed");
+  let names;
+  try { names = readdirSync(dir); } catch (e) { return [...lines, `Processed: priečinok ${dir} sa nedá čítať: ${cut(e.message, 160)}`]; }
+  const items = [];
+  for (const name of names) {
+    if (!name.endsWith(".md") || !NAME_RE.test(name)) continue;
+    let mtime, text;
+    try { mtime = statSync(join(dir, name)).mtimeMs; if (mtime < since) continue; text = readFileSync(join(dir, name), "utf8"); } catch { continue; }
+    const h = parseHeader(text);
+    const parsed = parseName(name);
+    const sender = h.meta?.od || parsed.sender;
+    if (SKIP_SENDERS.has(sender) || sender === cfg.name) continue;
+    const body = h.body.split("\n").map((l) => l.trim()).filter(Boolean);
+    const open = /(?:^|\s)Otvorené:\s*(.+)$/m.exec(h.body)?.[1];
+    const res = body.find((l) => l.startsWith("Výsledok:")) ?? body[0] ?? "";
+    items.push({ mtime, line: `- ${sender}, téma ${h.meta?.tema || parsed.topic || "bez témy"}, ${fmtAt(mtime)} (${h.mode ?? "bez režimu"}): ${cut(res.replace(/\s*Otvorené:.*$/, ""), 200)}${open ? ` | Otvorené: ${cut(open, 100)}` : ""}` });
+  }
+  items.sort((a, b) => a.mtime - b.mtime);
+  if (!items.length) lines.push("- žiadne");
+  for (const i of items.slice(0, 30)) lines.push(i.line);
+  if (items.length > 30) lines.push(`- ... ďalších ${items.length - 30}`);
+  return lines;
+}
+
 export function build(cfg, run = execFileSync, now = Date.now(), deps = {}) {
   let tasker;
   try {
@@ -240,13 +439,18 @@ export function build(cfg, run = execFileSync, now = Date.now(), deps = {}) {
   return [
     "Ranný súhrn. Napíš operátorovi do tohto vlákna stav firmy podľa svojej persony:",
     "Hotové, Beží, Čaká na teba, každá položka jeden riadok obyčajnými slovami.",
+    "Report napíš len z týchto dát, nástroj použi len na akciu (oprava, úloha). Chýbajúci údaj je úloha na morning.mjs, nie ručný dopyt.",
     "",
     "Tasker za posledných 24 h:",
     "",
     tasker,
+    ...stalledSection(cfg, now),
+    ...interruptedSection(cfg, now),
+    ...repliesSection(cfg, now),
     ...heldSection(sweepHeld(cfg, now)),
     ...decisionsSection(cfg, deps.git, deps.check),
     ...workSection(cfg, now, deps),
+    ...reposSection(cfg, deps),
     ...operatorSection(cfg, now, deps),
   ].join("\n");
 }
