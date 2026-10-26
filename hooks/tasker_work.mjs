@@ -182,7 +182,7 @@ function writeTool(input) {
     if (t.status === "needs_human" && String(t.assignee || "").toLowerCase() === agent) {
       // Správa schránky nie je odpoveď operátora, otázka na neho ostáva.
       if (cur.inbox) return;
-      tk(agent, ["comment", n, "--body", "Pracujem na úlohe vo vlákne, vraciam ju z needs_human do poradia."]);
+      tk(agent, ["comment", n, "--body", "Pracujem na úlohe vo vlákne. Komentár ju vracia z needs_human do poradia, keď ju nedrží bloker."]);
     }
     // Prevzatie (úloha 491): úloha v poradí s riešiteľom agentom ide príkazom `start` do in_progress.
     if (["queued", "scheduled", "handoff", "unassigned"].includes(t.status) && String(t.assignee || "").toLowerCase() === agent) tk(agent, ["start", n]);
