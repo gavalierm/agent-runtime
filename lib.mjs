@@ -45,6 +45,8 @@ export function config(env = process.env) {
     t3Url: (env.T3_URL || "http://127.0.0.1:3773").replace(/\/$/, ""),
     t3TokenFile: env.T3_TOKEN_FILE || join(home, `.config/${name}/t3_token`),
     taskerDb: env.TASKER_DB || join(taskerHome, "tasker.db"),
+    // Databáza T3 (len čítanie), z nej ranný súhrn počíta správy operátora z webu (operatorSection).
+    t3Db: env.AGENT_T3_DB || "/root/.t3/userdata/statev2.sqlite",
     taskerBin: env.TASKER_BIN || "/opt/tasker/bin/tasker",
     taskerHome,
     // Príkaz, ktorým budič zapíše do Taskera trasu doručenej správy (`route <id> --thread ...`,

@@ -5,11 +5,16 @@
 // presunie do processed a vypíše v súhrne (sweepHeld). Agent z neho napíše operátorovi súhrn
 // do svojho vlákna. Spúšťa ho agent-morning.timer.
 // Keď `tasker summary` zlyhá, správa nesie chybu, súhrn neodpadne potichu.
+// Časti súhrnu: držané správy, nové rozhodnutia, rozloženie práce (workSection)
+// a zásahy operátora za 24 h (operatorSection, úloha 605): udalosti operátora
+// a posuny poradia v Taskeri, komentáre agenta za operátora (telo začína
+// AGENT_OPERATOR_NAME) a správy operátora z webu v T3 (cfg.t3Db). Obe DB len na čítanie.
 import { execFileSync, spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, readFileSync, renameSync } from "node:fs";
 import { basename, join } from "node:path";
 import { config, inboxEntries, log, parseHeader, parseName, writeInbox } from "./lib.mjs";
+import { operatorActors } from "./tasker_events.mjs";
 
 // Držané správy na vedomie bez ohľadu na vek: presunie ich zo schránky
 // agenta do processed a vráti zoznam pre súhrn. Schránky berie z
@@ -133,6 +138,96 @@ export function workSection(cfg, now = Date.now(), deps = {}) {
   return lines;
 }
 
+const OPERATOR_NOISE = [/^\[harness/, /^Na vedomie, /, /^Schránka: /, /^<schranka/, /^Sprava z minuleho kontextu/, /^Spusti skill/];
+
+// Správa operátora z webu T3: nie správa budiča, nie /clear, nie notifikácia ani text vložený hookom.
+export function isOperatorMessage(payload) {
+  if (payload?.role !== undefined && payload.role !== "user") return false;
+  if (payload?.createdBy !== "user" || payload?.creationSource !== "web") return false;
+  if ("notification" in payload) return false;
+  if (String(payload.id ?? "").includes("-inbox-")) return false;
+  const text = String(payload.text ?? "").trim();
+  if (text === "/clear") return false;
+  return !OPERATOR_NOISE.some((re) => re.test(text));
+}
+
+const hhmm = (iso) => new Intl.DateTimeFormat("sk-SK", { timeZone: "Europe/Bratislava", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
+const idList = (ids) => [...new Set(ids)].sort((a, b) => a - b).join(", ") || "-";
+
+// Zásahy operátora za 24 h (úloha 605): z Taskera udalosti operátora (`operatorActors()`) podľa druhu
+// s číslami úloh, posuny poradia (`edited` s detailom `priority`) od kohokoľvek a zvlášť od operátora,
+// komentáre, ktoré agent zapísal za operátora (telo začína AGENT_OPERATOR_NAME, bez neho položka
+// odpadne); z T3 (cfg.t3Db) správy operátora z webu. Obe DB sa otvárajú len na čítanie, chyba
+// vráti riadok, nie výnimku.
+export function operatorSection(cfg, now = Date.now(), deps = {}) {
+  const env = deps.env || process.env;
+  const lines = ["", "Zásahy operátora za 24 h:", ""];
+  const since = now - 24 * 3600_000;
+  try {
+    const actors = operatorActors(env);
+    const db = new DatabaseSync(cfg.taskerDb, { readOnly: true });
+    let events, comments;
+    try {
+      events = db.prepare("SELECT task_id, actor, kind, detail FROM events WHERE at >= ? ORDER BY id").all(since);
+      comments = db.prepare("SELECT task_id, body FROM comments WHERE created_at >= ? ORDER BY id").all(since);
+    } finally { db.close(); }
+    const byKind = new Map();
+    for (const e of events) {
+      if (!actors.has(e.actor)) continue;
+      const g = byKind.get(e.kind) || [];
+      g.push(e.task_id);
+      byKind.set(e.kind, g);
+    }
+    lines.push("Tasker, udalosti operátora podľa druhu:");
+    if (!byKind.size) lines.push("- žiadne");
+    for (const k of [...byKind.keys()].sort()) lines.push(`- ${k}: ${byKind.get(k).length} (úlohy ${idList(byKind.get(k))})`);
+    const moves = events.filter((e) => e.kind === "edited" && e.detail === "priority");
+    const byOp = moves.filter((e) => actors.has(e.actor));
+    lines.push(`Posuny poradia: ${moves.length} (úlohy ${idList(moves.map((e) => e.task_id))}), z toho operátor ${byOp.length}`);
+    const name = String(env.AGENT_OPERATOR_NAME || "").trim();
+    if (name) {
+      const mine = comments.filter((c) => String(c.body).startsWith(name));
+      lines.push(`Komentáre agenta za operátora (telo začína "${name}"): ${mine.length} (úlohy ${idList(mine.map((c) => c.task_id))})`);
+    }
+  } catch (e) {
+    lines.push(`Tasker: čítanie databázy zlyhalo: ${(e.message || "").toString().trim().slice(0, 300)}`);
+  }
+  lines.push("");
+  if (!cfg.t3Db || !existsSync(cfg.t3Db)) {
+    lines.push("T3: databáza nie je");
+  } else {
+    try {
+      const db = new DatabaseSync(cfg.t3Db, { readOnly: true });
+      let rows;
+      try {
+        rows = db.prepare(
+          `SELECT m.created_at AS created_at, m.payload_json AS payload, t.title AS title, m.thread_id AS thread_id
+             FROM orchestration_v2_projection_messages m
+             LEFT JOIN orchestration_v2_projection_threads t ON t.thread_id = m.thread_id
+            WHERE m.role = 'user' AND m.created_at >= ? ORDER BY m.created_at`).all(new Date(since).toISOString());
+      } finally { db.close(); }
+      const msgs = [];
+      for (const r of rows) {
+        let p;
+        try { p = JSON.parse(r.payload); } catch { continue; }
+        if (!isOperatorMessage({ ...p, role: "user" })) continue;
+        msgs.push({ at: r.created_at, title: r.title || r.thread_id, text: String(p.text ?? "").trim().replace(/\s+/g, " ") });
+      }
+      lines.push(`T3, správy operátora z webu: ${msgs.length}`);
+      const byTitle = new Map();
+      for (const m of msgs) byTitle.set(m.title, (byTitle.get(m.title) || 0) + 1);
+      for (const [t, n] of [...byTitle].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) lines.push(`- ${t}: ${n}`);
+      if (msgs.length) lines.push("");
+      for (const m of msgs.slice(0, 60)) lines.push(`- ${hhmm(m.at)} ${m.title.slice(0, 30)}: ${m.text.slice(0, 120)}`);
+      if (msgs.length > 60) lines.push(`- ... ďalších ${msgs.length - 60}`);
+    } catch (e) {
+      lines.push(`T3: čítanie databázy zlyhalo: ${(e.message || "").toString().trim().slice(0, 300)}`);
+    }
+  }
+  lines.push("", "Spočítaj nútené zásahy operátora (oprava, námietka, chyba, ktorú mal nájsť agent, posun stojacej úlohy) a v súhrne uveď ich počet, posuny poradia a príčinu každého druhu.");
+  return lines;
+}
+
 export function build(cfg, run = execFileSync, now = Date.now(), deps = {}) {
   let tasker;
   try {
@@ -152,6 +247,7 @@ export function build(cfg, run = execFileSync, now = Date.now(), deps = {}) {
     ...heldSection(sweepHeld(cfg, now)),
     ...decisionsSection(cfg, deps.git, deps.check),
     ...workSection(cfg, now, deps),
+    ...operatorSection(cfg, now, deps),
   ].join("\n");
 }
 
