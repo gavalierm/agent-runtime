@@ -224,3 +224,61 @@ test("613 e: pôvodné správanie ostáva (repo agenta zamietne prvý pokus, dru
   assert.equal(seenBefore({ stateDir: o.stateDir, session: "orig", file: "/root/adam/CLAUDE.md", text: "iný text" }), false);
   assert.equal(seenBefore({ stateDir: o.stateDir, session: "orig", file: "/root/adam/CLAUDE.md", text: "iný text" }), true);
 });
+
+// Úloha 625: Bash, ktorý odsek Chyba <dátum> zo súboru maže alebo preformuluje, prejde.
+// Zamietne len odsek, ktorý v cieľovom súbore ešte nie je. Súbor je v tmp, hook ho len číta.
+function fixtura(obsah) {
+  const dir = mkdtempSync(join(tmpdir(), "ors-625-"));
+  assert.ok(dir.startsWith(tmpdir()) && !dir.startsWith(LIVE_STATE));
+  writeFileSync(join(dir, "CLAUDE.md"), obsah);
+  return dir;
+}
+const bashIn = (cwd, command) => ({ session_id: "u625", cwd, tool_name: "Bash", tool_input: { command } });
+const SUBOR = "# Adam\n\n- pravidlo\n\nChyba 23. 10. 2026: x\n\n- iné pravidlo\n";
+const PY = (text) =>
+  `python3 - <<'EOF'\np = open('CLAUDE.md').read()\np = p.replace('''${text}''', '')\nwith open('CLAUDE.md', 'w') as f:\n    f.write(p)\nEOF`;
+
+test("625 1: python s open('CLAUDE.md','w'), odsek je v súbore a skript ho nahrádza prázdnym: prejde", () => {
+  const dir = fixtura(SUBOR);
+  const c = PY("Chyba 23. 10. 2026: x\n\n");
+  assert.equal(check(bashIn(dir, c), direct()), null);
+  const { e } = env();
+  assert.equal(run(e, bashIn(dir, c)), null, "ako proces hooku");
+});
+
+test("625 2: sed -i 's/Chyba 23. 10. 2026: x//' pri súbore s tým odsekom prejde", () => {
+  const dir = fixtura(SUBOR);
+  const c = "sed -i 's/Chyba 23. 10. 2026: x//' CLAUDE.md";
+  assert.equal(check(bashIn(dir, c), direct()), null);
+  assert.equal(check(bashIn(dir, "sed -i '/^Chyba 23. 10. 2026: x$/d' " + join(dir, "CLAUDE.md")), direct()), null, "absolútna cesta");
+  const { e } = env();
+  assert.equal(run(e, bashIn(dir, c)), null, "ako proces hooku");
+});
+
+test("625 3: ten istý python s odsekom, ktorý v súbore nie je: zamietne", () => {
+  const dir = fixtura(SUBOR);
+  assert.match(check(bashIn(dir, PY("Chyba 27. 10. 2026: y\n\n")), direct()), CHYBA_DOVOD);
+  assert.match(check(bashIn(dir, "sed -i 's/Chyba 23. 10. 2026: x//; s/^- pravidlo/Chyba 27. 10. 2026: y\\n&/' CLAUDE.md"), direct()), CHYBA_DOVOD, "mazanie spolu s pridaním nového");
+  assert.match(check(bashIn(dir, PY("Chyba 23. 10. 2026: iný text")), direct()), CHYBA_DOVOD, "rovnaký dátum, iný text je nový odsek");
+  const { e } = env();
+  assert.equal(run(e, bashIn(dir, PY("Chyba 27. 10. 2026: y\n\n"))).permissionDecision, "deny");
+});
+
+test("625 4: printf >> CLAUDE.md s novým odsekom zamietne ako dnes, append, neexistujúci súbor a python len s módom a tiež", () => {
+  const dir = fixtura(SUBOR);
+  assert.match(check(bashIn(dir, "printf 'Chyba 27. 10. 2026: y' >> CLAUDE.md"), direct()), CHYBA_DOVOD);
+  assert.match(check(bashIn(dir, "printf 'Chyba 23. 10. 2026: x' >> CLAUDE.md"), direct()), CHYBA_DOVOD, "append ostáva zamietnutý aj pri odseku, ktorý v súbore je");
+  assert.match(check(bashIn(dir, "sed -i 's/Chyba 23. 10. 2026: x//' PERSONA.md"), direct()), CHYBA_DOVOD, "súbor neexistuje");
+  assert.match(check(bashIn(dir, "python3 -c \"open('CLAUDE.md','a').write('Chyba 23. 10. 2026: x')\""), direct()), CHYBA_DOVOD, "python len s módom a");
+});
+
+test("625 5: odsek zalomený v súbore na viac riadkov, repo pravidiel a cesta env/server/CLAUDE.md", () => {
+  const dir = fixtura("- a\n\nChyba 23. 10. 2026: x začína\n  a pokračuje.\n");
+  assert.equal(check(bashIn(dir, PY("Chyba 23. 10. 2026: x začína a pokračuje.")), direct()), null);
+  const rules = fixtura(SUBOR);
+  mkdirSync(join(rules, "env/server"), { recursive: true });
+  writeFileSync(join(rules, "env/server/CLAUDE.md"), SUBOR);
+  const c = `sed -i 's/Chyba 23. 10. 2026: x//' ${join(rules, "env/server/CLAUDE.md")}`;
+  assert.equal(check(bashIn("/tmp", c), direct()), null, "mazanie v repe pravidiel prejde");
+  assert.match(check(bashIn("/tmp", c.replace("23. 10. 2026: x", "27. 10. 2026: q")), direct()), CHYBA_DOVOD, "pridanie v repe pravidiel ostáva zamietnuté");
+});

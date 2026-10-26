@@ -25,6 +25,12 @@
 // odsekov v new_string než v old_string, Write s väčším počtom než má súbor,
 // Bash s textom odseku a zápisom (presmerovanie >, >>, tee, sed -i, perl -i,
 // python s open na zápis) do takého súboru. Čítanie (grep, cat, sed -n) prejde.
+// Mazanie prejde (úloha 625): pri sed -i, perl -i a python s prepisom súboru
+// (open na "w", write_text, write_bytes) hook prečíta cieľový súbor (cesta
+// z príkazu, relatívna voči cwd) a zamietne len odsek s dátumom z textu príkazu,
+// ktorý v súbore ešte nie je (porovnanie po zlúčení medzier). Odsek, ktorý v súbore
+// je, príkaz maže alebo preformuluje. Presmerovanie, tee a python len s módom "a"
+// pridávajú vždy, tam sa zamieta bez porovnania. Neexistujúci súbor: zamietne.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -58,6 +64,19 @@ const WRITE_TO_TARGET = [
   new RegExp(String.raw`^(?=[\s\S]*\bpython3?\b)(?=[\s\S]*(?:open\([^)]*["'][wa]\+?b?["']|write_text|write_bytes))[\s\S]*` + TARGET),
 ];
 
+// Mazanie a preformulovanie (úloha 625): Bash cez sed -i, perl -i alebo python
+// s prepisom súboru (open na zápis, write_text) odsek, ktorý je v cieľovom súbore
+// už teraz, nepridáva. Zamietne len odsek, ktorého text v súbore nie je. Presmerovanie,
+// tee a python len s módom "a" pridávajú vždy, tam platí zamietnutie bez porovnania.
+const PY_RE = WRITE_TO_TARGET[3];
+const REWRITE = [WRITE_TO_TARGET[2], PY_RE];
+const PY_REPLACE = /open\([^)]*["']w\+?b?["']|write_text|write_bytes/;
+const ws = (s) => String(s).replace(/\s+/g, " ").trim();
+const DATUM = /\d{1,2}\. ?\d{1,2}\. ?\d{4}/;
+// Odseky s dátumom chyby v texte príkazu: od "Chyba <dátum>" po koniec riadku, úvodzovky,
+// spätné lomítko, lomku, zvislú čiaru (oddeľovač sed) alebo kotvu konca riadku. Medzery sa zlúčia.
+const odseky = (cmd) => [...cmd.matchAll(/\bChyba \d{1,2}\. ?\d{1,2}\. ?\d{4}[^\n'"\\/|$]*/g)].map((m) => ws(m[0]));
+
 // Zápis nového odseku s dátumom chyby do CLAUDE.md alebo PERSONA.md: vráti
 // { file, datum } alebo null.
 export function chybaOdsek(input, read = (f) => { try { return readFileSync(f, "utf8"); } catch { return ""; } }) {
@@ -71,7 +90,11 @@ export function chybaOdsek(input, read = (f) => { try { return readFileSync(f, "
       const t = cmd.match(re);
       if (t) {
         const file = t[0].match(new RegExp(TARGET + "$"));
-        return { file: file ? file[0] : "CLAUDE.md", datum: datum[0].slice("Chyba ".length) };
+        const hit = { file: file ? file[0] : "CLAUDE.md", datum: datum[0].slice("Chyba ".length) };
+        if (!REWRITE.includes(re) || (re === PY_RE && !PY_REPLACE.test(cmd))) return hit;
+        const obsah = ws(read(resolve(input.cwd || process.cwd(), hit.file)));
+        const nove = odseky(cmd).find((o) => !obsah.includes(o));
+        return nove ? { ...hit, datum: nove.match(DATUM)[0] } : null;
       }
     }
     return null;
