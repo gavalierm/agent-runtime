@@ -23,7 +23,7 @@ Operátor píše do vlákna priamo z T3 desktopu alebo mobilu.
 | `stuck.mjs` | dozor visiacej požiadavky na schválenie vo vlákne T3: výstraha a správa do schránky iného agenta (časť Dozor) |
 | `clear_watch.mjs` | čistý kontext (`/clear`) na slovo agenta vo všetkých ostatných vláknach T3 servera, beží v budiči jedného agenta |
 | `tasker_events.mjs` | prechody úloh Taskera do `needs_human`, `failed` a `done` z tabuľky `events` (len čítanie) do schránky, úloha s projektom, ktorý je v zozname tém, ide do vlákna témy (`tasker-<téma>-...`), dávka viac ako `BURST` skutočne odosielaných prechodov ide jednou správou (`čakám`, keď v nej je `needs_human` alebo `failed`, inak `na vedomie`); most: úlohu agenta z `TASKER_EXTERNAL_AGENTS` a vlastníka mostu `TASKER_SELF` (predvolene `AGENT_NAME`, vlákno T3, v Taskeri `enabled=0`) pošle do `/var/lib/<agent>/inbox`, tému berie zo zoznamu tém schránky agenta, agenta s `enabled=1` (spúšťa ho dispečer) preskočí. Úloha bez riešiteľa, ktorú Tasker sám presunul `blocked` -> `unassigned` (actor `tasker`, všetky blokéry hotové), ide jej zakladateľovi (udalosť `created`, actor `human:<agent>`), ak je agent z mosta a nemá `enabled=1`, ako `nečakám` "je odblokovaná a nemá riešiteľa"; s riešiteľom sa správa ako každá úloha agenta (úloha 427, 23. 10. 2026). Úlohu vypnutého agenta bez mosta a komentár cudzieho človeka, ktorý nikoho nezobudí (koncová úloha, úloha bez riešiteľa), pošle vlastníkovi mostu do jeho schránky. Komentár operátora (`TASKER_OPERATORS`, mená cez dvojbodku, predvolene `operator`) na úlohe v `needs_human` (udalosti comment a status `needs_human` -> stav poradia toho istého aktéra) ide vlastníkovi mostu ako `čakám` "zapíš rozhodnutie" (úloha 402, U11); otázka, ktorú vlastník položil sám (`tasker ask`, status `needs_human` s detailom `ask`, actor `human:<vlastník>`), ho nebudí Po zápise správy o úlohe v `handoff` do schránky riešiteľa zapíše doručenie do Taskera (`tasker delivered`, úloha 496), poistka: udalosť `handoff_stale` z doctora pošle riešiteľovi správu znova a ohlási ju zakladateľovi a vlastníkovi mosta. |
-| `morning.mjs` | ranný súhrn do schránky: `tasker summary --since 24h`, držané správy, nové rozhodnutia, rozloženie práce a zásahy operátora za 24 h (udalosti a posuny poradia v Taskeri, komentáre agenta za operátora, správy operátora z webu v T3; úloha 605), stojace úlohy s príčinou a otvorené needs_human s vekom, prerušené behy (killed, cancelled) s udalosťami úlohy, neprázdne klony a správy iných agentov v processed (úloha 607, D0179), pokyn na začiatku: report len z týchto dát |
+| `morning.mjs` | ranný súhrn do schránky (s `--stdout` vypíše telo súhrnu bez hlavičky správy na stdout a do schránky nič nezapíše, presunie sa len držaná správa `na vedomie`, úloha 618, D0183): `tasker summary --since 24h`, držané správy, nové rozhodnutia, rozloženie práce a zásahy operátora za 24 h (udalosti a posuny poradia v Taskeri, komentáre agenta za operátora, správy operátora z webu v T3; úloha 605), stojace úlohy s príčinou a otvorené needs_human s vekom, prerušené behy (killed, cancelled) s udalosťami úlohy, neprázdne klony a správy iných agentov v processed (úloha 607, D0179), pokyn na začiatku: report len z týchto dát |
 | `start_agent.mjs` | založí projekt T3 nad klonom repa a vlákno agenta, id vlákna uloží do stavu |
 | `lib.mjs` | nastavenie, schránka, klient T3 (REST na čítanie, `/ws` na príkazy) |
 | `agent_vlakno.sh`, `github_repo.sh`, `github_device_login.sh` | zriadenie agenta (kľúč, repo, klony, schránka, budič, agent v Taskeri) |
@@ -174,6 +174,26 @@ a tú zábranu prejde. Telo každej odpovede (aj `--cakam`, `--necakam`,
 neprázdny text, `Otvorené: nič`, keď nič neostalo). Bez ktoréhokoľvek
 skript skončí kódom 1 a na stderr dá riadok `Správny postup:` s príkladom.
 Odpoveď tak nesie výsledok, dôkaz ako príkaz s výstupom a čo je otvorené.
+
+### Ktorou cestou ide správa
+
+| od koho, komu | cesta | odpoveď |
+|---|---|---|
+| hlavné vlákno agenta, iné vlákno T3 na tom istom serveri | nástroj `t3_thread_send` s `mode: queue`, správa nesie `senderThreadId` (overené 26. 10. 2026, audit T3 v repe agenta správcu agentov, `docs/t3-audit/audit.md`) | odpoveď príde ako ďalší beh odosielajúceho vlákna |
+| agent servera, agent iného stroja alebo používateľa | schránka `/var/lib/<meno>/inbox` cez `ask_agent.sh` | `reply.sh`, budič odpoveď trasuje do vlákna témy |
+| agent servera, zástupca operátora na Macu (cyril) | schránka cez `ask_agent.sh`, zástupca ju číta pri štarte relácie, budí ho `mac_wake.sh` | `ask_agent.sh --replies` |
+| Tasker, agent | most `tasker_events.mjs` zapíše správu do schránky agenta | `reply.sh` pri správe `čakám`, na správu `nečakám` sa nepíše |
+| odpoveď na správu zo schránky | `reply.sh` do `/var/lib/<meno>/outbox`, budič ju trasuje | podľa režimu správy |
+
+Schránka teda ostáva pre Mac, Tasker a odpovede, ktoré budič trasuje.
+Správu medzi dvoma vláknami T3 na tom istom serveri nesie `t3_thread_send`.
+
+Ranný súhrn (D0179, D0183) ide cez plánovač T3: úloha `schedule_task` typu
+`fixed_time` na 07:00, viazaná na hlavné vlákno správcu agentov, s promptom
+`node /root/agent-runtime/morning.mjs --stdout`. Správca agentov v tom vlákne
+spustí skript a z jeho výstupu napíše report podľa svojej persony.
+`agent-morning.timer` ostáva ako náhrada mimo T3 (zapisuje súhrn do schránky)
+a je vypnutý.
 
 ## Trasa odpovede do vlákna témy
 
@@ -775,8 +795,11 @@ Ako root:
 4. `node /root/agent-runtime/start_agent.mjs`, vypíše id vlákna.
 5. Jednotky zo `systemd/` do `/etc/systemd/system/`, `systemctl
    daemon-reload`, `systemctl enable --now agent-driver@<adam>.service`.
-   Udalosti a ranný súhrn Taskera zapne `systemctl enable --now
-   agent-tasker-events.service agent-morning.timer`.
+   Udalosti Taskera zapne `systemctl enable --now
+   agent-tasker-events.service`. Ranný súhrn beží cez plánovač T3
+   (`morning.mjs --stdout`, časť "Ktorou cestou ide správa"),
+   `agent-morning.timer` sa zapína len ako náhrada, keď plánovač T3 nebeží
+   (`systemctl enable --now agent-morning.timer`, D0183).
 6. Budenie agenta na Macu (úloha 466): `systemd/mac-wake.path`
    a `mac-wake.service` do `/etc/systemd/system/`, `systemctl enable --now
    mac-wake.path`. Pri zmene `/var/lib/cyril/inbox` spustí `mac_wake.sh`,

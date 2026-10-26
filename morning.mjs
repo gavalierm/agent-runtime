@@ -3,7 +3,10 @@
 // Taskera za 24 h (`tasker summary`), prvý riadok `odpoveď: nečakám`
 // (budí a vynesie držané správy na vedomie). Každú držanú správu na vedomie
 // presunie do processed a vypíše v súhrne (sweepHeld). Agent z neho napíše operátorovi súhrn
-// do svojho vlákna. Spúšťa ho agent-morning.timer.
+// do svojho vlákna. Spúšťa ho agent-morning.timer (náhrada mimo T3) alebo plánovač T3.
+// `--stdout` (úloha 618, D0183): ten istý beh, ale telo súhrnu ide na stdout bez hlavičky
+// správy a do schránky sa nezapíše nič. V schránkach sa tým zmení jediné: presun držaných
+// správ na vedomie do processed (sweepHeld), rovnako ako pri zápise do schránky.
 // Keď `tasker summary` zlyhá, správa nesie chybu, súhrn neodpadne potichu.
 // Časti súhrnu: držané správy, nové rozhodnutia, rozloženie práce (workSection)
 // a zásahy operátora za 24 h (operatorSection, úloha 605): udalosti operátora
@@ -455,8 +458,23 @@ export function build(cfg, run = execFileSync, now = Date.now(), deps = {}) {
   ].join("\n");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const cfg = config();
-  const name = writeInbox(cfg.box, "ranny", build(cfg), null, "nečakám");
+// Bez argumentu zapíše správu do schránky, s `--stdout` vypíše telo súhrnu (bez hlavičky
+// `odpoveď:` a pod.) a do schránky nič nezapíše. Iný argument skončí kódom 2.
+export function main(argv = process.argv.slice(2), cfg = config(), out = (t) => process.stdout.write(t)) {
+  const bad = argv.filter((a) => a !== "--stdout");
+  if (bad.length) {
+    process.stderr.write(`morning.mjs: neznámy argument ${bad.join(" ")}, platí len --stdout\n`);
+    return 2;
+  }
+  const text = build(cfg);
+  if (argv.includes("--stdout")) {
+    out(text.endsWith("\n") ? text : `${text}\n`);
+    log("agent-morning", "súhrn na stdout");
+    return 0;
+  }
+  const name = writeInbox(cfg.box, "ranny", text, null, "nečakám");
   log("agent-morning", `zapísané ${name}`);
+  return 0;
 }
+
+if (import.meta.url === `file://${process.argv[1]}`) process.exitCode = main();
