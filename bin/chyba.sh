@@ -3,11 +3,21 @@
 #
 #   chyba.sh --trieda <trieda> --subor <súbor, ktorý správanie riadi> [--popis "<čo som tvrdil alebo urobil>"]
 #            [--pravda "<čo bola pravda>"] [--kontrola "<hook alebo test, ktorý to zastaví>"]
+#            --mechanizmus <hook:<cesta>|test:<cesta>|deny:<vzor>|rozhodnutie:D<nnnn>>
+#   chyba.sh --otvorene
 #
-# Zapíše chybu do registra (dátum, agent, trieda, súbor, commit, popis, úloha),
+# Zapíše chybu do registra (dátum, agent, trieda, súbor, commit, popis, úloha, mechanizmus),
 # pri druhom výskyte tej istej triedy toho istého agenta založí v Taskeri úlohu
 # na kontrolu (projekt agenti, riešiteľ $CHYBA_REVIEWER) a vypíše hlásenie pre operátora
-# v štyroch vetách. Agent dodá len triedu a súbor.
+# v štyroch vetách. Agent dodá triedu, súbor a mechanizmus.
+#
+# Register je jediné miesto chyby (úloha 613): chyba sa nezapisuje ako odsek
+# "Chyba <dátum>" do CLAUDE.md ani PERSONA.md, hook own_rule_scope.mjs taký zápis
+# zamietne. Stĺpce TSV: 1 dátum, 2 agent, 3 trieda, 4 súbor, 5 commit, 6 popis,
+# 7 úloha, 8 mechanizmus (povinná voľba --mechanizmus, tvar hook:<cesta>,
+# test:<cesta>, deny:<vzor> alebo rozhodnutie:D<nnnn>; bez nej alebo s iným
+# tvarom skript skončí kódom 1 a nič nezapíše). Staršie riadky bez 8. stĺpca sú
+# otvorené chyby: --otvorene ich vypíše (dátum, agent, trieda, súbor), nič nezapíše.
 #
 # Prostredie:
 #   CHYBA_AGENT     meno agenta, inak AGENT_NAME, TASKER_USER, inak "# Meno" z PERSONA.md
@@ -28,7 +38,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/agent_rules.sh
 . "$HERE/../lib/agent_rules.sh"
 
-trieda="" subor="" popis="" pravda="" kontrola=""
+trieda="" subor="" popis="" pravda="" kontrola="" mechanizmus="" otvorene=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --trieda) trieda="${2:-}"; shift 2 ;;
@@ -36,9 +46,17 @@ while [ $# -gt 0 ]; do
         --popis) popis="${2:-}"; shift 2 ;;
         --pravda) pravda="${2:-}"; shift 2 ;;
         --kontrola) kontrola="${2:-}"; shift 2 ;;
+        --mechanizmus) mechanizmus="${2:-}"; shift 2 ;;
+        --otvorene) otvorene=1; shift ;;
         *) echo "chyba.sh: neznáma voľba $1" >&2; exit 64 ;;
     esac
 done
+reg="${CHYBA_REGISTER:-$HOME/.local/state/agent-rules/chyby.tsv}"
+if [ -n "$otvorene" ]; then
+    # Riadky bez 8. stĺpca: chyba bez mechanizmu. Register sa nemení.
+    [ -f "$reg" ] && awk -F'\t' '$8 == "" { print $1 "\t" $2 "\t" $3 "\t" $4 }' "$reg"
+    exit 0
+fi
 agent="${CHYBA_AGENT:-${AGENT_NAME:-${TASKER_USER:-}}}"
 # Vlákno T3 agenta nemá AGENT_NAME ani TASKER_USER, meno nesie "# Meno" v PERSONA.md projektu.
 if [ -z "$agent" ]; then
@@ -47,6 +65,10 @@ if [ -z "$agent" ]; then
 fi
 trim() { local v="$1"; v="${v//$'\t'/ }"; v="${v//$'\n'/ }"; printf '%s' "$v"; }
 trieda="$(trim "$trieda")"; popis="$(trim "$popis")"; pravda="$(trim "$pravda")"; kontrola="$(trim "$kontrola")"
+mechanizmus="$(trim "$mechanizmus")"
+if ! [[ "$mechanizmus" =~ ^((hook|test):[^[:space:]]+|deny:.+|rozhodnutie:D[0-9]{4})$ ]]; then
+    deny_postup "chýba mechanizmus, ktorý chybu nabudúce zastaví, alebo má zlý tvar: '$mechanizmus'" "chyba.sh --trieda <trieda> --subor <súbor s opravou> --mechanizmus <hook|test|deny|rozhodnutie>:<cesta alebo id>, napríklad --mechanizmus hook:hooks/own_rule_scope.mjs, test:test/chyba.test.mjs, deny:<vzor> alebo rozhodnutie:D0183"; exit 1
+fi
 
 if [ -z "$agent" ]; then
     deny_postup "chyba.sh nevie, ktorý agent chybu uznal" "nastav CHYBA_AGENT=<meno> alebo spusti skript v projekte agenta s PERSONA.md"; exit 64
@@ -65,18 +87,13 @@ fi
 commit="$(git -C "$dir" log -1 --format=%h -- "$subor")"
 
 reviewer="${CHYBA_REVIEWER:-spravca-agentov}"
-reg="${CHYBA_REGISTER:-$HOME/.local/state/agent-rules/chyby.tsv}"
 mkdir -p "$(dirname "$reg")"
 touch "$reg"
 datum="$(date +%F)"
-# Stĺpce: dátum, agent, trieda, súbor, commit, popis, úloha.
-pocet=0 uloha=""
-while IFS=$'\t' read -r _ a t _ _ _ u; do
-    if [ "$a" = "$agent" ] && [ "$t" = "$trieda" ]; then
-        pocet=$((pocet + 1))
-        [ -n "$u" ] && uloha="$u"
-    fi
-done < "$reg"
+# Stĺpce: dátum, agent, trieda, súbor, commit, popis, úloha, mechanizmus. Prázdne
+# stĺpce sa nesmú zlúčiť (read s tabulátorom ich zlučuje), preto awk.
+pocet="$(awk -F'\t' -v a="$agent" -v t="$trieda" '$2 == a && $3 == t { n++ } END { print n + 0 }' "$reg")"
+uloha="$(awk -F'\t' -v a="$agent" -v t="$trieda" '$2 == a && $3 == t && $7 != "" { u = $7 } END { print u }' "$reg")"
 pocet=$((pocet + 1))
 
 if [ "$pocet" -ge 2 ] && [ -z "$uloha" ]; then
@@ -99,7 +116,7 @@ if [ "$pocet" -ge 2 ] && [ -z "$uloha" ]; then
     fi
 fi
 
-printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$datum" "$agent" "$trieda" "$subor" "$commit" "${popis:-bez popisu}" "$uloha" >> "$reg"
+printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$datum" "$agent" "$trieda" "$subor" "$commit" "${popis:-bez popisu}" "$uloha" "$mechanizmus" >> "$reg"
 
 # Hlásenie pre operátora, štyri vety.
 [ -n "$popis" ] || popis="chyba triedy $trieda"

@@ -2,7 +2,7 @@
 // own_rule_scope.mjs: pravidlo, ktoré potrebuje aj iný agent, nepatrí do
 // vlastného repa (global/CLAUDE.md §3: "If other agents need a rule or hold
 // a copy, it goes to global rules or a role, not your own repo. Check before
-// writing."). PreToolUse pre Write, Edit a MultiEdit (zapojuje ho
+// writing."). PreToolUse pre Write, Edit, MultiEdit a Bash (zapojuje ho
 // env/server/install.sh a env/mac/settings.json repa pravidiel).
 //
 // Cieľ je CLAUDE.md alebo PERSONA.md v koreni repa agenta: server
@@ -15,9 +15,16 @@
 // Rovnaký zápis (relácia + cesta + hash nového textu) zopakovaný druhýkrát
 // prejde. Zmazanie a preformulovanie bez prírastku prejde hneď.
 // Stav: $AR_STATE alebo ~/.local/state/agent-rules/own_rule_scope/<relácia>.
-// Chyba 23. 10. 2026 (druhýkrát): pravidlo pre všetkých agentov (úloha
-// s riešiteľom) zapísal agent do CLAUDE.md vlastného repa, správne miesto bolo
-// env/server/CLAUDE.md.
+// Príčina zavedenia: pravidlo pre všetkých agentov zapísal agent do CLAUDE.md
+// vlastného repa, správne miesto bolo env/server/CLAUDE.md.
+//
+// Odsek s dátumom chyby (úloha 613): chyba agenta sa zapisuje len do registra
+// skriptom chyba.sh (stĺpec mechanizmus), nikdy ako nový odsek "Chyba <deň>. <mesiac>. <rok>"
+// do CLAUDE.md alebo PERSONA.md (ľubovoľný taký súbor, aj v repe pravidiel). Hook
+// zamietne trvalo, druhý pokus neprejde: Edit a MultiEdit s väčším počtom takých
+// odsekov v new_string než v old_string, Write s väčším počtom než má súbor,
+// Bash s textom odseku a zápisom (presmerovanie >, >>, tee, sed -i, perl -i,
+// python s open na zápis) do takého súboru. Čítanie (grep, cat, sed -n) prejde.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -35,6 +42,52 @@ const WT = /\/\.worktrees\/[^/]+$/;
 export const POSTUP =
   "ak tú vec robí aj iný agent alebo rola, zapíš ju do env/<prostredie>/CLAUDE.md, global/CLAUDE.md alebo roles/ " +
   "v repe agent-rules (/root/agent-rules, commit s riadkom o dosahu); ak je len tvoja, zopakuj ten istý zápis a prejde.";
+
+export const POSTUP_CHYBA =
+  "spusti /opt/agent-rules/bin/chyba.sh --trieda <trieda> --subor <súbor s opravou> --mechanizmus <hook|test|deny|rozhodnutie>:<cesta alebo id>; " +
+  "pravidlo bez dátumu a čísla úlohy prepíš v existujúcom odseku.";
+
+const CHYBA_RE = /\bChyba \d{1,2}\. ?\d{1,2}\. ?\d{4}\b/g;
+const count = (s) => (String(s ?? "").match(CHYBA_RE) || []).length;
+// Cieľový súbor v príkaze: CLAUDE.md alebo PERSONA.md, s cestou alebo bez nej.
+const TARGET = String.raw`(?:[^\s"'|;&<>()]*\/)?(?:CLAUDE|PERSONA)\.md(?=$|[\s"'|;&<>()\\])`;
+const WRITE_TO_TARGET = [
+  new RegExp(String.raw`>>?\s*["']?` + TARGET),
+  new RegExp(String.raw`\btee\s+(?:-\S+\s+)*["']?` + TARGET),
+  new RegExp(String.raw`\b(?:sed|perl)(?=\s)[\s\S]*?\s(?:-[A-Za-z]*i\S*|--in-place\S*)(?=\s)[\s\S]*` + TARGET),
+  new RegExp(String.raw`^(?=[\s\S]*\bpython3?\b)(?=[\s\S]*(?:open\([^)]*["'][wa]\+?b?["']|write_text|write_bytes))[\s\S]*` + TARGET),
+];
+
+// Zápis nového odseku s dátumom chyby do CLAUDE.md alebo PERSONA.md: vráti
+// { file, datum } alebo null.
+export function chybaOdsek(input, read = (f) => { try { return readFileSync(f, "utf8"); } catch { return ""; } }) {
+  const ti = input.tool_input || {};
+  const tool = input.tool_name;
+  if (tool === "Bash") {
+    const cmd = String(ti.command ?? "");
+    const datum = cmd.match(new RegExp(CHYBA_RE.source));
+    if (!datum) return null;
+    for (const re of WRITE_TO_TARGET) {
+      const t = cmd.match(re);
+      if (t) {
+        const file = t[0].match(new RegExp(TARGET + "$"));
+        return { file: file ? file[0] : "CLAUDE.md", datum: datum[0].slice("Chyba ".length) };
+      }
+    }
+    return null;
+  }
+  if (!["Write", "Edit", "MultiEdit"].includes(tool)) return null;
+  const file = ti.file_path;
+  if (!file || !FILES.has(basename(String(file)))) return null;
+  let more = false;
+  if (tool === "Edit") more = count(ti.new_string) > count(ti.old_string);
+  else if (tool === "MultiEdit") more = (ti.edits || []).some((e) => count(e.new_string) > count(e.old_string));
+  else more = count(ti.content) > count(read(String(file)));
+  if (!more) return null;
+  const texts = tool === "Write" ? [ti.content] : tool === "Edit" ? [ti.new_string] : (ti.edits || []).map((e) => e.new_string);
+  const datum = texts.map((t) => String(t ?? "").match(new RegExp(CHYBA_RE.source))).find(Boolean);
+  return { file: String(file), datum: datum ? datum[0].slice("Chyba ".length) : "<dátum>" };
+}
 
 // Repo agenta (priečinok) pre súbor, inak null.
 export function agentRepoOf(file, { home = process.env.HOME || homedir(), exists = existsSync, taskerUser = process.env.AGENT_TASKER_USER } = {}) {
@@ -83,6 +136,8 @@ export function seenBefore({ stateDir, session, file, text }) {
 }
 
 export function check(input, opts = {}) {
+  const chyba = chybaOdsek(input, opts.read);
+  if (chyba) return `Odsek Chyba ${chyba.datum} do ${chyba.file} nejde, chyba patrí do registra (skill chyba).`;
   if (!["Write", "Edit", "MultiEdit"].includes(input.tool_name)) return null;
   const file = (input.tool_input || {}).file_path;
   if (!file) return null;
@@ -101,5 +156,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try { input = JSON.parse(readFileSync(0, "utf8")); } catch {}
   let why = null;
   try { why = check(input, { taskerUser: hookEnv(input).AGENT_TASKER_USER }); } catch {}
-  if (why) denyTool(why, POSTUP);
+  if (why) denyTool(why, why.startsWith("Odsek Chyba ") ? POSTUP_CHYBA : POSTUP);
 }

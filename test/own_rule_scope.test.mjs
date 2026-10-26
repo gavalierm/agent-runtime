@@ -9,7 +9,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { agentRepoOf } from "../hooks/own_rule_scope.mjs";
+import { agentRepoOf, check, chybaOdsek, seenBefore } from "../hooks/own_rule_scope.mjs";
 
 const HOOK = new URL("../hooks/own_rule_scope.mjs", import.meta.url).pathname;
 const RULES = resolve(HOOK, "../..");
@@ -38,7 +38,10 @@ function env() {
   return { e, root };
 }
 // Skutočný vstup s @HOME@ nahradeným domovským priečinkom skúšky.
-const real = (e) => JSON.parse(JSON.stringify(REAL).replaceAll("@HOME@", e.HOME));
+const realRaw = (e) => JSON.parse(JSON.stringify(REAL).replaceAll("@HOME@", e.HOME));
+// Pôvodný text nesie odsek s dátumom chyby, ktorý od úlohy 613 zamieta iné pravidlo (test "613 replay").
+// Pravidlo o rozsahu (iný agent alebo rola) sa preto skúša s neutrálnym dátumom.
+const real = (e) => JSON.parse(JSON.stringify(realRaw(e)).replaceAll("Chyba 23. 10. 2026", "Oprava z 23. 10. 2026"));
 const run = (e, input) => {
   const r = spawnSync("node", [HOOK], { input: JSON.stringify(input), encoding: "utf8", env: e });
   assert.equal(r.status, 0, r.stderr);
@@ -127,4 +130,97 @@ test("používateľ behov úloh z runtime.env agenta (AGENT_TASKER_USER), bez ne
   const { AGENT_TASKER_USER, ...bez } = e;
   assert.equal(run({ ...bez, AGENT_NAME: "adam" }, input)?.permissionDecision, "deny");
   assert.equal(run({ ...bez, AGENT_NAME: "iny" }, { ...input, session_id: "t2" }), null);
+});
+
+// Úloha 613: chyba agenta patrí do registra (chyba.sh), nie ako odsek "Chyba <dátum>"
+// do CLAUDE.md alebo PERSONA.md. Volanie check() priamo, stav a čítanie súborov v tmp.
+function direct() {
+  const stateDir = join(mkdtempSync(join(tmpdir(), "ors-direct-")), "state");
+  assert.ok(stateDir.startsWith(tmpdir()) && !stateDir.startsWith(LIVE_STATE));
+  return { stateDir, exists: () => true };
+}
+const bash = (command, session_id = "b") => ({ session_id, cwd: "/tmp", tool_name: "Bash", tool_input: { command } });
+const CHYBA_DOVOD = /^Odsek Chyba .* nejde, chyba patrí do registra \(skill chyba\)\./;
+
+test("613 a: Edit s novým odsekom Chyba <dátum> je zamietnutý trvalo, druhý pokus tiež", () => {
+  const o = direct();
+  const input = edit("/root/adam/CLAUDE.md", "x", "x\n\nChyba 27. 10. 2026: x");
+  assert.match(check(input, o), CHYBA_DOVOD);
+  assert.match(check(input, o), CHYBA_DOVOD, "zopakovaný pokus neprejde");
+  assert.match(check({ ...input, tool_input: { ...input.tool_input, file_path: "/root/agent-rules/env/server/CLAUDE.md" } }, o), CHYBA_DOVOD);
+  const m = { session_id: "m", cwd: "/tmp", tool_name: "MultiEdit", tool_input: { file_path: "/root/adam/PERSONA.md", edits: [{ old_string: "a", new_string: "a" }, { old_string: "b", new_string: "b\nChyba 5.1.2026: y" }] } };
+  assert.match(check(m, o), CHYBA_DOVOD);
+  assert.match(check(m, o), CHYBA_DOVOD);
+});
+
+test("613 b: Edit, ktorý riadok Chyba ponechá a mení iný text, prejde", () => {
+  const o = direct();
+  const line = "Chyba 22. 10. 2026: y";
+  assert.equal(check(edit("/root/adam/CLAUDE.md", `${line} a`, `${line} b`), o), null);
+  assert.equal(check(edit("/root/adam/CLAUDE.md", line, ""), o), null, "zmazanie odseku prejde");
+});
+
+test("613 c: Write s o jeden odsek Chyba viac než súbor je zamietnutý, s rovnakým počtom nie týmto pravidlom", () => {
+  const o = direct();
+  const cur = "# Adam\n\nChyba 22. 10. 2026: y\n";
+  const w = (content) => ({ session_id: "w", cwd: "/tmp", tool_name: "Write", tool_input: { file_path: "/root/adam/PERSONA.md", content } });
+  o.read = () => cur;
+  assert.match(check(w(cur + "\nChyba 27. 10. 2026: x\n"), o), CHYBA_DOVOD);
+  assert.equal(chybaOdsek(w(cur.replace("# Adam", "# Adam II")), o.read), null);
+  assert.equal(check(w(cur.replace("# Adam", "# Adam II")), o), null);
+});
+
+test("613 d: Bash zápis odseku Chyba do CLAUDE.md alebo PERSONA.md je zamietnutý, čítanie a echo prejdú", () => {
+  const o = direct();
+  const deny = [
+    "cat >> /root/adam/CLAUDE.md <<'EOF'\n- Chyba 27. 10. 2026: x\nEOF",
+    "sed -i 's|^## Git|Chyba 27. 10. 2026: x\\n## Git|' /root/adam/CLAUDE.md",
+    "printf 'Chyba 27. 10. 2026: x\\n' >> /root/agent-rules/env/server/CLAUDE.md",
+    "echo 'Chyba 27. 10. 2026: x' | tee -a /root/adam/PERSONA.md",
+    "perl -pi -e 's/^## Git/Chyba 27. 10. 2026: x\\n## Git/' /root/adam/CLAUDE.md",
+    "python3 -c \"open('/root/adam/PERSONA.md','a').write('Chyba 27. 10. 2026: x')\"",
+    "echo 'Chyba 27. 10. 2026: x' > CLAUDE.md",
+  ];
+  for (const c of deny) {
+    assert.match(check(bash(c, "d"), o) || "", CHYBA_DOVOD, c);
+    assert.match(check(bash(c, "d"), o) || "", CHYBA_DOVOD, `trvalo: ${c}`);
+  }
+  const pass = [
+    "echo 'Chyba 27. 10. 2026: x'",
+    "grep -n 'Chyba 27. 10. 2026' /root/adam/CLAUDE.md",
+    "grep -n 'Chyba 27. 10. 2026' /root/adam/CLAUDE.md | tee /tmp/vystup.txt",
+    "sed -n '1,5p' /root/adam/CLAUDE.md",
+    "cat >> /root/adam/CLAUDE.md <<'EOF'\n- nové pravidlo bez dátumu\nEOF",
+    "echo 'Chyba 27. 10. 2026: x' >> /tmp/poznamky.md",
+  ];
+  for (const c of pass) assert.equal(check(bash(c, "p"), o), null, c);
+});
+
+test("613 d: hook ako proces zamietne Bash zápis s postupom chyba.sh --mechanizmus", () => {
+  const { e } = env();
+  const r = run(e, bash("cat >> /root/adam/CLAUDE.md <<'EOF'\nChyba 27. 10. 2026: x\nEOF"));
+  assert.equal(r.permissionDecision, "deny");
+  assert.match(r.permissionDecisionReason, CHYBA_DOVOD);
+  assert.match(r.permissionDecisionReason, /\nSprávny postup: spusti \/opt\/agent-rules\/bin\/chyba\.sh --trieda <trieda> --subor <súbor s opravou> --mechanizmus <hook\|test\|deny\|rozhodnutie>:<cesta alebo id>/);
+  assert.equal(run(e, bash("grep -n 'Chyba 27. 10. 2026' /root/adam/CLAUDE.md")), null);
+  assert.equal(run(e, bash("echo 'Chyba 27. 10. 2026: x'")), null);
+});
+
+test("613 replay: pôvodný Edit s odsekom Chyba 23. 10. 2026 je teraz zamietnutý trvalo ako chyba pre register", () => {
+  const { e } = env();
+  for (let i = 0; i < 2; i++) {
+    const r = run(e, realRaw(e));
+    assert.equal(r.permissionDecision, "deny");
+    assert.match(r.permissionDecisionReason, CHYBA_DOVOD);
+  }
+});
+
+test("613 e: pôvodné správanie ostáva (repo agenta zamietne prvý pokus, druhý rovnaký prejde)", () => {
+  const o = direct();
+  const bez = edit("/root/adam/CLAUDE.md", "x", "x\n- Úloha so zakladaním s riešiteľom, ktorá bez neho nikoho nezobudí.", "orig");
+  assert.match(check(bez, o), /iný agent alebo rola/);
+  assert.equal(check(bez, o), null);
+  assert.equal(agentRepoOf("/root/adam/CLAUDE.md", { exists: () => true }), "/root/adam");
+  assert.equal(seenBefore({ stateDir: o.stateDir, session: "orig", file: "/root/adam/CLAUDE.md", text: "iný text" }), false);
+  assert.equal(seenBefore({ stateDir: o.stateDir, session: "orig", file: "/root/adam/CLAUDE.md", text: "iný text" }), true);
 });

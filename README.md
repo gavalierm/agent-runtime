@@ -595,7 +595,7 @@ text pre model ho berie z `AGENT_OPERATOR_NAME` (bez neho slovo "operátor").
 | `identity.mjs` | SessionStart | ohlási identitu z `PERSONA.md` a vloží pravidlá rolí z `roles/<slug>.md` klonu repa pravidiel |
 | `rules_delta.mjs` | UserPromptSubmit | vloží zmenu `global/` a `env/<prostredie>/` klonu repa pravidiel od posledného videného HEAD (s `AR_ROZHODNUTIA=1` aj `rozhodnutia/`) |
 | `tasker_work.mjs` | UserPromptSubmit, PreToolUse (Agent, zapisujúce nástroje), SubagentStop | ohlási prácu na úlohe Taskera (`tk work N`), prevezme úlohu v poradí, zámok úlohy držanej inou reláciou |
-| `own_rule_scope.mjs` | PreToolUse (Write, Edit, MultiEdit) | prvý zápis nového textu do `CLAUDE.md` alebo `PERSONA.md` repa agenta sa zamietne s otázkou, či to nepatrí do repa pravidiel |
+| `own_rule_scope.mjs` | PreToolUse (Write, Edit, MultiEdit, Bash) | prvý zápis nového textu do `CLAUDE.md` alebo `PERSONA.md` repa agenta sa zamietne s otázkou, či to nepatrí do repa pravidiel; nový odsek `Chyba <dátum>` do akéhokoľvek `CLAUDE.md` alebo `PERSONA.md` (aj cez Bash: `>`, `>>`, `tee`, `sed -i`, `perl -i`, `python` so zápisom) sa zamietne vždy, chyba patrí do registra `chyba.sh` (úloha 613) |
 | `reply_guard.mjs` | Stop | odpoveď operátorovi: strop viet a slov, meno na prvom riadku, mŕtvy alebo lokálny odkaz, zmienka úlohy Taskera bez odkazu, položka "(rozhodnutie)" v "Čaká na teba:" bez `?` alebo s nedefinovaným A/B (`lib/human_question.mjs`, úloha 575), s `AR_ROZHODNUTIA=1` aj "Čaká na teba" a nezapísané rozhodnutie |
 | `no_operator_commands.mjs` | Stop | odpoveď bez príkazu shellu pre operátora a bez položky "Čaká na teba", ktorú urobí agent |
 | `objection_fix.mjs` | Stop | uznaná chyba alebo námietka sa nezaobíde bez `chyba.sh` a commitu súboru, ktorý agenta riadi |
@@ -603,7 +603,7 @@ text pre model ho berie z `AGENT_OPERATOR_NAME` (bez neho slovo "operátor").
 | `idle_wake.mjs`, `topic_task.mjs` | Stop, PostToolUse | zbytočné zobudenie a úloha vo vlákne témy (časti vyššie) |
 
 Zapojenie: `node <runtime>/hooks/<hook>.mjs` v `settings.json` používateľa
-(udalosť podľa tabuľky, `matcher` `^(Write|Edit|MultiEdit)$` pre
+(udalosť podľa tabuľky, `matcher` `^(Write|Edit|MultiEdit|Bash)$` pre
 `own_rule_scope`, `^(Agent|Task)$` a zapisujúce nástroje pre `tasker_work`).
 Server zapája hooky skriptom `env/server/install.sh` repa pravidiel, Mac
 nasadením `env/mac/settings.json` toho istého repa s klonom tohto repa
@@ -625,7 +625,7 @@ a re-exporty, playbook naň odkazuje odkazom na zdroj. Nič z toho nepredpoklad�
 |---|---|
 | `bin/rozhodni.sh` | jediný zápis rozhodnutia do `rozhodnutia/` repa s rozhodnutiami: pridelí číslo, zapíše súbor a `INDEX.md`, commitne pod menom agenta (`<Agent> (<stroj>)`), pushne, nepushnutý lokálny záznam po cudzom zápise s rovnakým číslom prečísluje, `--z-ulohy N` doplní zdroj a úlohu z Taskera, `--dry-run` nezapíše nič |
 | `lib/rozhodnutia.mjs` | register: `list`, `show`, `check`, `index`, `zapis`; exportuje aj `configure({ repo, operatori, kontroly })`, ktorým repo pravidiel doplní meno operátora a vlastné kontroly záznamov |
-| `bin/chyba.sh` | uznaná chyba agenta: zapíše riadok do registra a pri druhom výskyte tej istej triedy založí v Taskeri úlohu na kontrolu |
+| `bin/chyba.sh` | uznaná chyba agenta: zapíše riadok do registra (ôsmy stĺpec je povinný `--mechanizmus hook:<cesta>`, `test:<cesta>`, `deny:<vzor>` alebo `rozhodnutie:D<nnnn>`, bez neho kód 1 a `Správny postup:`) a pri druhom výskyte tej istej triedy založí v Taskeri úlohu na kontrolu; `--otvorene` vypíše riadky registra bez mechanizmu, nič nezapíše (úloha 613) |
 | `lib/deny.sh`, `lib/deny_check.mjs` | `deny_postup` pre git hooky (dôvod a riadok "Správny postup:") a strážca, ktorý zlyhá na hooku so zamietnutím bez postupu (`denyProblems(koreň)`) |
 | `lib/session_id.mjs` | `originalId()`: pôvodné id relácie claude vlákna T3 z príkazového riadku predkov procesu |
 | `lib/path_check.mjs` | kontrola, že každá cesta v apostrofoch v `*.md` repa je v ňom alebo je uvedená v jeho `README.md` v sekcii "Čo v repe nie je" (`PATH_CHECK_ROOT` ukáže na iné repo) |
