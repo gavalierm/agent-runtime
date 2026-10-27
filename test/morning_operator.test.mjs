@@ -78,6 +78,8 @@ test("filter správ operátora: operátor áno, budič, /clear, notifikácia, ag
   assert.equal(isOperatorMessage(ok), true);
   assert.equal(isOperatorMessage({ ...ok, createdBy: "agent" }), false);
   assert.equal(isOperatorMessage({ ...ok, creationSource: "provider" }), false);
+  assert.equal(isOperatorMessage({ ...ok, creationSource: "mobile" }), true);
+  assert.equal(isOperatorMessage({ ...ok, creationSource: "mcp" }), false);
   assert.equal(isOperatorMessage({ ...ok, notification: {} }), false);
   assert.equal(isOperatorMessage({ ...ok, id: "q-inbox-2" }), false);
   assert.equal(isOperatorMessage({ ...ok, text: " /clear " }), false);

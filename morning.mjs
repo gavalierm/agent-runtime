@@ -152,7 +152,8 @@ const OPERATOR_NOISE = [/^\[harness/, /^Na vedomie, /, /^Schránka: /, /^<schran
 // Správa operátora z webu T3: nie správa budiča, nie /clear, nie notifikácia ani text vložený hookom.
 export function isOperatorMessage(payload) {
   if (payload?.role !== undefined && payload.role !== "user") return false;
-  if (payload?.createdBy !== "user" || payload?.creationSource !== "web") return false;
+  // Operátor píše z webu aj z mobilu (creationSource "mobile", 27. 10. 2026 súhrn vynechal 5 správ).
+  if (payload?.createdBy !== "user" || !["web", "mobile"].includes(payload?.creationSource)) return false;
   if ("notification" in payload) return false;
   if (String(payload.id ?? "").includes("-inbox-")) return false;
   const text = String(payload.text ?? "").trim();
