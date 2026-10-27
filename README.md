@@ -702,7 +702,7 @@ prostredia. `reply.sh` si `runtime.env` agenta načíta sám.
 | `AGENT_HOST` | (povinné) | označenie stroja v autorovi commitov, `<Meno> (<stroj>)` |
 | `AGENT_TASKER_USER` | (povinné) | používateľ, pod ktorým bežia behy úloh a prehliadač; hooky: `own_rule_scope.mjs` kontroluje `/home/<používateľ>/agenti/<agent>/`, `tasker_read.mjs` hľadá DB v `/home/<používateľ>/.tasker/tasker.db`, keď nie je `TASKER_DB` ani `TASKER_HOME` |
 | `AGENT_INBOX_GROUP` | `agent-inbox` | skupina schránok v `tmpfiles.d` |
-| `AGENT_BROWSER_USER`, `AGENT_BROWSER_INST` | `AGENT_TASKER_USER`, `~/.cache/agent-browser` | prehliadač |
+| `AGENT_BROWSER_USER`, `AGENT_BROWSER_INST` | `AGENT_TASKER_USER`, `~/.cache/agent-browser` | prehliadač; pod rootom bez premenných v prostredí (vlákno T3) číta `browser.sh` `AGENT_BROWSER_USER` a `AGENT_TASKER_USER` z `runtime.env` agenta podľa `AGENT_RUNTIME_ENV`, `AGENT_NAME` alebo `PERSONA.md` v `CLAUDE_PROJECT_DIR` či aktuálnom priečinku (úloha 649) |
 | `GH_CLIENT_ID` | (povinné pre `github_device_login.sh`) | client id aplikácie OAuth |
 | `MAC_WAKE_AGENT` | (povinné pre `mac_wake.sh`) | agent na Macu, ktorého schránku `mac_wake.sh` sleduje; ďalej `MAC_WAKE_INBOX`, `MAC_WAKE_STATE`, `MAC_WAKE_CMD` |
 | `ASK_VAR_LIB` | `/var/lib` | koreň schránok (skúšky) |
