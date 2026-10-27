@@ -2,7 +2,7 @@
 // Testy reply_guard.mjs. Prvý prípad je odpoveď vlákna domov z 22. 10. 2026,
 // ktorú operátor dostal s odkazom na web, ktorý ešte nebežal.
 
-import { deadLinks, resolveArgs, deferredCheck, unverifiedPlan, localLinks, taskLinks, prose, replyProblem, sentences } from "../hooks/reply_guard.mjs";
+import { deadLinks, resolveArgs, deferredCheck, intentProblem, unverifiedPlan, localLinks, taskLinks, prose, replyProblem, sentences } from "../hooks/reply_guard.mjs";
 
 const REAL = "Spustil som to cez Tasker a agent domov-web beží na modeli Sonnet sám, bez teba.\n\n"
   + "Úloha 353 je audit súčasného webu a už beží. Doslovne vypíše všetky texty, frázy, kontakty a ponuky a k tomu farebnú paletu v hex a písma. "
@@ -246,6 +246,26 @@ for (const [text, name, want] of named) {
   if (!ok) { bad++; console.log(`✗ meno ${name}: chcem ${want}, mám ${got}: ${text.slice(0, 50)}`); }
 }
 
-const total = named.length + task.length + 3 + resolves.length + cases.length + unit.length + links.length + 2 + deferred.length + 1 + unverified.length + 1 + local.length + 1;
+// Priebežná správa so zámerom (námietka 27. 10. 2026), prvý prípad je skutočná veta Huga.
+const intent = [
+  ["Prečítam hook štartu relácie v /root/agent-runtime, aby som overil, čo pri štarte vkladá a odkiaľ berie stav odovzdávky.", "hlási zámer"],
+  ["Pozriem, čo máme.", "hlási zámer"],
+  ["Teraz skontrolujem test.", "hlási zámer"],
+  ["I'll check the hook first.", "hlási zámer"],
+  ["Let me read the file.", "hlási zámer"],
+  ["Hotovo. Teraz overím test.", "hlási zámer"],
+  ["Načítal som hooks/reply_guard.mjs, aby som doplnil kontrolu.", null],
+  ["Spustil som node --test, 12 prípadov prešlo.", null],
+  ["Veta \"Prečítam hook\" je zámer, nie krok.", null],
+  ["Hook `overím` nepustí.", null],
+  ["Overíme to zajtra na Macu.", null],
+];
+for (const [text, want] of intent) {
+  const got = intentProblem(text);
+  const ok = want === null ? got === null : typeof got === "string" && got.includes(want);
+  if (!ok) { bad++; console.log(`✗ zámer: chcem ${want}, mám ${got}: ${text.slice(0, 50)}`); }
+}
+
+const total = intent.length + named.length + task.length + 3 + resolves.length + cases.length + unit.length + links.length + 2 + deferred.length + 1 + unverified.length + 1 + local.length + 1;
 console.log(bad ? `${bad}/${total} zlyhalo` : `${total} prípadov v poriadku`);
 process.exit(bad ? 1 : 0);

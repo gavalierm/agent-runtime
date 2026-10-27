@@ -177,9 +177,31 @@ export function replyProblem(text, name = null) {
   return null;
 }
 
+const L = "\\p{L}";
+
+// Priebežná správa hlási zámer (úloha 631, námietka 27. 10. 2026): veta začína
+// slovesom prvej osoby v budúcom čase ("Prečítam hook štartu", "Pozriem, čo
+// máme", "I'll check the hook"). Krok sa píše hotový s názvom súboru alebo
+// príkazu a účelom ("Načítal som hooks/x.mjs, aby som ..."). Kontroluje sa
+// celý ťah od poslednej správy operátora, nie len posledná odpoveď.
+const SK_INTENT_VERBS = "prečítam|načítam|pozriem|overím|skontrolujem|zistím|spustím|otvorím|nájdem|vyhľadám|prejdem|pripravím|urobím|začnem|opravím|zmením|pošlem|založím|zapíšem|preverím|skúsim|pustím|idem|pokúsim|porovnám|naštudujem|prezriem|zapnem|nasadím|doplním|upravím|prepíšem|vložím|odstránim|zmažem|dopíšem|prehľadám|vypíšem|stiahnem";
+const SK_LEAD = "(?:(?:teraz|najprv|potom|ešte|hneď|ďalej|následne)\\s+)?";
+const INTENT = [
+  new RegExp(`^${SK_LEAD}(?:${SK_INTENT_VERBS})(?![${L}])`, "iu"),
+  new RegExp(`^(?:(?:now|next|first|then)[,\\s]+)?(?:i['’]ll|i will|i['’]m going to|let me|going to)(?![${L}])`, "iu"),
+];
+
+// Vráti dôvod zastavenia alebo null. text je celý text ťahu agenta.
+export function intentProblem(text) {
+  const { prose: p, items } = parse(text);
+  for (const s of [...sentences(p), ...items.flatMap((i) => sentences(i))]) {
+    if (INTENT.some((re) => re.test(s))) return `priebežná správa hlási zámer namiesto hotového kroku: "${clip(s)}"`;
+  }
+  return null;
+}
+
 // Overenie odložené na nasadenie alebo prvý beh, po slovensky aj po anglicky.
 // Sloveso overenia a čas nasadenia v jednej vete, v oboch poradiach.
-const L = "\\p{L}";
 const SK_VERB = `(?<![${L}])(?:over(?:í|íme|ím|íš|ia)|zist(?:í|íme|ím|íš|ia)|ukáž(?:e|u)|skontroluj(?:eme|em|e)|vyskúš(?:ame|am|a)|uvidí(?:me|m)?)(?![${L}])`;
 const SK_WHEN = `(?<![${L}])(?:až\\s+)?(?:pri|po|počas)\\s+(?:(?:nasaden\\p{L}*|deploy\\p{L}*)|(?:prvom|prvým|ostrom)\\s+(?:štarte|behu|spustení|nasadení|nasadením|štartu))(?![${L}])`;
 const EN_VERB = `(?<![${L}])(?:verify|validate|confirm|find\\s+out|discover|(?:we['’]ll|we\\s+will|will)\\s+see)(?![${L}])`;
@@ -438,6 +460,7 @@ export const POSTUPY = [
   [/viet prózy/, "skráť odpoveď na verdikt, dôvod a čo urobiť; podrobnosti ulož do súboru v docs/ a v odpovedi uveď jeho cestu"],
   [/^veta so \d+ slovami/, "rozdeľ vetu na kratšie alebo ju zmaž a odpoveď prepíš"],
   [/^položka zoznamu/, "skráť položku zoznamu na jednu vetu a odpoveď prepíš"],
+  [/^priebežná správa hlási zámer/, "napíš krok hotový v minulom čase s názvom súboru alebo príkazu a účelom (\"Načítal som hooks/x.mjs, aby som ...\"), alebo správu pred nástrojom vynechaj; pravidlo je v Jadre skillu unslop"],
   [/^odklad overenia/, "over to teraz (skúšobná inštancia mimo živého systému, kód alebo dokumentácia) a výsledok napíš do odpovede, alebo napíš, prečo sa to overiť nedá"],
   [/^neoverená položka v návrhu/, "over položku teraz (skúška, kód, dokumentácia) a výsledok napíš do odpovede, alebo napíš, prečo sa to teraz overiť nedá, a vetu, že návrh nie je pripravený na schválenie; návrh nedávaj na schválenie s neoverenou položkou"],
   [/je localhost servera/, "nahraď adresu adresou z `tailscale serve status`: {HOST}:<port>"],
@@ -469,8 +492,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } catch {}
   const env = hookEnv(input);
   let cmds = null;
-  if (zapnute(env) && input.transcript_path) { try { cmds = lastTurn(readFileSync(input.transcript_path, "utf8")).cmds; } catch {} }
-  const reason = waitingItemProblem(text) ?? replyProblem(text, name) ?? deferredCheck(text) ?? unverifiedPlan(text) ?? localLinks(text, process.platform, env.TASKER_WEB_URL)
+  let turnText = text;
+  if (input.transcript_path) {
+    try {
+      const turn = lastTurn(readFileSync(input.transcript_path, "utf8"));
+      if (zapnute(env)) cmds = turn.cmds;
+      if (turn.text) turnText = turn.text;
+    } catch {}
+  }
+  const reason = waitingItemProblem(text) ?? replyProblem(text, name) ?? intentProblem(turnText) ?? deferredCheck(text) ?? unverifiedPlan(text) ?? localLinks(text, process.platform, env.TASKER_WEB_URL)
     ?? taskLinks(text, env.TASKER_WEB_URL || DEFAULT_WEB)
     ?? (zapnute(env) ? (await waitingProblem(text, (ids) => fetchTasks({ ids, env })) ?? (cmds ? decisionProblem(text, cmds, env) : null)) : null)
     ?? (env.REPLY_GUARD_NO_NET === "1" ? null : deadLinks(text));
