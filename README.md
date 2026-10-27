@@ -32,7 +32,7 @@ Operátor píše do vlákna priamo z T3 desktopu alebo mobilu.
 | `systemd/` | šablóna budiča `agent-driver@.service`, jednotky udalostí Taskera a ranného súhrnu, `tmpfiles.d` schránky a drop-in `t3code.service` |
 | `test/` | `node --test 'test/*.test.mjs'`, falošný T3 server bez závislostí |
 | `lib/public_check.mjs` | kontrola mien a adries pred commitom a pushom (`.githooks/pre-push`), slúži aj repu playbooku |
-| `hooks/` | hooky relácie claude (časť Hooky relácie): `identity`, `memory_context`, `no_operator_commands`, `objection_fix`, `own_rule_scope`, `reply_guard`, `rules_delta`, `tasker_work`, `todo_after_comment`, `idle_wake`, `topic_task`, testy v `test/<hook>.test.mjs` |
+| `hooks/` | hooky relácie claude (časť Hooky relácie): `identity`, `memory_context`, `no_operator_commands`, `objection_fix`, `own_rule_scope`, `reply_guard`, `rules_delta`, `tasker_work`, `todo_after_comment`, `done_related`, `idle_wake`, `topic_task`, testy v `test/<hook>.test.mjs` |
 | `lib/agent_env.mjs`, `lib/agent_name.mjs`, `lib/deny.mjs`, `lib/tasker_read.mjs` | knižnice hookov: hodnoty z `runtime.env` agenta, meno agenta, zamietnutie s riadkom "Správny postup:" (D0141), čítanie úloh Taskera |
 | `bin/chyba.sh`, `bin/rozhodni.sh` | zápis uznanej chyby a zápis rozhodnutia, opis v časti Skripty a knižnice |
 | `lib/rozhodnutia.mjs`, `lib/deny.sh`, `lib/deny_check.mjs`, `lib/session_id.mjs`, `lib/path_check.mjs`, `lib/agent_rules.sh` | register rozhodnutí, zamietnutie pre shell, strážca zamietnutí, id relácie T3, kontrola odkazov na cesty, cesta ku klonu pravidiel |
@@ -601,6 +601,7 @@ text pre model ho berie z `AGENT_OPERATOR_NAME` (bez neho slovo "operátor").
 | `no_operator_commands.mjs` | Stop | odpoveď bez príkazu shellu pre operátora a bez položky "Čaká na teba", ktorú urobí agent |
 | `objection_fix.mjs` | Stop | uznaná chyba alebo námietka sa nezaobíde bez `chyba.sh` a commitu súboru, ktorý agenta riadi |
 | `todo_after_comment.mjs` | Stop | úloha agenta s jeho komentárom nesmie ostať v poradí |
+| `done_related.mjs` | Stop | po zavretí úlohy nesmie v jej projekte ostať otázka `needs_human` toho istého riešiteľa bez jeho komentára v ťahu (zruš s dôvodom, alebo napíš, prečo platí; úloha 609 po audite 612, 27. 10. 2026) |
 | `idle_wake.mjs`, `topic_task.mjs` | Stop, PostToolUse | zbytočné zobudenie a úloha vo vlákne témy (časti vyššie) |
 
 Zapojenie: `node <runtime>/hooks/<hook>.mjs` v `settings.json` používateľa
