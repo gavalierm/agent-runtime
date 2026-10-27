@@ -360,6 +360,7 @@ test("subory: súbor z klonu agent-runtime sa uzná, chýbajúci nie", () => {
   const { root, dir } = fixtura([
     rec({ id: "D0001", subory: "hooks/reply_guard.mjs", kluc: "a.a", alias: "" }),
     rec({ id: "D0002", subory: "hooks/nie_je.mjs", kluc: "a.b", alias: "" }),
+    rec({ id: "D0003", stav: "nahradené", nahradene: "D0001", subory: "bin/zmazany.sh", kluc: "a.c", alias: "" }),
   ]);
   const runtime = mkdtempSync(join(tmpdir(), "rozh-runtime-"));
   try {
@@ -368,6 +369,7 @@ test("subory: súbor z klonu agent-runtime sa uzná, chýbajúci nie", () => {
     const t = problems(loadAll(dir), { ...context(dir), runtime }).join("\n");
     assert.doesNotMatch(t, /reply_guard\.mjs' neexistuje/);
     assert.match(t, /hooks\/nie_je\.mjs' neexistuje/);
+    assert.doesNotMatch(t, /zmazany\.sh/);
     assert.match(problems(loadAll(dir), { ...context(dir), runtime: join(runtime, "prazdny") }).join("\n"), /reply_guard\.mjs' neexistuje/);
   } finally { rmSync(root, { recursive: true, force: true }); rmSync(runtime, { recursive: true, force: true }); }
 });
