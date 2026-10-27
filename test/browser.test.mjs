@@ -153,6 +153,23 @@ const run = (args, opts = {}) =>
   });
 const profBase = `/home/${bUser}/.local/share/agent-browser/profiles`;
 
+// Úloha 649: vlákno T3 pod rootom nemá AGENT_* v prostredí, používateľ
+// prehliadača ide z runtime.env agenta podľa PERSONA.md v cwd.
+test("browser.sh pod rootom bez AGENT_*: používateľ z ~/.config/<agent>/runtime.env", { skip: process.getuid?.() !== 0 && "nie je root" }, async () => {
+  const home = mkdtempSync(join(tmpdir(), "browser-env-"));
+  try {
+    mkdirSync(join(home, ".config/adam"), { recursive: true });
+    writeFileSync(join(home, ".config/adam/runtime.env"), "AGENT_TASKER_USER=neexistuje-xyz\n");
+    writeFileSync(join(home, "PERSONA.md"), "# Adam\n");
+    const env = { PATH: process.env.PATH, HOME: home };
+    const r = await run(["--url", "http://127.0.0.1:1/"], { env, cwd: home });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /neexistuje-xyz/, "meno z runtime.env sa má použiť, nie chýbať");
+    const r2 = await run(["--url", "http://127.0.0.1:1/"], { env, cwd: tmpdir() });
+    assert.match(r2.stderr, /chýba používateľ/);
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
 test("browser.sh: zlé voľby používateľa, profilu a --exec skončia kódom 2", async () => {
   assert.equal((await run(["--user", "neexistuje-xyz", "--url", "http://127.0.0.1:1/"])).status, 2);
   assert.equal((await run(["--user", "root", "--url", "http://127.0.0.1:1/"])).status, 2);

@@ -42,8 +42,26 @@
 set -euo pipefail
 
 ME="$(id -un)"
+# Pod rootom vo vlákne T3 prostredie AGENT_* nenesie (úloha 649), premenné
+# číta z runtime.env agenta ako hooky (lib/agent_env.mjs): AGENT_RUNTIME_ENV,
+# inak ~/.config/<agent>/runtime.env, agent z AGENT_NAME alebo "# Meno"
+# v PERSONA.md priečinka CLAUDE_PROJECT_DIR alebo aktuálneho.
+runtime_env_value() {
+  local key="$1" f="${AGENT_RUNTIME_ENV:-}" name="${AGENT_NAME:-}" persona
+  if [ -z "$f" ]; then
+    if [ -z "$name" ]; then
+      persona="${CLAUDE_PROJECT_DIR:-$PWD}/PERSONA.md"
+      [ -f "$persona" ] && name="$(sed -n 's/^# \(.*\)$/\1/p' "$persona" | head -1 | tr '[:upper:]' '[:lower:]')"
+    fi
+    [[ "$name" =~ ^[a-z0-9_-]+$ ]] || return 0
+    f="${HOME:-/root}/.config/$name/runtime.env"
+  fi
+  [ -f "$f" ] && sed -n "s/^$key=//p" "$f" | head -1
+}
 if [ "$(id -u)" -eq 0 ]; then
   USER_B="${AGENT_BROWSER_USER:-${AGENT_TASKER_USER:-}}"
+  [ -n "$USER_B" ] || USER_B="$(runtime_env_value AGENT_BROWSER_USER)"
+  [ -n "$USER_B" ] || USER_B="$(runtime_env_value AGENT_TASKER_USER)"
 else
   USER_B="$ME"
 fi
@@ -83,7 +101,7 @@ done
 if [ "$(id -u)" -ne 0 ] && [ "$USER_B" != "$ME" ]; then
   die "--user $USER_B: pod používateľom $ME smie Chrome bežať len pod ním (iného používateľa môže zvoliť len root)" 2
 fi
-HOME_B="$(getent passwd "$USER_B" | cut -d: -f6)"
+HOME_B="$(getent passwd "$USER_B" | cut -d: -f6 || true)"
 [ -n "$HOME_B" ] && [ -d "$HOME_B" ] || die "používateľ $USER_B neexistuje" 2
 [ "$USER_B" != root ] || die "Chrome so sandboxom pod rootom nebeží, zvoľ iného používateľa" 2
 INST="${AGENT_BROWSER_INST:-$HOME_B/.cache/agent-browser}"
