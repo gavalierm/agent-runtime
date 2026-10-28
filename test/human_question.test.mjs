@@ -2,7 +2,7 @@
 // 573 s vymyslenými menami, tvar zachovaný.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { questionProblem, waitingItemProblem, usedLetters, decisionItems, unverifiedClaim } from "../lib/human_question.mjs";
+import { accountItemProblem, questionProblem, waitingItemProblem, usedLetters, decisionItems, unverifiedClaim } from "../lib/human_question.mjs";
 
 const SUMMARY = "Medzery v návrhu sú opravené, --gaps dáva kód 0 pri 1440 aj 390 px, hlavicka.sh 0 nálezov (1dd47fa). Čaká na Adamovo A/B k zápisu do agent-rules.";
 const COMMENT = "[Boris za Adama] Adam, máme prepísať vzor pre dashboardy v repe pravidiel podľa nového detailu úlohy v Taskeri?\n\n"
@@ -123,4 +123,14 @@ test("'unverified' v URL, v kóde a v bloku kódu prejde", () => {
   assert.equal(unverifiedClaim("Kód:\n```\nconst unverified = 1; // neoverené\n```\nHotovo."), null);
   assert.equal(unverifiedClaim("Slovo preneoverené nie je značka."), null);
   assert.equal(questionProblem("Zapísať? A) áno. B) nie. Príznak `unverified` je v kóde."), null);
+});
+
+test("položka (tvoj účet) bez riadku Overené: sa zamietne, s ním prejde", () => {
+  const bad = "Kredity začnú chodiť po prepojení ([úloha 658](https://x/tasks/658)).\n\nČaká na teba: (tvoj účet) prepojenie organizácie Console v claude.ai (Settings, Billing, API credits).";
+  assert.match(accountItemProblem(bad), /tvoj účet\) bez riadku "Overené:"/);
+  assert.match(accountItemProblem("Čaká na teba:\n- (tvoj účet) prepojenie organizácie"), /Overené/);
+  const ok = bad.replace("\n\nČaká", "\n\nOverené: plán Max (`claude auth status`); neoverené: stav organizácie Console.\n\nČaká");
+  assert.equal(accountItemProblem(ok), null);
+  assert.equal(accountItemProblem("Čaká na teba:\n- heslo (hodnota)"), null);
+  assert.equal(accountItemProblem("Bez čakania, (tvoj účet) len v texte."), null);
 });
