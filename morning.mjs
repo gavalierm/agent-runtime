@@ -18,6 +18,11 @@
 // počas behu), reposSection (klony cfg.workRepos s neprázdnym git status --short)
 // a repliesSection (správy iných agentov v processed za 24 h). Prvý riadok pokynu
 // v build(): report len z týchto dát, nástroj len na akciu, chýbajúci údaj je úloha na tento skript.
+// Značka účasti operátora (úloha 653): každý riadok hotovej úlohy v `tasker summary` dostane
+// `[s <operátorom>]`, keď operátor v okne 24 h písal do vlákna T3, ktorého názov nesie číslo
+// úlohy (`úloha N`, `#N`, `uN`), alebo do úlohy komentár (autor z TASKER_OPERATORS, alebo telo
+// začína AGENT_OPERATOR_NAME). Agent takú úlohu v súhrne len spočíta, opis dostane len práca bez
+// účasti operátora. Tvar značky dá AGENT_OPERATOR_WITH, inak AGENT_OPERATOR_NAME + "om".
 import { execFileSync, spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, readdirSync, readFileSync, renameSync, statSync } from "node:fs";
@@ -431,6 +436,94 @@ export function repliesSection(cfg, now = Date.now()) {
   return lines;
 }
 
+// ---- Úloha 653: účasť operátora na hotovej úlohe ----
+
+// Čísla úloh v názve vlákna T3: `úloha 14`, `Úloha 614:`, `#351`, `u621`, `u621b`. Holé číslo nie.
+const TASK_IN_TITLE_RE = /(?:^|[^\p{L}\d])(?:úloha|uloha|#|u)\s?(\d{1,6})(?![\d])/giu;
+export function taskIdsInTitle(title) {
+  const out = new Set();
+  for (const m of String(title ?? "").matchAll(TASK_IN_TITLE_RE)) out.add(Number(m[1]));
+  return out;
+}
+
+export function operatorMark(env = process.env) {
+  const w = String(env.AGENT_OPERATOR_WITH || "").trim();
+  if (w) return `[s ${w}]`;
+  const name = String(env.AGENT_OPERATOR_NAME || "").trim();
+  return name ? `[s ${name}om]` : "[s operátorom]";
+}
+
+// Úlohy, na ktorých sa operátor v okne zúčastnil: Map id -> zoznam zdrojov ("T3 <názov vlákna>",
+// "komentár"). Obe DB len na čítanie, chyba ide do `errors`, nie výnimkou.
+export function operatorTasks(cfg, now = Date.now(), deps = {}) {
+  const env = deps.env || process.env;
+  const since = now - 24 * 3600_000;
+  const tasks = new Map();
+  const errors = [];
+  const add = (id, src) => { const g = tasks.get(id) || []; if (!g.includes(src)) g.push(src); tasks.set(id, g); };
+  const operators = new Set(String(env.TASKER_OPERATORS || "operator").split(":").filter(Boolean));
+  const name = String(env.AGENT_OPERATOR_NAME || "").trim();
+  try {
+    const db = new DatabaseSync(cfg.taskerDb, { readOnly: true });
+    let comments;
+    try { comments = db.prepare("SELECT task_id, author, body FROM comments WHERE created_at >= ? ORDER BY id").all(since); } finally { db.close(); }
+    for (const c of comments) {
+      if (operators.has(String(c.author)) || (name && String(c.body).startsWith(name))) add(c.task_id, "komentár");
+    }
+  } catch (e) {
+    errors.push(`Tasker: čítanie komentárov zlyhalo: ${(e.message || "").toString().trim().slice(0, 300)}`);
+  }
+  if (cfg.t3Db && existsSync(cfg.t3Db)) {
+    try {
+      const db = new DatabaseSync(cfg.t3Db, { readOnly: true });
+      let rows;
+      try {
+        rows = db.prepare(
+          `SELECT m.payload_json AS payload, t.title AS title
+             FROM orchestration_v2_projection_messages m
+             JOIN orchestration_v2_projection_threads t ON t.thread_id = m.thread_id
+            WHERE m.role = 'user' AND m.created_at >= ?`).all(new Date(since).toISOString());
+      } finally { db.close(); }
+      for (const r of rows) {
+        const ids = taskIdsInTitle(r.title);
+        if (!ids.size) continue;
+        let p;
+        try { p = JSON.parse(r.payload); } catch { continue; }
+        if (!isOperatorMessage({ ...p, role: "user" })) continue;
+        for (const id of ids) add(id, `T3 ${cut(r.title, 40)}`);
+      }
+    } catch (e) {
+      errors.push(`T3: čítanie správ zlyhalo: ${(e.message || "").toString().trim().slice(0, 300)}`);
+    }
+  }
+  return { tasks, errors };
+}
+
+// Do výstupu `tasker summary` doplní značku za každý riadok `- #N ...` v časti `## Hotové`, ktorého
+// úloha je v `part.tasks`. Vráti text a riadky s počtom pod časťou.
+export function markDone(summary, part, mark) {
+  const lines = String(summary ?? "").split("\n");
+  let inDone = false;
+  const withOp = [], without = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (/^## /.test(l)) { inDone = /^## Hotové\b/.test(l); continue; }
+    if (!inDone) continue;
+    const m = l.match(/^- #(\d+)\b/);
+    if (!m) continue;
+    const id = Number(m[1]);
+    if (part.tasks.has(id)) { lines[i] = `${l} ${mark}`; withOp.push(id); } else without.push(id);
+  }
+  const tail = [];
+  if (withOp.length || without.length) {
+    tail.push("", `Hotové ${mark}, len počet, bez opisu: ${withOp.length} (úlohy ${idList(withOp)})`);
+    for (const id of withOp) tail.push(`- #${id}: ${part.tasks.get(id).join(", ")}`);
+    tail.push(`Hotové bez účasti operátora, do súhrnu s opisom: ${without.length} (úlohy ${idList(without)})`);
+  }
+  for (const e of part.errors) tail.push(e);
+  return { text: lines.join("\n"), lines: tail };
+}
+
 export function build(cfg, run = execFileSync, now = Date.now(), deps = {}) {
   let tasker;
   try {
@@ -440,14 +533,18 @@ export function build(cfg, run = execFileSync, now = Date.now(), deps = {}) {
   } catch (e) {
     tasker = `tasker summary zlyhal: ${(e.stderr || e.message || "").toString().trim().slice(0, 1000)}`;
   }
+  const mark = operatorMark(deps.env || process.env);
+  const done = markDone(tasker, operatorTasks(cfg, now, deps), mark);
   return [
     "Ranný súhrn. Napíš operátorovi do tohto vlákna stav firmy podľa svojej persony:",
     "Hotové, Beží, Čaká na teba, každá položka jeden riadok obyčajnými slovami.",
     "Report napíš len z týchto dát, nástroj použi len na akciu (oprava, úloha). Chýbajúci údaj je úloha na morning.mjs, nie ručný dopyt.",
+    `Hotovú úlohu so značkou ${mark} uveď len v počte, bez opisu, opis dostane len práca bez účasti operátora.`,
     "",
     "Tasker za posledných 24 h:",
     "",
-    tasker,
+    done.text,
+    ...done.lines,
     ...stalledSection(cfg, now),
     ...interruptedSection(cfg, now),
     ...repliesSection(cfg, now),
