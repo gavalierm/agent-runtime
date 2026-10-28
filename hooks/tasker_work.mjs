@@ -52,6 +52,10 @@
 // Relácia toho istého vlákna po /clear (T3 dá nové session_id, transcript jedného
 // id je symlink na druhý) nie je cudzia (sameSession). Chyba 25. 10. 2026 pri
 // úlohe 595: vlastné vlákno po /clear ohlásilo, že úlohu drží jeho stará relácia.
+// Chyba 28. 10. 2026 (úloha 656): po druhom /clear je predošlý prepis obyčajný
+// súbor, symlinky nestačia. clear_bridge.mjs zapisuje reťaz id do
+// `<pôvodné id>.sessions` v priečinku prepisov a sameSession ju číta
+// (chainedSessions z lib/session_id.mjs).
 //
 // Meno agenta: AGENT_NAME, inak "# Meno" z PERSONA.md v projekte (malými).
 // Obal `tk` je AGENT_TK, inak `bin/tk` v klone repa pravidiel (rulesRepo
@@ -66,6 +70,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { denyTool } from "../lib/deny.mjs";
 import { hookEnv, rulesRepo } from "../lib/agent_env.mjs";
+import { chainedSessions } from "../lib/session_id.mjs";
 
 const TIMEOUT_MS = 2500;
 // "úloha N", "úlohy N", "úlohe N", "úlohu N", "úlohou N", "/tasks/N", "#N".
@@ -191,12 +196,14 @@ function writeTool(input) {
 }
 
 // Rovnaká relácia: rovnaké id, alebo transcripty oboch id v priečinku `dir` ukazujú na ten istý
-// súbor (po /clear je jeden symlink na druhý). Chyba realpath: cudzia (fail open).
+// súbor (po /clear je jeden symlink na druhý), alebo ich spája reťaz v `*.sessions`
+// (po druhom /clear, úloha 656). Chyba realpath: cudzia (fail open).
 export function sameSession(a, b, dir) {
   if (String(a) === String(b)) return true;
   try {
-    return realpathSync(join(dir, `${a}.jsonl`)) === realpathSync(join(dir, `${b}.jsonl`));
-  } catch { return false; }
+    if (realpathSync(join(dir, `${a}.jsonl`)) === realpathSync(join(dir, `${b}.jsonl`))) return true;
+  } catch {}
+  return chainedSessions(dir, a).has(String(b)) || chainedSessions(dir, b).has(String(a));
 }
 
 // Porovnanie držiteľa s touto reláciou: podľa priečinka transcriptu, bez neho len reťazce.

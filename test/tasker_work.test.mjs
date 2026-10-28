@@ -8,7 +8,8 @@ import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, chmodS
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { taskNumber, taskNumbers, sameSession } from "../hooks/tasker_work.mjs";
+import { taskNumber, taskNumbers, sameSession, foreignHolder } from "../hooks/tasker_work.mjs";
+import { recordChain } from "../lib/session_id.mjs";
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), "../hooks/tasker_work.mjs");
 
@@ -428,4 +429,50 @@ test("sameSession: rovnaké id, symlink v oboch smeroch, chýbajúci súbor", ()
   assert.equal(sameSession("c7ab4d1f", "0241cda7", dir), false);
   assert.equal(sameSession("c7ab4d1f", "zzzz", dir), false);
   assert.equal(sameSession("zzzz", "yyyy", dir), false);
+});
+
+// Replay úlohy 656 (28. 10. 2026): po druhom /clear sú prepisy 2c36d09d a 54f8935d obyčajné
+// súbory, 3724bef6 je symlink na 54f8935d. Spája ich len `3724bef6.sessions`.
+function chainDir() {
+  const dir = mkdtempSync(join(tmpdir(), "chain-"));
+  writeFileSync(join(dir, "2c36d09d.jsonl"), "");
+  writeFileSync(join(dir, "54f8935d.jsonl"), "");
+  symlinkSync("54f8935d.jsonl", join(dir, "3724bef6.jsonl"));
+  return dir;
+}
+const ev656 = (holder) => [ev(1, "work", `start until ${FAR} thread ${holder}`, "adam")];
+
+test("zámok: po druhom /clear bez .sessions drží úlohu cudzí (stav pred opravou 656)", () => {
+  const dir = chainDir();
+  assert.equal(sameSession("2c36d09d", "54f8935d", dir), false);
+  assert.equal(sameSession("2c36d09d", "3724bef6", dir), false);
+});
+
+test("zámok: po druhom /clear s .sessions držiteľ nie je cudzí (replay úlohy 656)", () => {
+  const dir = chainDir();
+  recordChain(dir, "3724bef6", ["2c36d09d", "54f8935d"]);
+  assert.equal(sameSession("2c36d09d", "54f8935d", dir), true);
+  assert.equal(sameSession("54f8935d", "2c36d09d", dir), true);
+  assert.equal(sameSession("2c36d09d", "3724bef6", dir), true);
+  assert.equal(sameSession("2c36d09d", "cudzia", dir), false);
+  const own = (t) => sameSession(t, "54f8935d", dir);
+  assert.equal(foreignHolder(ev656("2c36d09d"), "54f8935d", Date.now(), own), null);
+  assert.notEqual(foreignHolder(ev656("cudzia"), "54f8935d", Date.now(), own), null);
+});
+
+test("zámok: hook po druhom /clear nehlási vlastnú starú reláciu s .sessions, bez nich hlási", () => {
+  for (const withChain of [true, false]) {
+    const sb = sandbox();
+    writeFileSync(join(sb.dir, "task-656.json"), JSON.stringify({ id: 656, status: "in_progress", assignee: "adam", events: [ev(1, "work", `start until ${FAR} thread 2c36d09d`, "adam")] }));
+    const proj = chainDir();
+    if (withChain) recordChain(proj, "3724bef6", ["2c36d09d", "54f8935d"]);
+    const input = { ...pre("úloha 656", "tu1"), session_id: "54f8935d", transcript_path: join(proj, "54f8935d.jsonl") };
+    if (withChain) {
+      assert.equal(runRaw(sb, input), null);
+      assert.deepEqual(sb.calls(), ["adam work 656 --thread 54f8935d"]);
+    } else {
+      assert.equal(runRaw(sb, input).permissionDecision, "deny");
+      assert.deepEqual(sb.calls(), []);
+    }
+  }
 });
