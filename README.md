@@ -460,8 +460,10 @@ ako `kontextDir`.
 3. Kým prechod trvá, schránka čaká a správy z nej idú do vlákna až po
    čistom kontexte.
 
-Keď agent slovo nenapíše, kontext rastie až po automatickú kompakciu
-Claude Code.
+Keď agent slovo nenapíše, kontext rastie až po limit okna a beh skončí
+chybou API (prompt is too long): kompakcia je zakázaný stav (D0190),
+`autoCompactEnabled` false a hook `compact_block.mjs` repa pravidiel ju
+zastavia aj pri `/compact`.
 
 `/clear` cez `message.dispatch` T3 odovzdá Claude Code ako príkaz
 a bežiaci proces claude pokračuje v novej relácii. T3 0.1.0 si však pri
