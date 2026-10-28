@@ -507,7 +507,7 @@ export function markDone(summary, part, mark) {
   const withOp = [], without = [];
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    if (/^## /.test(l)) { inDone = /^## Hotové\b/.test(l); continue; }
+    if (/^## /.test(l)) { inDone = /^## Hotové(\s|$)/.test(l); continue; }
     if (!inDone) continue;
     const m = l.match(/^- #(\d+)\b/);
     if (!m) continue;
