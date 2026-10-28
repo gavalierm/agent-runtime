@@ -1,0 +1,5 @@
+#!/bin/bash
+# Pri commite prejde meno autora a committera a správu commitu (lib/public_check.mjs --commit-msg),
+# aby meno agenta a stroja neprešlo cez -c user.name až do pre-push. Zapnutie: git config core.hooksPath .githooks
+cd "$(git rev-parse --show-toplevel)" || exit 1
+node lib/public_check.mjs --commit-msg "$1" || exit 1

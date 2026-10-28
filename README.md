@@ -31,7 +31,7 @@ Operátor píše do vlákna priamo z T3 desktopu alebo mobilu.
 | `secret_drop.sh`, `secret_drop.mjs` | jednorazová stránka na odovzdanie tajomstva |
 | `systemd/` | šablóna budiča `agent-driver@.service`, jednotky udalostí Taskera a ranného súhrnu, `tmpfiles.d` schránky a drop-in `t3code.service` |
 | `test/` | `node --test 'test/*.test.mjs'`, falošný T3 server bez závislostí |
-| `lib/public_check.mjs` | kontrola mien a adries pred commitom a pushom (`.githooks/pre-push`), slúži aj repu playbooku |
+| `lib/public_check.mjs` | kontrola mien a adries pred commitom (`.githooks/pre-commit` súbory, `.githooks/commit-msg` meno autora a committera a správa, `--commit-msg`) a pushom (`.githooks/pre-push` commity), slúži aj repu playbooku |
 | `hooks/` | hooky relácie claude (časť Hooky relácie): `identity`, `memory_context`, `no_operator_commands`, `objection_fix`, `own_rule_scope`, `reply_guard`, `rules_delta`, `tasker_work`, `todo_after_comment`, `done_related`, `idle_wake`, `topic_task`, testy v `test/<hook>.test.mjs` |
 | `lib/agent_env.mjs`, `lib/agent_name.mjs`, `lib/deny.mjs`, `lib/tasker_read.mjs` | knižnice hookov: hodnoty z `runtime.env` agenta, meno agenta, zamietnutie s riadkom "Správny postup:" (D0141), čítanie úloh Taskera |
 | `bin/chyba.sh`, `bin/rozhodni.sh` | zápis uznanej chyby a zápis rozhodnutia, opis v časti Skripty a knižnice |
