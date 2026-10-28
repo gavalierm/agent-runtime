@@ -33,7 +33,7 @@ Operátor píše do vlákna priamo z T3 desktopu alebo mobilu.
 | `test/` | `node --test 'test/*.test.mjs'`, falošný T3 server bez závislostí |
 | `lib/public_check.mjs` | kontrola mien a adries pred commitom (`.githooks/pre-commit` súbory, `.githooks/commit-msg` meno autora a committera a správa, `--commit-msg`) a pushom (`.githooks/pre-push` commity), slúži aj repu playbooku |
 | `hooks/` | hooky relácie claude (časť Hooky relácie): `identity`, `memory_context`, `no_operator_commands`, `objection_fix`, `own_rule_scope`, `reply_guard`, `rules_delta`, `tasker_work`, `todo_after_comment`, `done_related`, `idle_wake`, `topic_task`, testy v `test/<hook>.test.mjs` |
-| `lib/agent_env.mjs`, `lib/agent_name.mjs`, `lib/deny.mjs`, `lib/tasker_read.mjs` | knižnice hookov: hodnoty z `runtime.env` agenta, meno agenta, zamietnutie s riadkom "Správny postup:" (D0141), čítanie úloh Taskera |
+| `lib/agent_env.mjs`, `lib/agent_name.mjs`, `lib/deny.mjs`, `lib/tasker_read.mjs` | knižnice hookov: hodnoty z `runtime.env` agenta, meno a persona agenta (aj vo vlákne témy cez T3 a `topics.json`), zamietnutie s riadkom "Správny postup:" (D0141), čítanie úloh Taskera |
 | `bin/chyba.sh`, `bin/rozhodni.sh` | zápis uznanej chyby a zápis rozhodnutia, opis v časti Skripty a knižnice |
 | `lib/rozhodnutia.mjs`, `lib/deny.sh`, `lib/deny_check.mjs`, `lib/session_id.mjs`, `lib/path_check.mjs`, `lib/agent_rules.sh` | register rozhodnutí, zamietnutie pre shell, strážca zamietnutí, id relácie T3, kontrola odkazov na cesty, cesta ku klonu pravidiel |
 
@@ -592,12 +592,12 @@ text pre model ho berie z `AGENT_OPERATOR_NAME` (bez neho slovo "operátor").
 
 | hook | udalosť | čo robí |
 |---|---|---|
-| `identity.mjs` | SessionStart | ohlási identitu z `PERSONA.md` a vloží pravidlá rolí z `roles/<slug>.md` klonu repa pravidiel |
+| `identity.mjs` | SessionStart | ohlási identitu z `PERSONA.md` a vloží pravidlá rolí z `roles/<slug>.md` klonu repa pravidiel; bez `PERSONA.md` v koreni (vlákno témy v klone projektu) nájde agenta cez vlákno relácie v T3 a `topics.json` agentov (`personaFor` v `lib/agent_name.mjs`, úloha 636) a ohlási aj tému |
 | `memory_context.mjs` | SessionStart | vloží prvých 200 riadkov `memory/MEMORY.md` repa agenta (index pamäte) do kontextu, aj po `/clear`; úvodná správa budiča preto pamäť čítať nehovorí (úloha 614). Bez `PERSONA.md` alebo `MEMORY.md` mlčí |
 | `rules_delta.mjs` | UserPromptSubmit | vloží zmenu `global/` a `env/<prostredie>/` klonu repa pravidiel od posledného videného HEAD (s `AR_ROZHODNUTIA=1` aj `rozhodnutia/`) |
 | `tasker_work.mjs` | UserPromptSubmit, PreToolUse (Agent, zapisujúce nástroje), SubagentStop | ohlási prácu na úlohe Taskera (`tk work N`), prevezme úlohu v poradí, zámok úlohy držanej inou reláciou |
 | `own_rule_scope.mjs` | PreToolUse (Write, Edit, MultiEdit, Bash) | prvý zápis nového textu do `CLAUDE.md` alebo `PERSONA.md` repa agenta sa zamietne s otázkou, či to nepatrí do repa pravidiel; nový odsek `Chyba <dátum>` do akéhokoľvek `CLAUDE.md` alebo `PERSONA.md` (aj cez Bash: `>`, `>>`, `tee`, `sed -i`, `perl -i`, `python` so zápisom) sa zamietne vždy, chyba patrí do registra `chyba.sh` (úloha 613); príkaz `sed -i`, `perl -i` alebo `python` s prepisom súboru, ktorého odsek `Chyba <dátum>` je v cieľovom súbore už teraz (mazanie, preformulovanie), prejde, zamietne sa len odsek, ktorý v súbore ešte nie je (úloha 625) |
-| `reply_guard.mjs` | Stop | odpoveď operátorovi: strop viet a slov, meno na prvom riadku, priebežná správa v ťahu so slovesom v budúcom čase (zámer namiesto hotového kroku), mŕtvy alebo lokálny odkaz, zmienka úlohy Taskera bez odkazu, položka "(rozhodnutie)" v "Čaká na teba:" bez `?` alebo s nedefinovaným A/B (`lib/human_question.mjs`, úloha 575), s `AR_ROZHODNUTIA=1` aj "Čaká na teba" a nezapísané rozhodnutie |
+| `reply_guard.mjs` | Stop | odpoveď operátorovi: strop 3 viet prózy (6, keď posledná správa operátora žiada postup, podrobnosti, vysvetlenie alebo dokument; zoznamy, kód a štyri vety hlásenia z `bin/chyba.sh` sa nerátajú) a 35 slov na vetu, meno na prvom riadku, priebežná správa v ťahu so slovesom v budúcom čase (zámer namiesto hotového kroku), mŕtvy alebo lokálny odkaz, zmienka úlohy Taskera bez odkazu, položka "(rozhodnutie)" v "Čaká na teba:" bez `?` alebo s nedefinovaným A/B (`lib/human_question.mjs`, úloha 575), s `AR_ROZHODNUTIA=1` aj "Čaká na teba" a nezapísané rozhodnutie |
 | `no_operator_commands.mjs` | Stop | odpoveď bez príkazu shellu pre operátora a bez položky "Čaká na teba", ktorú urobí agent |
 | `objection_fix.mjs` | Stop | uznaná chyba alebo námietka sa nezaobíde bez `chyba.sh` a commitu súboru, ktorý agenta riadi |
 | `todo_after_comment.mjs` | Stop | úloha agenta s jeho komentárom nesmie ostať v poradí |

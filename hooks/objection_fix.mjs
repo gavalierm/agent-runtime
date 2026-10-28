@@ -17,13 +17,14 @@ const RULES = /(PERSONA\.md|CLAUDE\.md|AGENTS\.md|hooks\/|check\.mjs|global\/|wo
 
 // Text odpovede a príkazy Bash od poslednej skutočnej správy operátora.
 export function lastTurn(transcript) {
-  let text = [], cmds = [];
+  let text = [], cmds = [], userText = "";
   for (const line of transcript.split("\n")) {
     let e;
     try { e = JSON.parse(line); } catch { continue; }
     const c = e.message?.content;
     if (e.type === "user") {
-      if (typeof c === "string" || (Array.isArray(c) && c.some((b) => b.type === "text"))) { text = []; cmds = []; }
+      if (typeof c === "string") { text = []; cmds = []; userText = c; }
+      else if (Array.isArray(c) && c.some((b) => b.type === "text")) { text = []; cmds = []; userText = c.filter((b) => b.type === "text").map((b) => b.text).join("\n"); }
     } else if (e.type === "assistant" && Array.isArray(c)) {
       for (const b of c) {
         if (b.type === "text") text.push(b.text);
@@ -31,7 +32,7 @@ export function lastTurn(transcript) {
       }
     }
   }
-  return { text: text.join("\n"), cmds };
+  return { text: text.join("\n"), cmds, userText };
 }
 
 export const POSTUP = {

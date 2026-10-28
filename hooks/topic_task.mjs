@@ -18,12 +18,11 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DatabaseSync } from "node:sqlite";
 import { setTopic, TOPIC_RE } from "../route.mjs";
-import { agentName } from "../lib/agent_name.mjs";
+import { agentName, T3_DB, threadsForNative, topicOfThreads } from "../lib/agent_name.mjs";
+export { T3_DB, threadsForNative, topicOfThreads };
 
 const RUNTIME = join(dirname(fileURLToPath(import.meta.url)), "..");
-export const T3_DB = "/root/.t3/userdata/statev2.sqlite";
 
 // Objekty JSON na najvyššej úrovni výstupu (pretty výstup `--json`, aj viac
 // objektov za sebou). Reťazce so zátvorkami počíta správne.
@@ -88,19 +87,6 @@ export function recentTasks(command, { agent, now = Date.now(), tk = defaultTk(a
     }
     return out;
   } catch { return []; }
-}
-
-// Vlákna T3, ktorých providerThread nesie dané natívne id relácie claude.
-export function threadsForNative(nativeId, dbPath = T3_DB) {
-  const db = new DatabaseSync(dbPath, { readOnly: true });
-  try {
-    return db.prepare("SELECT DISTINCT thread_id FROM orchestration_v2_projection_provider_threads WHERE json_extract(payload_json, '$.nativeThreadRef.nativeId') = ? AND thread_id IS NOT NULL").all(nativeId).map((r) => r.thread_id);
-  } finally { db.close(); }
-}
-
-export function topicOfThreads(topics, threads) {
-  for (const [name, v] of Object.entries(topics ?? {})) if (v?.thread && threads.includes(v.thread)) return name;
-  return null;
 }
 
 function defaultMainFile() {

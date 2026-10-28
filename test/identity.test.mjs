@@ -25,7 +25,7 @@ function run(persona, extraEnv = {}) {
     if (persona !== null) writeFileSync(join(dir, "PERSONA.md"), persona);
     const out = execFileSync("node", [HOOK], {
       input: JSON.stringify({ session_id: "test1234", cwd: dir }),
-      env: { PATH: process.env.PATH, HOME, CLAUDE_PROJECT_DIR: "", AGENT_RULES_REPO: RULES, ...extraEnv },
+      env: { PATH: process.env.PATH, HOME, CLAUDE_PROJECT_DIR: "", AGENT_RULES_REPO: RULES, AGENT_THREADS: "", ...extraEnv },
     }).toString();
     return out ? JSON.parse(out).hookSpecificOutput.additionalContext : "";
   } finally {
@@ -82,4 +82,25 @@ test("klon pravidiel z runtime.env agenta (AGENT_RULES_REPO)", () => {
     const c = run("# Xaver\n\nRole: spravca-servera\n", { AGENT_RULES_REPO: "", AGENT_NAME: "xaver" });
     assert.match(c, /# Pravidlá roly: z runtime\.env/);
   } finally { rmSync(other, { recursive: true, force: true }); }
+});
+
+// Vlákno témy (úloha 636): klon projektu bez PERSONA.md, vlákno relácie je
+// v topics.json agenta, identita je persona agenta a téma je v riadku.
+test("vlákno témy bez PERSONA.md dostane identitu agenta témy", () => {
+  const lib = mkdtempSync(join(tmpdir(), "identity-lib-"));
+  const homes = mkdtempSync(join(tmpdir(), "identity-homes-"));
+  try {
+    mkdirSync(join(lib, "xaver"));
+    writeFileSync(join(lib, "xaver", "topics.json"), JSON.stringify({ web: { thread: "mcp:abc", at: "2026-10-28T00:00:00Z" } }));
+    mkdirSync(join(homes, "xaver"));
+    writeFileSync(join(homes, "xaver", "PERSONA.md"), "# Xaver\n\nRole: spravca-servera\n");
+    const c = run(null, { AGENT_THREADS: "mcp:abc", AGENT_TOPICS_DIR: lib, AGENT_HOMES_DIR: homes });
+    assert.match(c, /Si Xaver podľa .*xaver\/PERSONA\.md/);
+    assert.match(c, /vlákno témy web/);
+    assert.match(c, /# Pravidlá roly: správca servera/);
+    assert.equal(run(null, { AGENT_THREADS: "mcp:ine", AGENT_TOPICS_DIR: lib, AGENT_HOMES_DIR: homes }), "");
+  } finally {
+    rmSync(lib, { recursive: true, force: true });
+    rmSync(homes, { recursive: true, force: true });
+  }
 });

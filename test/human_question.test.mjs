@@ -71,7 +71,7 @@ test("reply_guard zastaví odpoveď s položkou (rozhodnutie) bez otázky", asyn
   try {
     const run = (text) => spawnSync("node", [guard], {
       input: JSON.stringify({ last_assistant_message: text, cwd: dir }),
-      env: { ...process.env, CLAUDE_PROJECT_DIR: dir, REPLY_GUARD_NO_NET: "1", AR_ROZHODNUTIA: "" }, encoding: "utf8",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: dir, REPLY_GUARD_NO_NET: "1", AR_ROZHODNUTIA: "", AGENT_THREADS: "" }, encoding: "utf8",
     }).stdout;
     const bad = JSON.parse(run(ITEM));
     assert.equal(bad.decision, "block");

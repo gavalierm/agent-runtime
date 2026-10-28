@@ -96,7 +96,7 @@ test("decisionProblem: meno operátora z prostredia", () => {
 });
 
 const hook = (name, input, env = {}) =>
-  spawnSync("node", [join(HOOKS, name)], { input: JSON.stringify(input), encoding: "utf8", env: { PATH: process.env.PATH, HOME, AGENT_NAME: "adam", REPLY_GUARD_NO_NET: "1", ...env } });
+  spawnSync("node", [join(HOOKS, name)], { input: JSON.stringify(input), encoding: "utf8", env: { PATH: process.env.PATH, HOME, AGENT_NAME: "adam", REPLY_GUARD_NO_NET: "1", AGENT_THREADS: "", ...env } });
 
 test("no_operator_commands: tvary mena operátora z runtime.env, bez mena slovo operátor", () => {
   const cmd = { last_assistant_message: "Spusti:\n```sh\nnpm test\n```" };

@@ -90,7 +90,7 @@ test("K3b: operátor rozhodol bez zápisu zastaví, so skriptom, číslom D aleb
 
 function cli(script, input, env = {}) {
   const home = tmp();
-  return spawnSync("node", [join(HOOKS, script)], { input: JSON.stringify(input), encoding: "utf8", env: { ...cleanEnv(), HOME: home, CLAUDE_PROJECT_DIR: home, REPLY_GUARD_NO_NET: "1", ...env } });
+  return spawnSync("node", [join(HOOKS, script)], { input: JSON.stringify(input), encoding: "utf8", env: { ...cleanEnv(), HOME: home, CLAUDE_PROJECT_DIR: home, REPLY_GUARD_NO_NET: "1", AGENT_THREADS: "", ...env } });
 }
 
 test("reply_guard CLI: odpoveď s prepínačom dá block, bez neho sa správanie nemení", () => {

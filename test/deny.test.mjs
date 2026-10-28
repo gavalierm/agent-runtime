@@ -17,7 +17,7 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const HOME = mkdtempSync(join(tmpdir(), "deny-home-"));
 test.after(() => rmSync(HOME, { recursive: true, force: true }));
 const hook = (name, input, env = {}) =>
-  spawnSync("node", [join(REPO, "hooks", name)], { input: JSON.stringify(input), encoding: "utf8", env: { PATH: process.env.PATH, HOME, REPLY_GUARD_NO_NET: "1", AR_ROZHODNUTIA: "", ...env } });
+  spawnSync("node", [join(REPO, "hooks", name)], { input: JSON.stringify(input), encoding: "utf8", env: { PATH: process.env.PATH, HOME, REPLY_GUARD_NO_NET: "1", AR_ROZHODNUTIA: "", AGENT_THREADS: "", ...env } });
 const postupOf = (text) => (text.match(/Správny postup: (.+)/) || [])[1] || "";
 
 test("helper vyžaduje dôvod a konkrétny postup", () => {

@@ -2,7 +2,15 @@
 // Testy reply_guard.mjs. Prvý prípad je odpoveď vlákna domov z 22. 10. 2026,
 // ktorú operátor dostal s odkazom na web, ktorý ešte nebežal.
 
-import { deadLinks, resolveArgs, deferredCheck, intentProblem, unverifiedPlan, localLinks, taskLinks, prose, replyProblem, sentences } from "../hooks/reply_guard.mjs";
+import { deadLinks, resolveArgs, deferredCheck, detailRequested, intentProblem, unverifiedPlan, localLinks, taskLinks, prose, replyProblem, sentences } from "../hooks/reply_guard.mjs";
+
+// Odpoveď vlákna témy projektu z 28. 10. 2026 (úloha 636): štyri vety o tom,
+// čo nenapísalo, neposlalo a nevedelo zistiť. Operátor: agenti majú byť struční a vecní.
+const REAL28 = "[Úloha 636](https://x.ts.net:8801/tasks/636) patrí správcovi agentov, je riešiteľ, a v tejto relácii nemám jeho identitu, takže rozhodnutie cez `rozhodni.sh` ani odpoveď v úlohe pod jeho menom nepíšem a správu som mu ani nepreposlal. "
+  + "Tvoja námietka podľa mňa platí aj mimo tejto úlohy: odpoveď od klienta dokazuje, že schránka info@example.sk poštu prijíma, a správca agentov mal najprv pozrieť dôkaz, ktorý už bol k dispozícii, a až potom písať neoverené.\n\n"
+  + "Úloha čaká na správcu agentov v stave handoff. Nevedel som zistiť, či mu Tasker túto správu doručil aj do jeho vlákna.";
+const SHORT28 = "[Úloha 636](https://x.ts.net:8801/tasks/636) nepatrí mne, ale správcovi agentov. Ja ju neriešim a doručenie správy sem je chyba workflow.";
+const CHYBA = "Tvrdil alebo urobil som: že schránka je neoverená.\nPravda bola: klient odpísal hneď.\nZmenil sa súbor hooks/reply_guard.mjs, commit abc1234.\nNabudúce to zastaví: hook reply_guard.mjs.\n\nHotovo, commit abc1234.";
 
 const REAL = "Spustil som to cez Tasker a agent domov-web beží na modeli Sonnet sám, bez teba.\n\n"
   + "Úloha 353 je audit súčasného webu a už beží. Doslovne vypíše všetky texty, frázy, kontakty a ponuky a k tomu farebnú paletu v hex a písma. "
@@ -18,6 +26,7 @@ const status = "Hotovo:\n" + Array.from({ length: 4 }, (_, i) => `- úloha ${i +
 
 const forty = Array.from({ length: 40 }, (_, i) => `slovo${i}`).join(" ");
 
+let bad = 0;
 // [text, čo musí dôvod obsahovať, alebo null pre prejde]
 const cases = [
   [REAL, "viet prózy"],
@@ -28,14 +37,38 @@ const cases = [
   [`Stav:\n- ${forty}`, "40 slovami"],
   ["Hotovo, commit abc123.\n\nunslop: slovník prešiel. Tento riadok sa nepočíta. A ani tento.\nidentita: Adam, role x. Aj tento riadok.\nČaká na teba: nič. Ani toto.\nHOTOVO-KONTEXT", null],
   ["Hotovo, commit abc123.\n\nHOTOVO-KONTEXT pokracuj 0123456789abcdef", null],
-  ["Jedna. Dve. Tri. Štyri. Päť. Šesť.\nHOTOVO-KONTEXT pokracuj 0123456789abcdef", null],
+  ["Jedna. Dve. Tri.\nHOTOVO-KONTEXT pokracuj 0123456789abcdef", null],
+  ["Jedna. Dve. Tri.", null],
+  ["Jedna. Dve. Tri. Štyri.", "4 viet"],
+  [REAL28, "4 viet"],
+  [SHORT28, null],
+  [CHYBA, null],
+  ["Pozri napr. súbor a t. j. cestu, tzv. mapu, resp. index, atď. Je to jedna veta, str. 5, č. 3 a s. 7.", null],
+  ["Jedna. Dve. Tri.\n\n```\nJedna. Dve. Tri. Štyri. Päť. Šesť. Sedem. Osem.\n```\n\n# Nadpis\n| a | b |\n", null],
+  ["Jedna. Dve. Tri. `Štyri. Päť. Šesť.`", null],
+];
+// Operátor žiadal podrobnosti: strop 6.
+const detail = [
   ["Jedna. Dve. Tri. Štyri. Päť. Šesť.", null],
   ["Jedna. Dve. Tri. Štyri. Päť. Šesť. Sedem.", "7 viet"],
-  ["Pozri napr. súbor a t. j. cestu, tzv. mapu, resp. index, atď. Je to jedna veta, str. 5, č. 3 a s. 7.", null],
-  ["Jedna. Dve. Tri. Štyri.\n\n```\nJedna. Dve. Tri. Štyri. Päť. Šesť. Sedem. Osem.\n```\n\n# Nadpis\n| a | b |\n", null],
-  ["Jedna. Dve. Tri. Štyri. Päť. Šesť. `Sedem. Osem. Deväť.`", null],
 ];
-let bad = 0;
+for (const [text, want] of detail) {
+  const got = replyProblem(text, null, { maxSentences: 6 });
+  const ok = want === null ? got === null : typeof got === "string" && got.includes(want);
+  if (!ok) { bad++; console.log(`✗ podrobnosti: chcem ${want}, mám ${got}: ${text.slice(0, 40)}`); }
+}
+const asked = [
+  ["Vysvetli mi, prečo to tak je.", true],
+  ["Napíš postup nasadenia.", true],
+  ["Daj mi podrobnosti k úlohe 5.", true],
+  ["Explain the steps.", true],
+  ["Preco pises ze je to neoverene, ked kubo odpisal hned?", false],
+  ["Je to hotové?", false],
+  ["Pozri `postup.md` a povedz áno/nie.", false],
+];
+for (const [text, want] of asked) {
+  if (detailRequested(text) !== want) { bad++; console.log(`✗ žiadosť o podrobnosti: chcem ${want}: ${text}`); }
+}
 for (const [text, want] of cases) {
   const got = replyProblem(text);
   const ok = want === null ? got === null : typeof got === "string" && got.includes(want);
@@ -266,6 +299,6 @@ for (const [text, want] of intent) {
   if (!ok) { bad++; console.log(`✗ zámer: chcem ${want}, mám ${got}: ${text.slice(0, 50)}`); }
 }
 
-const total = intent.length + named.length + task.length + 3 + resolves.length + cases.length + unit.length + links.length + 2 + deferred.length + 1 + unverified.length + 1 + local.length + 1;
+const total = intent.length + named.length + task.length + 3 + resolves.length + cases.length + detail.length + asked.length + unit.length + links.length + 2 + deferred.length + 1 + unverified.length + 1 + local.length + 1;
 console.log(bad ? `${bad}/${total} zlyhalo` : `${total} prípadov v poriadku`);
 process.exit(bad ? 1 : 0);

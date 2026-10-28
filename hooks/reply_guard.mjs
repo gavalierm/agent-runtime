@@ -10,11 +10,19 @@
 // Taskera TASKER_WEB_URL, meno operátora AGENT_OPERATOR_NAME.
 //
 // Stop z settings.json prostredia. Prečíta poslednú odpoveď a zastaví ju,
-// keď má viac ako 6 viet prózy, vetu nad 35 slov, položku zoznamu s viac
-// vetami alebo adresu http(s), ktorá dnes neodpovedá. Zastaví na prvom
-// probléme. Bloky kódu, inline kód, nadpisy, tabuľky, zoznamy a riadky
+// keď má viac ako 3 vety prózy (global §2; 6, keď posledná správa operátora
+// žiada postup, podrobnosti, vysvetlenie alebo dokument, detailRequested), vetu
+// nad 35 slov, položku zoznamu s viac vetami alebo adresu http(s), ktorá dnes
+// neodpovedá. Zastaví na prvom probléme. Bloky kódu, inline kód, nadpisy,
+// tabuľky, zoznamy, štyri vety hlásenia chyby z bin/chyba.sh a riadky
 // unslop:, identita:, Čaká na teba:, Príkaz pre teba a HOTOVO-KONTEXT (aj s režimom a kľúčom z kontext.sh) sa do
-// prózy nepočítajú. Položky zoznamu sa kontrolujú zvlášť, každá je jedna
+// prózy nepočítajú.
+//
+// Dňa 28. 10. 2026 vlákno témy projektu odpovedalo operátorovi štyrmi
+// vetami o tom, čo nenapísalo, neposlalo a nevedelo zistiť (úloha 636).
+// Strop 6 viet (D0031) to pustil, hoci global §2 hovorí jedna až tri vety.
+// Operátor: agenti majú byť struční a vecní, omáčka okolo výsledku preč.
+// Strop je preto 3 a dôvod zastavenia menuje, čo do odpovede nepatrí. Položky zoznamu sa kontrolujú zvlášť, každá je jedna
 // veta. Pri REPLY_GUARD_NO_NET=1 sa adresy nekontrolujú (testy, stroj bez
 // siete). Odpoveď agenta s PERSONA.md musí mať na prvom riadku samotné
 // "<Meno>:" (meno ako v hooks/identity.mjs, koncové medzery smú byť), druhý
@@ -63,18 +71,29 @@
 import { execFileSync } from "node:child_process";
 import { waitingItemProblem } from "../lib/human_question.mjs";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { personaFor } from "../lib/agent_name.mjs";
 import { lastReply } from "./no_operator_commands.mjs";
 import { blockStop } from "../lib/deny.mjs";
 import { lastTurn } from "./objection_fix.mjs";
 import { hookEnv, operatorForms, zapnute } from "../lib/agent_env.mjs";
 import { DEFAULT_WEB, fetchTasks } from "../lib/tasker_read.mjs";
 
-export const MAX_SENTENCES = 6;
+export const MAX_SENTENCES = 3;
+export const MAX_SENTENCES_DETAIL = 6;
 export const MAX_WORDS = 35;
 
-const SKIP_LINE = /^(unslop:|identita:|čaká na teba:|príkaz pre teba|hotovo-kontext)/i;
+// Riadky hlásenia uznanej chyby (bin/chyba.sh, global §4) sa do prózy nerátajú.
+const SKIP_LINE = /^(unslop:|identita:|čaká na teba:|príkaz pre teba|hotovo-kontext|tvrdil alebo urobil som:|pravda bola:|zmenil sa súbor |nabudúce to zastaví:)/i;
+
+// Operátor žiada dlhšiu odpoveď: postup, kroky, podrobnosti, vysvetlenie,
+// dokument, súhrn, návrh, analýzu alebo porovnanie (global §2, "Longer only
+// when the user asks for steps, details or a document"). Text je posledná
+// správa operátora (lastTurn z objection_fix.mjs), bez kódu.
+const DETAIL = /(?<![\p{L}])(?:vysvetl\p{L}*|podrobn\p{L}*|detail\p{L}*|postup\p{L}*|krok\p{L}*|dokument\p{L}*|súhrn\p{L}*|zhrň\p{L}*|zhrnutie|rozpíš\p{L}*|opíš\p{L}*|popíš\p{L}*|analýz\p{L}*|audit\p{L}*|navrhni|návrh\p{L}*|plán\p{L}*|porovna\p{L}*|explain\p{L}*|steps|details?|document\p{L}*|summar\p{L}*|describe|proposal|plan|compare|analy[sz]\p{L}*)(?![\p{L}])/iu;
+export function detailRequested(userText) {
+  return DETAIL.test(withoutInline(withoutFences(String(userText ?? ""))));
+}
 const LIST_ITEM = /^\s*(?:[-*+]|\d+[.)])\s+(.*)$/;
 // Skratky, za ktorými bodka vetu nekončí.
 const ABBR = new Set(["napr", "tzv", "resp", "atď", "str", "s", "č", "j", "t", "tj", "pozn", "cca"]);
@@ -147,7 +166,7 @@ export function stripName(text, name) {
 // Vráti dôvod zastavenia alebo null. Pri zadanom mene (nadpis PERSONA.md, bez
 // persony null) najprv skontroluje predponu a odstráni ju, aby riadok
 // "unslop:" ostal preskočený a meno sa nerátalo do viet.
-export function replyProblem(text, name = null) {
+export function replyProblem(text, name = null, { maxSentences = MAX_SENTENCES } = {}) {
   if (name && text.trim()) {
     const rest = stripName(text, name);
     if (rest === null) return `odpoveď nezačína menom, napíš na prvý riadok samotné "${name}:", prázdny riadok a text od tretieho riadku`;
@@ -163,9 +182,10 @@ export function replyProblem(text, name = null) {
   const { prose: p, items } = parse(text);
   const sents = sentences(p);
   const counted = sents.filter((s) => !s.endsWith(":"));
-  if (counted.length > MAX_SENTENCES)
-    return `odpoveď má ${counted.length} viet prózy, strop je ${MAX_SENTENCES}. Napíš verdikt, dôvod a čo treba urobiť. `
-      + "Podrobnosti patria do súboru v docs/ a odpoveď nesie jeho cestu.";
+  if (counted.length > maxSentences)
+    return `odpoveď má ${counted.length} viet prózy, strop je ${maxSentences} (global §2). Napíš verdikt, dôvod a čo treba urobiť. `
+      + "Čo si neurobil, prečo si to neurobil, čo si nevedel zistiť a tvoj názor do odpovede nepatria. "
+      + "Podrobnosti patria do súboru v docs/ a odpoveď nesie jeho cestu, dlhšia odpoveď len na žiadosť o postup, podrobnosti alebo dokument.";
   for (const s of [...sents, ...items.flatMap((i) => sentences(i))]) {
     const n = wordCount(s);
     if (n > MAX_WORDS) return `veta so ${n} slovami je súvetie, rozdeľ ju alebo zmaž: "${clip(s)}"`;
@@ -457,7 +477,7 @@ export function deadLinks(text, probe = curlProbe) {
 const ASK = "polož otázku ako úlohu `tasker ask <id> --body \"otázka, cesty A a B, odporúčanie\"` a v odpovedi daj jej odkaz";
 export const POSTUPY = [
   [/^odpoveď nezačína menom|^za riadkom "/, "prepíš odpoveď: prvý riadok samotné `<Meno>:`, druhý prázdny, text od tretieho riadku (global/CLAUDE.md §2)"],
-  [/viet prózy/, "skráť odpoveď na verdikt, dôvod a čo urobiť; podrobnosti ulož do súboru v docs/ a v odpovedi uveď jeho cestu"],
+  [/viet prózy/, "skráť odpoveď na verdikt, dôvod a čo urobiť (najviac 3 vety prózy, zoznamy sa nerátajú); vynechaj, čo si neurobil a prečo, čo si nevedel zistiť a svoj názor; podrobnosti ulož do súboru v docs/ a v odpovedi uveď jeho cestu"],
   [/^veta so \d+ slovami/, "rozdeľ vetu na kratšie alebo ju zmaž a odpoveď prepíš"],
   [/^položka zoznamu/, "skráť položku zoznamu na jednu vetu a odpoveď prepíš"],
   [/^priebežná správa hlási zámer/, "napíš krok hotový v minulom čase s názvom súboru alebo príkazu a účelom (\"Načítal som hooks/x.mjs, aby som ...\"), alebo správu pred nástrojom vynechaj; pravidlo je v Jadre skillu unslop"],
@@ -485,22 +505,20 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!text && input.transcript_path) {
     try { text = lastReply(readFileSync(input.transcript_path, "utf8")); } catch {}
   }
-  let name = null;
-  try {
-    const root = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd();
-    name = readFileSync(join(root, "PERSONA.md"), "utf8").match(/^# (.+)$/m)?.[1].trim() ?? null;
-  } catch {}
+  const name = personaFor(input)?.name ?? null;
   const env = hookEnv(input);
   let cmds = null;
   let turnText = text;
+  let maxSentences = MAX_SENTENCES;
   if (input.transcript_path) {
     try {
       const turn = lastTurn(readFileSync(input.transcript_path, "utf8"));
       if (zapnute(env)) cmds = turn.cmds;
       if (turn.text) turnText = turn.text;
+      if (detailRequested(turn.userText)) maxSentences = MAX_SENTENCES_DETAIL;
     } catch {}
   }
-  const reason = waitingItemProblem(text) ?? replyProblem(text, name) ?? intentProblem(turnText) ?? deferredCheck(text) ?? unverifiedPlan(text) ?? localLinks(text, process.platform, env.TASKER_WEB_URL)
+  const reason = waitingItemProblem(text) ?? replyProblem(text, name, { maxSentences }) ?? intentProblem(turnText) ?? deferredCheck(text) ?? unverifiedPlan(text) ?? localLinks(text, process.platform, env.TASKER_WEB_URL)
     ?? taskLinks(text, env.TASKER_WEB_URL || DEFAULT_WEB)
     ?? (zapnute(env) ? (await waitingProblem(text, (ids) => fetchTasks({ ids, env })) ?? (cmds ? decisionProblem(text, cmds, env) : null)) : null)
     ?? (env.REPLY_GUARD_NO_NET === "1" ? null : deadLinks(text));

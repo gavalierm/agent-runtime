@@ -3,7 +3,10 @@
 // (ohlásenie identity). SessionStart zo settings.json prostredia alebo
 // .claude/settings.json repa agenta, beží pri štarte, obnovení, /clear
 // aj kompakcii. Meno vezme z nadpisu "# <Meno>" v PERSONA.md koreňa
-// projektu, ID relácie zo vstupu hooku. Bez PERSONA.md hook mlčí.
+// projektu, ID relácie zo vstupu hooku. Bez PERSONA.md v koreni hľadá
+// vlákno témy agenta (personaFor v lib/agent_name.mjs, úloha 636): vlákno témy beží
+// v klone projektu, po kompakcii zabudlo, kto je, a správu Taskera
+// "úloha pre teba" odmietlo ako cudziu. Bez persony hook mlčí.
 // Riadok "Role: <slug>, <slug>" v PERSONA.md pridá do kontextu pravidlá
 // roly zo súborov roles/<slug>.md klonu repa pravidiel (rulesRepo: AGENT_RULES_REPO,
 // predvolene /opt/agent-rules, na Macu ~/Work/agent-rules).
@@ -14,23 +17,22 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { hookEnv, rulesRepo } from "../lib/agent_env.mjs";
+import { personaFor } from "../lib/agent_name.mjs";
 
 let input = {};
 try {
   input = JSON.parse(readFileSync(0, "utf8"));
 } catch {}
 
-const root = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd();
-let name;
-let persona = "";
-try {
-  persona = readFileSync(join(root, "PERSONA.md"), "utf8");
-  name = persona.match(/^# (.+)$/m)?.[1].trim();
-} catch {}
-if (!name) process.exit(0);
+const found = personaFor(input);
+if (!found) process.exit(0);
+const { name, root, persona, topic } = found;
 
 const session = (input.session_id || "neznáma").slice(0, 8);
-const line = `${name}, persona ${join(root, "PERSONA.md")}, relácia ${session}`;
+const line = `${name}, persona ${join(root, "PERSONA.md")}, relácia ${session}${topic ? `, vlákno témy ${topic}` : ""}`;
+const topicNote = topic
+  ? ` Toto je tvoje vlákno témy ${topic}: správy Taskera a schránky s touto témou idú sem a úlohy s riešiteľom ${name.toLowerCase()} v nich sú tvoje, rieš ich ako ${name}.`
+  : "";
 
 const rolesDir = join(rulesRepo(hookEnv(input)), "roles");
 const slugs = (persona.match(/^Role:[ \t]*(.+)$/m)?.[1] ?? "")
@@ -51,7 +53,7 @@ process.stdout.write(
   JSON.stringify({
     hookSpecificOutput: {
       hookEventName: "SessionStart",
-      additionalContext: `Si ${name} podľa PERSONA.md. Prvá odpoveď tejto relácie, aj po /clear, obnovení a kompakcii, má na prvom riadku len meno (\`${name}:\`), potom prázdny riadok, riadok unslop, prázdny riadok, riadok \`identita: ${line}\`, prázdny riadok a jednu vetu, kto si, podľa časti "Kto som" v PERSONA.md.${rules}`,
+      additionalContext: `Si ${name} podľa ${join(root, "PERSONA.md")}.${topicNote} Prvá odpoveď tejto relácie, aj po /clear, obnovení a kompakcii, má na prvom riadku len meno (\`${name}:\`), potom prázdny riadok, riadok unslop, prázdny riadok, riadok \`identita: ${line}\`, prázdny riadok a jednu vetu, kto si, podľa časti "Kto som" v PERSONA.md.${rules}`,
     },
   }),
 );
