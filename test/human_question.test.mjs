@@ -2,7 +2,7 @@
 // 573 s vymyslenými menami, tvar zachovaný.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { questionProblem, waitingItemProblem, usedLetters, decisionItems } from "../lib/human_question.mjs";
+import { questionProblem, waitingItemProblem, usedLetters, decisionItems, unverifiedClaim } from "../lib/human_question.mjs";
 
 const SUMMARY = "Medzery v návrhu sú opravené, --gaps dáva kód 0 pri 1440 aj 390 px, hlavicka.sh 0 nálezov (1dd47fa). Čaká na Adamovo A/B k zápisu do agent-rules.";
 const COMMENT = "[Boris za Adama] Adam, máme prepísať vzor pre dashboardy v repe pravidiel podľa nového detailu úlohy v Taskeri?\n\n"
@@ -79,4 +79,48 @@ test("reply_guard zastaví odpoveď s položkou (rozhodnutie) bez otázky", asyn
     assert.match(bad.reason, /Správny postup:/);
     assert.equal(run("Hotovo.\n\nČaká na teba:\n- (rozhodnutie) zapísať vzor do repa, A) áno alebo B) nie, odporúčam A?"), "");
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// Chyba 28. 10. 2026 (úloha 656): otázka s A) B) niesla odsek s neoverenou položkou.
+const CLAIM = "Neoverené: či sa skilly z .claude/skills nadradeného priečinka načítajú v behu v podpriečinku.";
+const QUESTION_656 = "Ktorú cestu zvoliť? A) skilly dám do repa kódu. B) nechám ich v nadradenom priečinku.\n\n"
+  + `- ${CLAIM} Overím v dokumentácii skillov pred ďalším krokom; keď nie, projektové skilly sa do repa kódu dostanú symlinkom, ktorý založí adopt.sh.`;
+
+test("unverifiedClaim nájde skutočnú vetu z chyby 656", () => {
+  const got = unverifiedClaim(QUESTION_656);
+  assert.match(got, /^- Neoverené: či sa skilly z \.claude\/skills/);
+  assert.equal(unverifiedClaim(CLAIM), CLAIM.replace(/\.$/, "."));
+});
+
+test("questionProblem zamietne otázku s neoverenou vetou, text sa skráti na 80 znakov", () => {
+  const why = questionProblem(QUESTION_656);
+  assert.match(why, /^text pre človeka obsahuje neoverené tvrdenie "- Neoverené: /);
+  assert.match(why, /\.\.\."$/);
+  assert.equal(why.match(/"([^"]*)"/)[1].length, 80);
+  const both = questionProblem("Zapísať vzor, variant A. Neoverené, či to beží.");
+  assert.match(both, /nemá vetu končiacu `\?` a spomína voľbu A bez definície/);
+  assert.match(both, / a obsahuje neoverené tvrdenie "Neoverené, či to beží\."/);
+});
+
+test("waitingItemProblem zamietne položku (rozhodnutie) s neoverenou vetou", () => {
+  assert.match(waitingItemProblem("Čaká na teba:\n- (rozhodnutie) úloha 656: zapísať? A) áno, B) nie. Unverified, či hook beží."), /neoverené tvrdenie/);
+});
+
+test("značky: veľkosť písmen, anglické tvary, len celé slová", () => {
+  for (const t of ["Zatiaľ nevieme, či to ide.", "NEOVERENÉ.", "Neoveril som to.", "Nie je overené, či to ide.", "Not verified yet is odd. This is not yet verified.", "I haven't verified it.", "We have not verified it.", "Unverified claim."]) {
+    assert.notEqual(unverifiedClaim(t), null, t);
+  }
+});
+
+test("veta 'Overené v dokumentácii' prejde", () => {
+  assert.equal(unverifiedClaim("Overené v dokumentácii skillov, načítajú sa."), null);
+  assert.equal(questionProblem("Zapísať? A) áno. B) nie. Overené v dokumentácii skillov."), null);
+});
+
+test("'unverified' v URL, v kóde a v bloku kódu prejde", () => {
+  assert.equal(unverifiedClaim("Pozri https://example.com/unverified/neoverene a rozhodni."), null);
+  assert.equal(unverifiedClaim("Príznak `unverified` je v kóde."), null);
+  assert.equal(unverifiedClaim("Kód:\n```\nconst unverified = 1; // neoverené\n```\nHotovo."), null);
+  assert.equal(unverifiedClaim("Slovo preneoverené nie je značka."), null);
+  assert.equal(questionProblem("Zapísať? A) áno. B) nie. Príznak `unverified` je v kóde."), null);
 });
