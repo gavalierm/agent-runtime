@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,7 +50,7 @@ test("gh --version: prvý pokus prejde, log zapíše, druhý zamietne s postupom
     const d = pre(sb, "gh --version");
     assert.equal(d.permissionDecision, "deny");
     assert.match(d.permissionDecisionReason, /`gh --version` v prostredí root@testhost už zlyhal \(\/bin\/bash: line 1: gh: command not found\)/);
-    assert.match(d.permissionDecisionReason, /\nSprávny postup: použi iný nástroj alebo tvar; keď nový tvar prejde, pridaj do env\/server\/nastroje\.tsv riadok s náhradou/);
+    assert.match(d.permissionDecisionReason, /\nSprávny postup: použi iný nástroj alebo tvar; keď nový tvar prejde, pridaj do env\/server\/nastroje\.tsv spoločného mozgu riadok s náhradou/);
     // iné prostredie a iné prepínače register nezasiahne
     assert.equal(pre(sb, "gh --version", "tasker-svc"), null);
     assert.equal(pre(sb, "gh pr list"), null);
@@ -67,7 +67,7 @@ test("sudo ls pod rootom zo zoznamu zamietne hneď, pod iným používateľom pr
     writeFileSync(sb.known, KNOWN_LIST);
     const d = pre(sb, "sudo ls", "root");
     assert.equal(d.permissionDecision, "deny");
-    assert.match(d.permissionDecisionReason, /zozname nefunkčných nástrojov servera/);
+    assert.match(d.permissionDecisionReason, /zozname nefunkčných nástrojov servera \(env\/server\/nastroje\.tsv spoločného mozgu\)/);
     assert.match(d.permissionDecisionReason, /Správny postup: pod rootom bez sudo/);
     assert.equal(pre(sb, "sudo ls", "tasker-svc"), null);
     assert.equal(pre(sb, "doas ls", "root").permissionDecision, "deny");
@@ -75,6 +75,29 @@ test("sudo ls pod rootom zo zoznamu zamietne hneď, pod iným používateľom pr
     assert.match(gh.permissionDecisionReason, /Správny postup: git s tokenom z ~\/\.config\/<meno>\/ \(skill github-repo\); PR sa nerobí/);
     assert.equal(pre(sb, "git status && ls -la", "root"), null);
     assert.equal(pre(sb, "echo sudo gh", "root"), null);
+  } finally {
+    rmSync(sb.dir, { recursive: true, force: true });
+  }
+});
+
+test("bez AR_TOOLS_KNOWN sa zoznam berie z env/server/nastroje.tsv v AGENT_BRAIN_GLOBAL", () => {
+  const sb = sandbox();
+  try {
+    const brain = join(sb.dir, "brain");
+    mkdirSync(join(brain, "env", "server"), { recursive: true });
+    writeFileSync(join(brain, "env", "server", "nastroje.tsv"), KNOWN_LIST);
+    const env = { ...envOf(sb), AGENT_BRAIN_GLOBAL: brain };
+    delete env.AR_TOOLS_KNOWN;
+    const run = (command) => {
+      const r = spawnSync("node", [BLOCK], { input: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command } }), env, encoding: "utf8" });
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout ? JSON.parse(r.stdout).hookSpecificOutput : null;
+    };
+    assert.equal(run("sudo ls").permissionDecision, "deny");
+    assert.equal(run("git status"), null);
+    // mozog bez súboru: nič sa nezamietne
+    env.AGENT_BRAIN_GLOBAL = join(sb.dir, "prazdny");
+    assert.equal(run("sudo ls"), null);
   } finally {
     rmSync(sb.dir, { recursive: true, force: true });
   }

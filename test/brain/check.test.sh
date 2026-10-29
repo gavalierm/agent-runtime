@@ -11,7 +11,7 @@ SRC=$(build_template "$TMP/template")
 export HOME="$TMP/home"
 mkdir -p "$HOME"
 export GIT_CONFIG_NOSYSTEM=1
-unset AGENTIC_BRAIN_GLOBAL
+unset AGENTIC_BRAIN_GLOBAL AGENT_BRAIN_GLOBAL
 
 N=0; FAILS=0; W=""; OUT=""; RC=0
 
@@ -158,6 +158,17 @@ printf -- '---\nname: shared\ndescription: Use when a shared skill is needed.\ns
 printf '#!/usr/bin/env bash\ntrue\n' > "$W/agentic-brain/skills/shared/scripts/a.sh"; run_check
 expect "scope shared outside the global layer is a warning" 0 "WARNING agentic-brain/skills/shared: scope is shared"
 rm -rf "$HOME/agentic-brain"
+
+# the folder of the global brain from AGENT_BRAIN_GLOBAL (the variable of lib/paths.sh);
+# AGENTIC_BRAIN_GLOBAL wins when both are set
+fresh; mkdir -p "$TMP/gb$N/skills/error" "$TMP/gb$N/skills/other"; touch "$TMP/gb$N/RULES.md"
+AGENT_BRAIN_GLOBAL="$TMP/gb$N" run_check
+expect "AGENT_BRAIN_GLOBAL points to the global layer" 1 "ERROR agentic-brain/skills/error: skill error also exists in the global layer"
+mkdir -p "$TMP/gc$N"; touch "$TMP/gc$N/RULES.md"
+AGENTIC_BRAIN_GLOBAL="$TMP/gc$N" AGENT_BRAIN_GLOBAL="$TMP/gb$N" run_check
+expect "AGENTIC_BRAIN_GLOBAL wins over AGENT_BRAIN_GLOBAL" 0 "^check.sh: ok$"
+run_check
+expect "without both variables the global layer is not found" 0 "^check.sh: ok$"
 
 # the global repo itself (a folder without a parent agentic-brain/)
 N=$((N + 1)); W="$TMP/flat$N"; mkdir -p "$W"; cp -a "$SRC/agentic-brain/." "$W/"; git -C "$W" init -q

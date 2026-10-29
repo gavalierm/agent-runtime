@@ -12,7 +12,8 @@
 # adopt.sh --standalone, or the repo root of this script).
 #
 # The variable AGENTIC_BRAIN_GLOBAL may point to the folder of the global brain
-# (with RULES.md and skills/). Without it, the script looks for ~/agentic-brain.
+# (with RULES.md and skills/). Without it the script takes AGENT_BRAIN_GLOBAL (the
+# variable of lib/paths.sh), and without both it looks for ~/agentic-brain.
 #
 # The variable AGENTIC_BRAIN_PROJECT may point to the folder of the project layer
 # (with RULES.md and skills/), absolute or relative to the repo root. Without it,
@@ -86,6 +87,8 @@ global_brain() {
   local d=""
   if [ -n "${AGENTIC_BRAIN_GLOBAL:-}" ]; then
     d=$AGENTIC_BRAIN_GLOBAL
+  elif [ -n "${AGENT_BRAIN_GLOBAL:-}" ]; then
+    d=$AGENT_BRAIN_GLOBAL
   elif [ -f "${HOME:-/nonexistent}/agentic-brain/RULES.md" ] || [ -d "${HOME:-/nonexistent}/agentic-brain/skills" ]; then
     d=$HOME/agentic-brain
   elif [ -f "${HOME:-/nonexistent}/agentic-brain/agentic-brain/RULES.md" ] || [ -d "${HOME:-/nonexistent}/agentic-brain/agentic-brain/skills" ]; then
