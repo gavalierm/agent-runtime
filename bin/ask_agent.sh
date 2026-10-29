@@ -28,7 +28,9 @@
 #   cez čiarku) prijímajú z Macu len súrne a blokujúce správy, bez
 #   ASK_URGENT=1 skript nič nepošle.
 #
-# Odosielateľ je AGENT_NAME, inak ASK_FROM. Meno správy je <odosielateľ>-[<téma>-]<čas>-<pid>.md.
+# Odosielateľ je AGENT_NAME, inak ASK_FROM, inak meno z PERSONA.md
+# (lib/agent_name.sh, vlákno T3 agenta nemá AGENT_NAME).
+# Meno správy je <odosielateľ>-[<téma>-]<čas>-<pid>.md.
 #
 # Hlavička správy (píšu ju skripty, budič ju z textu pre model odstráni):
 #   odpoveď: čakám|na vedomie          čo odosielateľ od odpovede čaká
@@ -90,6 +92,9 @@ if [ "$mode" = "na vedomie" ] && [ -z "$k" ] && [ "$replies" = 0 ] && [ -z "${do
     exit 1
 fi
 
+# shellcheck source=../lib/agent_name.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/agent_name.sh"
+
 L=abcdefghijklmnopqrstuvwxyz
 SNAKE="^[$L][${L}0123456789_]{0,30}$"
 
@@ -121,8 +126,9 @@ fi
 
 if [ -n "${AGENT_NAME:-}" ]; then FROM="$AGENT_NAME"
 elif [ -n "${ASK_FROM:-}" ]; then FROM="$ASK_FROM"
+elif FROM="$(agent_name)"; then :
 else
-    echo "Chýba odosielateľ: nastav AGENT_NAME alebo ASK_FROM. Nič som neposlal." >&2
+    echo "Chýba odosielateľ: nastav AGENT_NAME alebo ASK_FROM, alebo spusti v priečinku s PERSONA.md (riadok '# Meno'). Nič som neposlal." >&2
     exit 1
 fi
 if ! [[ "$FROM" =~ $SNAKE ]]; then

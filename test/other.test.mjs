@@ -238,3 +238,43 @@ test("reply.sh pre iného agenta: AGENT_NAME určí schránku, env súbor a pred
   execFileSync(join(RUNTIME, "reply.sh"), ["adam-boris-adam-boris-tema-20261018-120000.md"], { env, input: "Znova.\n" + TRI });
   assert.ok(readdirSync(adamInbox).includes("boris-adam-tema-20261018-120000.md"));
 });
+
+// Úloha 665: vlákno T3 agenta nemá AGENT_NAME, meno nesie PERSONA.md v cwd
+// (lib/agent_name.sh). Prostredie je prázdne, schránky a runtime.env sú v tmp.
+test("reply.sh bez AGENT_NAME odvodí meno z PERSONA.md: predpona a runtime.env agenta", () => {
+  const { root, box } = boxDir();
+  const home = join(root, "home");
+  mkdirSync(join(home, ".config/delta"), { recursive: true });
+  const adamInbox = join(root, "adam_inbox");
+  mkdirSync(adamInbox);
+  writeFileSync(join(home, ".config/delta/runtime.env"), `AGENT_BOX=${box}\nAGENT_REPLY_ROUTE_adam=${adamInbox}\n`);
+  const cwd = join(root, "klon");
+  mkdirSync(cwd);
+  writeFileSync(join(cwd, "PERSONA.md"), "# Delta\n");
+  const env = { PATH: process.env.PATH, HOME: home, CLAUDE_PID: "" };
+  const r = spawnSync(join(RUNTIME, "reply.sh"), ["adam-20261018-120000-1.md"], { env, cwd, input: "Od Delty.\n" + TRI, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(readdirSync(join(box, "outbox")), ["adam-20261018-120000-1.md"]);
+  assert.deepEqual(readdirSync(adamInbox), ["delta-adam-20261018-120000-1.md"]);
+});
+
+test("ask_agent.sh bez AGENT_NAME odvodí odosielateľa z PERSONA.md, bez mena ohlási PERSONA.md", () => {
+  const root = mkdtempSync(join(tmpdir(), "ask-persona-"));
+  const inbox = join(root, "boris_inbox");
+  mkdirSync(inbox);
+  const cwd = join(root, "klon");
+  mkdirSync(cwd);
+  writeFileSync(join(cwd, "PERSONA.md"), "# Delta\n");
+  const env = { PATH: process.env.PATH, HOME: root, AGENT_SEND_boris: inbox, ASK_VAR_LIB: join(root, "var"), CLAUDE_PID: "", CLAUDE_CODE_SESSION_ID: "" };
+  const r = spawnSync(join(RUNTIME, "bin/ask_agent.sh"), ["--hlavne", "boris", "Test"], { env, cwd, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const [name] = readdirSync(inbox);
+  assert.match(name, /^delta-\d{8}-\d{6}-\d+\.md$/);
+  assert.match(readFileSync(join(inbox, name), "utf8"), /^od: delta$/m);
+  const prazdny = join(root, "prazdny");
+  mkdirSync(prazdny);
+  const bez = spawnSync(join(RUNTIME, "bin/ask_agent.sh"), ["--hlavne", "boris", "Test"], { env, cwd: prazdny, encoding: "utf8" });
+  assert.equal(bez.status, 1);
+  assert.match(bez.stderr, /Chýba odosielateľ.*PERSONA\.md/);
+  assert.equal(readdirSync(inbox).length, 1);
+});

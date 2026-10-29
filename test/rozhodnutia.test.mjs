@@ -204,6 +204,25 @@ test("rozhodni.sh: dry-run nezapíše nič, zápis commitne pod menom agenta a p
   } finally { rmSync(t.root, { recursive: true, force: true }); }
 });
 
+test("rozhodni.sh bez AGENT_NAME zapíše meno z PERSONA.md v cwd (úloha 665)", () => {
+  const t = repoSOrigin();
+  try {
+    writeFileSync(join(t.repo, "PERSONA.md"), "# Delta\n");
+    const bezMena = { AGENT_NAME: "" };
+    let r = t.sh(t.repo, [...zapisArgy.slice(0, 14), "--dry-run"], "Text.", bezMena);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /zapisal: Delta/);
+    r = t.sh(t.repo, zapisArgy.slice(0, 14), "Text.", bezMena);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(t.git(t.repo, "log", "-1", "--format=%an").trim(), "Delta (test)");
+    // Bez PERSONA.md a bez AGENT_NAME zápis skončí chybou s odkazom na PERSONA.md.
+    rmSync(join(t.repo, "PERSONA.md"));
+    r = t.sh(t.repo, zapisArgy.slice(0, 14), "Text.", bezMena);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /Chýba kto píše.*PERSONA\.md/);
+  } finally { rmSync(t.root, { recursive: true, force: true }); }
+});
+
 test("rozhodni.sh: číslo a kľúč z cudzieho pushu sa vezmú po fetchi, kolízia skončí chybou", () => {
   const t = repoSOrigin();
   try {

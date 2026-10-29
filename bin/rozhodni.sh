@@ -17,8 +17,9 @@
 # záznam bez --nahradza skončí chybou s výpisom platných záznamov.
 #
 # Premenné: AGENT_BRAIN_GLOBAL (klon so spoločným mozgom, priečinok decisions/),
-# AGENT_NAME (kto píše, inak --zapisal), ROZHODNI_STROJ (meno stroja v mene
-# autora, inak hostname), ROZHODNI_SYNC_UNIT (jednotka systemd, ktorú po pushi
+# AGENT_NAME (kto píše, inak meno z PERSONA.md cez lib/agent_name.sh, inak
+# --zapisal), ROZHODNI_STROJ (meno stroja v mene autora, inak hostname),
+# ROZHODNI_SYNC_UNIT (jednotka systemd, ktorú po pushi
 # spustí sync klonu, bez nej sa sync nespúšťa), ROZHODNI_TASKER (príkaz Taskera
 # pre --z-ulohy), AGENT_WORKFLOW.
 # Commit nesie meno "<Agent> (<stroj>)". Kód 0 zapísané, 1 chyba, 2 zlé použitie.
@@ -27,6 +28,8 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/paths.sh
 . "$here/../lib/paths.sh"
+# shellcheck source=../lib/agent_name.sh
+. "$here/../lib/agent_name.sh"
 lib="$here/../lib/rozhodnutia.mjs"
 repo="$(brain_global_dir)"
 dir="$(decisions_dir)"
@@ -70,8 +73,8 @@ if [ -n "$z_ulohy" ]; then
     [ "$zdroj_dany" = 0 ] && args+=(--zdroj "$zdroj_z")
 fi
 
-if [ -z "$zapisal" ] && [ -n "${AGENT_NAME:-}" ]; then
-    zapisal="$(tr '[:lower:]' '[:upper:]' <<<"${AGENT_NAME:0:1}")${AGENT_NAME:1}"
+if [ -z "$zapisal" ]; then
+    zapisal="$(agent_name_capital)" || zapisal=""
 fi
 [ -n "$zapisal" ] && args+=(--zapisal "$zapisal")
 
@@ -88,7 +91,7 @@ if [ "$dry" = 1 ]; then
 fi
 
 if [ -z "$zapisal" ]; then
-    echo "Chýba kto píše: AGENT_NAME alebo --zapisal." >&2
+    echo "Chýba kto píše: nastav AGENT_NAME, spusti v priečinku s PERSONA.md (riadok '# Meno') alebo daj --zapisal." >&2
     exit 2
 fi
 stroj="${ROZHODNI_STROJ:-$(hostname -s)}"

@@ -3,19 +3,16 @@
 #   tk task show 462 --json
 # Spustí `tasker` pod používateľom správcu úloh (AGENT_TASKER_USER, inak `tasker`)
 # s TASKER_HOME a TASKER_USER.
-# Meno agenta: AGENT_NAME, inak TASKER_USER, inak "# Meno" z PERSONA.md
-# projektu (CLAUDE_PROJECT_DIR alebo aktuálny priečinok), malými písmenami.
-# Vlákno T3 agenta nemá AGENT_NAME ani TASKER_USER (lib/agent_name.mjs), meno
-# preto nesie persona. Bez mena skončí kódom 64, Tasker sa nespustí.
+# Meno agenta odvodí lib/agent_name.sh: AGENT_NAME, inak TASKER_USER, inak
+# "# Meno" z PERSONA.md (CLAUDE_PROJECT_DIR, PWD a jeho rodičia), malými
+# písmenami. Vlákno T3 agenta nemá AGENT_NAME ani TASKER_USER, meno preto nesie
+# persona. Bez mena skončí kódom 64, Tasker sa nespustí.
 # Premenné TK_HOME a TK_USER menia databázu a používateľa (aj pre test).
 set -u
 . "$(dirname "$(readlink -f "$0")")/../lib/deny.sh"
-name="${AGENT_NAME:-${TASKER_USER:-}}"
+. "$(dirname "$(readlink -f "$0")")/../lib/agent_name.sh"
+name="$(agent_name)" || name=""
 if [ -z "$name" ]; then
-    persona="${CLAUDE_PROJECT_DIR:-$PWD}/PERSONA.md"
-    [ -f "$persona" ] && name="$(sed -n 's/^# \(.*\)$/\1/p' "$persona" | head -n1 | tr '[:upper:]' '[:lower:]')"
-fi
-if [[ ! "$name" =~ ^[a-z0-9_-]+$ ]]; then
     deny_postup "tk nevie, ktorý agent volá Tasker (AGENT_NAME, TASKER_USER ani PERSONA.md v $PWD)" "AGENT_NAME=<meno> tk ..."
     exit 64
 fi

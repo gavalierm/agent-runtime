@@ -60,3 +60,20 @@ test("prostredie má prednosť pred runtime.env", () => {
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /FAKE task show 1/);
 });
+
+// Úloha 665: vlákno T3 agenta nemá AGENT_NAME ani TASKER_USER, meno nesie
+// PERSONA.md (lib/agent_name.sh). Podvrh tasker vypíše TASKER_USER, ktorý dostal.
+test("bez AGENT_NAME a TASKER_USER odvodí meno z PERSONA.md v cwd", () => {
+  const d = mkdtempSync(join(tmpdir(), "tk-persona-"));
+  writeFileSync(join(d, "tasker"), "#!/bin/sh\necho USER=$TASKER_USER\n");
+  chmodSync(join(d, "tasker"), 0o755);
+  writeFileSync(join(d, "PERSONA.md"), "# Delta\n\nText.\n");
+  const env = { PATH: `${d}:${process.env.PATH}`, TK_HOME: d, TK_USER: userInfo().username };
+  const r = spawnSync("bash", [TK, "task", "show", "1"], { encoding: "utf8", env, cwd: d });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /USER=delta/);
+  const prazdny = mkdtempSync(join(tmpdir(), "tk-bez-"));
+  const bez = spawnSync("bash", [TK, "task", "show", "1"], { encoding: "utf8", env, cwd: prazdny });
+  assert.equal(bez.status, 64);
+  assert.doesNotMatch(bez.stdout, /USER=/);
+});

@@ -2,7 +2,8 @@
 # Odpoveď agenta na správu zo schránky. Agent ho volá vo
 # vlákne T3 s menom správy z hlavičky <schranka id="...">, text odpovede ide
 # na stdin. Agent ho volá s AGENT_NAME=<meno> (budič to dáva do
-# hlavičky cez AGENT_REPLY_CMD).
+# hlavičky cez AGENT_REPLY_CMD), bez AGENT_NAME odvodí meno z PERSONA.md
+# (lib/agent_name.sh, vlákno T3 agenta ho nemá), inak použije "agent".
 #
 # Odpoveď sa zapíše do $AGENT_BOX/outbox pod menom správy, odkiaľ ju
 # odosielateľ prečíta (`ask_agent.sh --replies`). Odpoveď pre odosielateľa z AGENT_INBOX_ONLY ide len do jeho schránky. Keď tam neprečítaná
@@ -51,7 +52,10 @@ done
 set -- "${args[@]+"${args[@]}"}"
 
 # Rovnaké nastavenie ako služby (EnvironmentFile), vlákno T3 ho nededí.
-AGENT="${AGENT_NAME:-agent}"
+# shellcheck source=lib/agent_name.sh
+. "$(dirname "$(readlink -f "$0")")/lib/agent_name.sh"
+AGENT="${AGENT_NAME:-}"
+[ -n "$AGENT" ] || AGENT="$(agent_name)" || AGENT="agent"
 ENV_FILE="${AGENT_ENV_FILE:-$HOME/.config/$AGENT/runtime.env}"
 # shellcheck disable=SC1090
 if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
