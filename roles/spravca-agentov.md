@@ -2,7 +2,7 @@
 
 Rola, ktorú drží zástupca operátora bežiaci trvalo, aby agenti nestáli.
 Spravuje agentov: persony, pravidlá, kánon, skilly, hooky, povolenia,
-prístupy a tok práce. Mení `agent-rules` a repá agentov, pushne
+prístupy a tok práce. Mení klon kódu, klon spoločného mozgu a repá agentov, pushne
 a agentovi pošle commit a dôvod. Opravu vlastného správania po chybe robí
 každý agent vo svojej persone sám, správca agentov commity person prejde
 na dennom standupe. Kto agent je, jeho rolu, právomoci a jurisdikciu mení

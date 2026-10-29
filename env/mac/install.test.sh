@@ -22,15 +22,15 @@ echo "# pravidlá Macu" > "$BR/env/mac/RULES.md"
 echo "# skill mozgu" > "$BR/skills/brain-skill/SKILL.md"
 echo "agent@example.org" > "$BR/commit_guard/git_email.txt"
 echo "LEGACY_PATHS=\"$OLD\"" > "$BR/env/mac/config.env"
-mkdir -p "$OLD/skills/stary" "$OLD/global"
+mkdir -p "$OLD/skills/stary"
 echo x > "$OLD/skills/stary/SKILL.md"
-echo x > "$OLD/global/CLAUDE.md"
+echo x > "$OLD/pravidla.md"
 
 export HOME="$H" AGENT_BRAIN_GLOBAL="$BR" AR_BACKUPS="$T/backups" AR_NO_CHECK=1
 unset AGENT_WORKFLOW
 mkdir -p "$H/.claude/skills" "$H/Work"
 # Stav po starej inštalácii.
-ln -s "$OLD/global/CLAUDE.md" "$H/.claude/CLAUDE.md"
+ln -s "$OLD/pravidla.md" "$H/.claude/CLAUDE.md"
 ln -s "$OLD/skills/stary" "$H/.claude/skills/stary"
 ln -s /etc/hostname "$H/.claude/skills/cudzi"
 echo "stare pravidla Work" > "$H/Work/CLAUDE.md"

@@ -100,7 +100,7 @@ Budič ho z textu pre model odstráni a dá do značky `odpoveď="..."`.
 | `tasker_events.mjs`, most úlohy agentovi | `nečakám` | bez voľby |
 | `tasker_events.mjs`, úloha založená agentom je `done` | `na vedomie` | bez voľby |
 | `morning.mjs` | `nečakám` | bez voľby |
-| `sync.sh` repa agent-rules (pravidlá) | `na vedomie` | bez voľby |
+| `env/server/sync.sh` (pravidlá) | `na vedomie` | bez voľby |
 
 Hlavička správy (píše ju `bin/ask_agent.sh` a `reply.sh`, budič ju z textu
 pre model odstráni): `odpoveď:` (režim), pri odpovedi `k správe:` (režim
@@ -190,7 +190,7 @@ Správu medzi dvoma vláknami T3 na tom istom serveri nesie `t3_thread_send`.
 
 Ranný súhrn (D0179, D0183) ide cez plánovač T3: úloha `schedule_task` typu
 `fixed_time` na 07:00, viazaná na hlavné vlákno správcu agentov, s promptom
-`node /root/agent-runtime/morning.mjs --stdout`. Správca agentov v tom vlákne
+`node $AGENT_WORKFLOW/morning.mjs --stdout`. Správca agentov v tom vlákne
 spustí skript a z jeho výstupu napíše report podľa svojej persony.
 `agent-morning.timer` ostáva ako náhrada mimo T3 (zapisuje súhrn do schránky)
 a je vypnutý.
@@ -229,7 +229,7 @@ hlavného vlákna.
    to je archivované, preto je tu.` Platí aj pre rozpracovanú dávku.
 
 Platí pre každého agenta s týmto budičom: Boris volá
-`AGENT_NAME=boris /opt/agent-rules/bin/ask_agent.sh adam <téma>` a jeho
+`AGENT_NAME=boris $AGENT_WORKFLOW/bin/ask_agent.sh adam <téma>` a jeho
 budič číta `~/.local/state/boris/routes.json`.
 
 ## Zoznam tém
@@ -294,7 +294,7 @@ klonov (úloha 2 v Taskeri, 19. 10. 2026).
    `trasa odpovede`, `vlákno úlohy`, `téma <téma>` alebo `hlavné vlákno`).
    Web Taskera ukáže riadok `Správy idú do vlákna: ...` v bunke Riešiteľ
    na detaile úlohy (úloha 486). Príkaz je `AGENT_ROUTE_CMD`, predvolene
-   `/opt/agent-rules/bin/tk`, prázdna hodnota zápis vypne. Chyba zápisu
+   `$AGENT_WORKFLOW/bin/tk`, prázdna hodnota zápis vypne. Chyba zápisu
    doručenie nezdrží.
 
 ## Zbytočné zobudenie
@@ -344,8 +344,8 @@ kým niektorý beh neskončí riadne (napríklad operátor napíše do vlákna).
 Stojaci beh: vlákno s `activeRunId`, bez položky behu v stave `running`
 (príkaz alebo sub-agent) a s poslednou položkou behu staršou než
 `AGENT_STALLED_S` (predvolene 600 s, 0 vypne) budič preruší príkazom
-`run.interrupt` (`orchestration.dispatchCommand`, ako v Taskeri
-`lib/t3.mjs`). T3 zapíše položku `run_interrupt_request`, takže ide o zámer,
+`run.interrupt` (`orchestration.dispatchCommand`, ako v kóde Taskera
+v module t3). T3 zapíše položku `run_interrupt_request`, takže ide o zámer,
 nie pád, a nebudí sa. Do `alerts.log` ide výstraha, správy v rade T3
 pokračujú. Vlákno čakajúce na schválenie alebo na iné vlákno sa
 nepreruší. Prípad 23. 10. 2026: beh otvorila notifikácia o skončení
@@ -424,10 +424,10 @@ nezopakuje.
 
 ## Čistý kontext
 
-Hranicu kontextu stráži hook `context_warning.mjs` repa `agent-rules`,
-na serveri `/opt/agent-rules/hooks` (80 tisíc tokenov, pripomienka, o čistení rozhoduje agent). Vo vlákne T3
+Hranicu kontextu stráži hook `context_warning.mjs` klonu kódu,
+na serveri `$AGENT_WORKFLOW/hooks` (80 tisíc tokenov, pripomienka, o čistení rozhoduje agent). Vo vlákne T3
 agentovi povie zapísať rozpracované do pamäte, commitnúť, pushnúť
-a odpoveď ukončiť posledným riadkom z `bin/kontext.sh` repa `agent-rules`.
+a odpoveď ukončiť posledným riadkom z `bin/kontext.sh` klonu kódu.
 Budič agenta nevyzýva, výzva stála celý ťah navyše
 (čistý kontext na slovo agenta, 18. 10. 2026). Po `/clear` sa model predvolene nevolá (úloha 420: 83 % ťahov
 po starej pokračovacej správe nespravilo nič a stálo okolo 192 tisíc
@@ -471,7 +471,7 @@ vlákne drží id relácie z prvého štartu (`nativeThreadRef.nativeId`
 v tabuľke `orchestration_v2_projection_provider_threads` v
 `statev2.sqlite`) a ďalší proces claude, napríklad po reštarte T3 alebo
 páde, spustí s `--resume` na reláciu spred `/clear`. Starý kontext by sa
-vrátil. Bráni tomu hook `hooks/clear_bridge.mjs` repa `agent-rules`: pri
+vrátil. Bráni tomu hook `hooks/clear_bridge.mjs` klonu kódu: pri
 `SessionStart` so source `clear` odloží prepis pôvodnej relácie ako
 `.bak` a na jeho miesto dá symbolický odkaz na prepis novej relácie,
 takže `--resume` načíta čistý kontext (/clear v T3 cez most prepisu,
@@ -565,18 +565,19 @@ Runtime nesie meno agenta v `AGENT_NAME` a z neho odvodí cesty. Bez
 (`Environment=AGENT_NAME=...`) alebo z `runtime.env`.
 
 Šablóna `systemd/agent-driver@.service`: inštancia je meno agenta,
-nastavenie `%h/.config/<meno>/runtime.env`, `AGENT_RUNTIME` je priečinok
-s `driver.mjs` (predvolene `%h/agent-runtime`). Je to systémová služba pod
+nastavenie `%h/.config/<meno>/runtime.env`, `AGENT_WORKFLOW` je klon tohto repa
+s `driver.mjs` (predvolene `/opt/agentic-workflow`; `Environment=` je v jednotke pred
+`EnvironmentFile=`, takže ho `runtime.env` prekryje). Je to systémová služba pod
 rootom v `/etc/systemd/system/`, všetci agenti zdieľajú jeden T3 server
 (`t3code.service`).
 
 - Hlavný agent `adam`: `agent-driver@<adam>.service`,
-  `/root/.config/adam/runtime.env` s `AGENT_RUNTIME=/root/agent-runtime`,
+  `/root/.config/adam/runtime.env` (`AGENT_WORKFLOW` len pri inom klone),
   `AGENT_WORKDIR=/root/adam`, `AGENT_BOX=/var/lib/adam`, `AGENT_CLEAR_WATCH=1`.
 - Druhý agent `boris`: `agent-driver@<boris>.service`,
-  `/root/.config/boris/runtime.env` (600) s `AGENT_RUNTIME=/root/agent-runtime`,
+  `/root/.config/boris/runtime.env` (600),
   `AGENT_WORKDIR=/root/boris`, `AGENT_BOX=/var/lib/boris`,
-  `AGENT_REPLY_CMD="AGENT_NAME=boris /root/agent-runtime/reply.sh"` a
+  `AGENT_REPLY_CMD="AGENT_NAME=boris $AGENT_WORKFLOW/reply.sh"` a
   `AGENT_REPLY_ROUTE_adam=/var/lib/adam/inbox`. Hlavný agent mu odpovedá
   cez `AGENT_REPLY_ROUTE_boris` v svojom `runtime.env`.
 - Ďalší agenti sa zriaďujú skriptom `agent_vlakno.sh` (nižšie).
@@ -606,11 +607,13 @@ text pre model ho berie z `AGENT_OPERATOR_NAME` (bez neho slovo "operátor").
 | `done_related.mjs` | Stop | po zavretí úlohy nesmie v jej projekte ostať otázka `needs_human` toho istého riešiteľa bez jeho komentára v ťahu (zruš s dôvodom, alebo napíš, prečo platí; úloha 609 po audite 612, 27. 10. 2026) |
 | `idle_wake.mjs`, `topic_task.mjs` | Stop, PostToolUse | zbytočné zobudenie a úloha vo vlákne témy (časti vyššie) |
 
-Zapojenie: `node <runtime>/hooks/<hook>.mjs` v `settings.json` používateľa
-(udalosť podľa tabuľky, `matcher` `^(Write|Edit|MultiEdit|Bash)$` pre
-`own_rule_scope`, `^(Agent|Task)$` a zapisujúce nástroje pre `tasker_work`).
-Server zapája hooky skriptom `env/server/install.sh`, Mac nasadením
-`env/mac/settings.json` (adaptéry prostredia príjdu v dávke 1c). Hooky nájdu
+Zapojenie: `node <klon kódu>/hooks/<hook>.mjs` v `settings.json`. Hooky, ich
+udalosti, matchery, časové limity a to, kde bežia (`main` interaktívne relácie na serveri,
+`runs` behy správcu úloh, `mac` Mac, `agent` hook, ktorý si zapína repo agenta), nesie
+jediná tabuľka `env/hooks.mjs`. Server píše `settings.json` skriptom
+`env/server/install.sh`, Mac skriptom `env/mac/install.sh`, oba cez
+`node env/hooks.mjs apply <druh> <settings.json>`: naše skupiny hookov nahradí, cudzie
+kľúče a hooky nechá. `node check.mjs` porovná živý súbor Macu s generátorom. Hooky nájdu
 tento repo a spoločný mozog cez `lib/paths.mjs` (`AGENT_WORKFLOW`, predvolene
 `/opt/agentic-workflow`, na Macu `~/Work/agentic-workflow`; `AGENT_BRAIN_GLOBAL`,
 predvolene `/opt/agentic-brain-global`, na Macu `~/Work/agentic-brain-global`)
@@ -792,6 +795,16 @@ odkaz s platným certifikátom, zlý token 404, cesta po skončení zrušená.
 
 Ako root:
 
+0. Klony `agentic-workflow` (tento repo) a `agentic-brain-global` (spoločný mozog)
+   v `/opt/` (`AGENT_WORKFLOW`, `AGENT_BRAIN_GLOBAL` menia cesty), v mozgu
+   `env/server/config.env` podľa `env/server/config.env.example`. Potom
+   `env/server/install.sh` z klonu kódu: `~/.claude/CLAUDE.md` rootu a
+   používateľa behov (dva importy `RULES.md`), `CLAUDE.md` koreňa stromu agentov
+   a domova používateľa behov ako odkaz na `env/server/RULES.md` mozgu, skilly
+   z oboch klonov, `agents/`, `output-styles/`, `settings.json` z `env/hooks.mjs`,
+   `user.email` a `core.hooksPath`, jednotky `agentic-workflow-sync.timer` a
+   `.service` (každých 5 minút ťahá oba klony). Staré odkazy a jednotky z
+   `LEGACY_PATHS` a `LEGACY_UNITS` odstráni, opakované spustenie nič nepokazí.
 1. Skupina `agent-inbox`, člen `adam` (SSH zástupcu operátora z Macu),
    neskôr agenti servera, ktorí Adamovi píšu.
 2. `systemd/agent-inbox.tmpfiles.conf` do `/etc/tmpfiles.d/agent-inbox.conf`
@@ -803,7 +816,7 @@ Ako root:
    `runtime.env` patrí `AGENT_REPLY_ROUTE_boris=/var/lib/boris/inbox` a
    `TASKER_HOME` Taskera na serveri (napríklad `/home/tasker-svc/.tasker`). Odpoveď
    príde Borisovi ako `adam-<správa>`, predponu mení `AGENT_REPLY_PREFIX`.
-4. `node /root/agent-runtime/start_agent.mjs`, vypíše id vlákna.
+4. `node $AGENT_WORKFLOW/start_agent.mjs`, vypíše id vlákna.
 5. Jednotky zo `systemd/` do `/etc/systemd/system/`, `systemctl
    daemon-reload`, `systemctl enable --now agent-driver@<adam>.service`.
    Udalosti Taskera zapne `systemctl enable --now
@@ -818,7 +831,7 @@ Ako root:
    úlohy T3 na Macu (URL v `/home/cyril/mac_webhook_url`, 600). Vybavené
    správy drží `/var/lib/mac-wake/notified`, po zlyhaní (Mac spí) skúsi
    znova pri ďalšej zmene schránky. Model na serveri sa nevolá.
-7. Skúška: `ask_agent.sh adam adam_server "test"` z Macu (`bin/` repa pravidiel),
+7. Skúška: `ask_agent.sh adam adam_server "test"` z Macu (`bin/` klonu kódu),
    správa sa objaví vo vlákne, odpoveď príde cez `ask_agent.sh --replies`.
 
 ## Skúšky a kontrola mien
@@ -828,6 +841,10 @@ Ako root:
 živý systém sa nedotkne). Skúšky, ktoré volajú `ask_agent.sh` z repa pravidiel,
 a skúšky prehliadača (`AGENT_BROWSER_USER` s nainštalovaným Chrome) sa bez nich
 preskočia.
+
+`./test/run.sh` spustí všetky testy repa (node testy, shellové testy, `test/brain/run.sh`,
+`env/mac/install.test.sh`, `env/server/tests/run.sh`) a skončí pri prvom zlyhaní;
+`./test/run.sh <súbor>...` len vybrané.
 
 `node lib/public_check.mjs` prejde súbory repa a nahlási meno alebo adresu, ktoré
 sem nepatria (vzory sú v `lib/public_check.txt` v base64), `--commits <rozsah>`
@@ -887,91 +904,119 @@ niekde mimo seba a mimo testov (`*.test.*`, `*.replay.mjs`, `test/`) importovan�
 alebo menovaný v kóde, skripte, konfigurácii, systemd alebo v `SKILL.md`; zmienka v
 README a v ostatných `.md` nestačí. Výnimka je riadok `<cesta> <dôvod>` v
 `lib/dead_code_allow.txt`; výnimka bez dôvodu, na neexistujúci súbor alebo na súbor,
-ktorý mŕtvy nie je, je chyba. Hooky, ktoré volá nastavenie prostredia `env/`, majú
-dočasnú výnimku do dávky 1c.
+ktorý mŕtvy nie je, je chyba. Hook zapísaný v tabuľke `env/hooks.mjs` je menovaný,
+hook mimo tabuľky potrebuje výnimku s dôvodom.
 
-## Presun (úloha 663, dávka 1a)
+## Mapa repa
 
-Texty a kostra mozgu presunuté z troch zdrojov, kód hookov a knižníc sa v tejto
-dávke nemenil (dávka 1b). Plná mapa repa príde v dávke 1c. Zdroje: `agent-rules`
-(pravidlá servera), `agent-playbook` (verejná kópia pravidiel), `agentic-brain-template`
-(šablóna mozgu), skilly z klonu zástupcu operátora. Cesty zdrojov sú relatívne k ich koreňu.
+Repo je kód agentov: pravidlá, skilly, hooky, runtime a nasadenie prostredia. Dáta
+nasadenia (mená, adresy, rozhodnutia, register chýb, zoznam agentov) sú v druhom repe,
+v spoločnom mozgu (`AGENT_BRAIN_GLOBAL`). Cesty v tabuľkách sú relatívne ku koreňu repa.
 
-| nový súbor | odkiaľ |
+### Pravidlá a roly
+
+| cesta | čo to je |
 |---|---|
-| `RULES.md` | agent-rules: `global/CLAUDE.md` |
-| `output-styles/operator.md` | agent-rules: `global/output-styles/operator.md` |
-| `env/mac/gitignore` | agent-rules: `global/gitignore` |
-| `roles/*.md` (okrem zoznamu agentov `agents.md`) | agent-rules: `roles/*.md`; v `spravca-agentov.md` je účet na GitHube nahradený slovom "agenta" |
-| `agents/implementator.md` | agent-rules: `agents/implementator.md`; cesta worktree pod používateľom správcu úloh je `<home>/.worktrees/` |
-| `skills/unslop/SKILL.md` | agent-rules: `skills/unslop/SKILL.md`, pridané `scripts: none` |
-| `skills/uloha-postup/SKILL.md` | agent-rules: `skills/uloha-postup/SKILL.md`, pridané `scripts: none`, mená nahradené rolou |
-| `skills/schranka/SKILL.md` | agent-rules: `skills/schranka/SKILL.md`, pridané `scripts: none` |
-| `skills/artefakty/SKILL.md` | agent-rules: `skills/artefakty/SKILL.md`, pridané `scripts: none` |
-| `skills/dokonci/SKILL.md` | agent-rules: `skills/dokonci/SKILL.md` (cesty v texte na `dokonci.sh` a skúšku ostali pôvodné) |
-| `skills/dokonci/scripts/dokonci.sh` | agent-rules: `skills/dokonci/dokonci.sh` |
-| `test/dokonci.test.mjs` | agent-rules: `skills/dokonci/dokonci.test.mjs`, cesta k skriptu opravená |
-| `skills/error/SKILL.md` | nový, po anglicky: zlúčenie `skills/chyba/SKILL.md` z agent-rules a `skills/error/SKILL.md` zo šablóny. `scripts/error.sh` prišiel v dávke 1b2 z `bin/chyba.sh` |
-| `skills/task-end/SKILL.md` | agentic-brain-template: `agentic-brain/skills/task-end/SKILL.md` |
-| `skills/task-end/scripts/task-end.sh` | agentic-brain-template: `agentic-brain/skills/task-end/scripts/task-end.sh` (bez zmeny, hľadá `bin/check.sh` o tri úrovne vyššie, v tomto repe ju treba nasmerovať na `brain/bin/check.sh`) |
-| `skills/browser/SKILL.md` | klon zástupcu operátora: `.claude/skills/prehliadac/SKILL.md` |
-| `skills/secret-from-operator/SKILL.md` | klon zástupcu operátora: `.claude/skills/tajomstvo-od-<operátor>/SKILL.md` |
-| `brain/RULES.md` | agentic-brain-template: `agentic-brain/RULES.md` |
-| `brain/bin/check.sh`, `adopt.sh`, `install.sh`, `decide.sh`, `pre-commit`, `repeat_guard.mjs`, `repeat_guard.allow` | agentic-brain-template: `agentic-brain/bin/*`, bez zmeny |
-| `brain/artifacts/README.md` | agentic-brain-template: `agentic-brain/artifacts/README.md` |
-| `brain/decisions/README.md` | agentic-brain-template: `agentic-brain/decisions/README.md` |
-| `brain/errors/REGISTER.md` | agentic-brain-template: `agentic-brain/errors/REGISTER.md` |
-| `brain/memory/MEMORY.md` | agentic-brain-template: `agentic-brain/memory/MEMORY.md` |
-| `brain/scratch/.gitkeep` | agentic-brain-template: `agentic-brain/scratch/.gitkeep` |
-| `test/brain/check.test.sh`, `adopt.test.sh`, `install.test.sh`, `repeat_guard.test.mjs`, `run.sh` | agentic-brain-template: `agentic-brain/test/*`, cesty opravené |
-| `test/brain/template.sh` | nový pomocník testov: zloží z `brain/` a zo `skills/error`, `skills/task-end` rozloženie šablóny (`agentic-brain/` s `skills/`) |
-| `test/brain/fixtures/error.sh`, `settings.json`, `template-ignore` | agentic-brain-template: `agentic-brain/skills/error/scripts/error.sh`, `.claude/settings.json`, ignorovací súbor koreňa. Náhrada, kým nevznikol `skills/error/scripts/error.sh`; `error.sh` z fixtúr dávka 1b2 zmazala |
-| `docs/PLAYBOOK.md`, `docs/PLAYBOOK.en.md` | agent-playbook: `PLAYBOOK.md`, `PLAYBOOK.en.md` |
-| `LICENSE` | agent-playbook: `LICENSE` |
-| `docs/decisions-schema.md` | agent-playbook: `rozhodnutia/README.md` a `rozhodnutia/ROZSAHY.md` za sebou, nadpisy o stupeň nižšie |
-| `lib/public_check.txt` | zjednotenie s `lib/public_check.txt` z agent-playbook (riadok `+` s povoleným odkazom, doplnený komentár) |
+| `RULES.md` | globálne pravidlá každého agenta, importuje ich `~/.claude/CLAUDE.md` (spolu s `RULES.md` mozgu) |
+| `roles/ROLES.md` | zoznam rolí a pravidlo, že pravidlo hovorí o role, nie o mene agenta |
+| `roles/*.md` | pravidlá jednej roly (`zastupca-operatora`, `spravca-agentov`, `spravca-servera`, `veduci-vyvoja`, `prva-linia`, `pracovny-agent`, `dizajner`, `osobny-asistent`); zoznam agentov podľa rolí je `roles/agents.md` v mozgu |
+| `output-styles/operator.md` | output style `operator` (vyberá ho `outputStyle` v `settings.json`) |
 
-## Presun (úloha 663, dávka 1b1)
+### Skilly a agenti
 
-Kód hookov, knižníc a skriptov z `agent-rules`. Obaly a re-exporty nad týmto repom
-zanikli, cesty ku klonom dáva `lib/paths.mjs` a `lib/paths.sh`. Kód mozgu (`brain/`,
-`skills/error`, `skills/task-end`) a adaptéry `env/` prídu v ďalších dávkach.
-Cesty sú relatívne ku koreňu zdroja, nové cesty sú rovnaké, ak nie je uvedené inak.
-
-| nový súbor | odkiaľ |
+| cesta | čo to je |
 |---|---|
-| `hooks/*.mjs`, `hooks/guard.replay.mjs` a testy `hooks/*.test.mjs` | agent-rules: `hooks/*` (37 hookov a ich testy), cesty ku klonom cez `lib/paths.mjs`, mená a adresy cez premenné prostredia |
-| `check.mjs`, `check.test.mjs` | agent-rules: rovnaké. Nasadený klon je `workflowDir()`, kontroly obalov a kópie hooku v druhom repe zanikli, `rule_dupes` číta `RULES.md`, `env/*/RULES.md` zo spoločného mozgu a `roles/*.md`, `word_cap` meria `RULES.md`; test beží s prázdnym `HOME` a bez živých repí agentov |
-| `lib/agent_defs.mjs`, `deploy_keys.mjs`, `doc_paths.mjs`, `kontext.mjs`, `memory_claims.mjs`, `open_branches.mjs`, `plugin_skills_user_only.mjs`, `plugins.mjs`, `rule_dupes.mjs`, `shell_cmd.mjs`, `tool_shape.mjs`, `web_gate.mjs`, `word_cap.mjs` a testy `lib/*.test.mjs` | agent-rules: `lib/*`. `lib/kontext.mjs` (zápis odovzdávky, `bin/kontext.sh`) a koreňový `kontext.mjs` (rozbor riadku `HOTOVO-KONTEXT` v budiči) robia rôzne veci, ostávajú oba |
-| `lib/claude_md_guard.sh`, `commit_guard.sh`, `frozen_log_guard.sh`, `open_branch_guard.sh`, `retired_names.sh` a testy `lib/*.test.sh` | agent-rules: `lib/*`. `commit_guard.sh` berie e-mail a autorov repí z `$AGENT_BRAIN_GLOBAL/commit_guard/`, tabuľku agentov z `$AGENT_BRAIN_GLOBAL/roles/agents.md` |
-| `lib/git_email.txt`, `lib/repo_authors.txt` | agent-rules: `lib/*`; v tomto repe sú len vzory (`agent@example.org`, prázdny zoznam autorov), skutočné dáta patria do spoločného mozgu |
-| `lib/global_word_cap.txt`, `lib/rule_dupes_allow.txt`, `lib/retired_claims.txt`, `lib/retired_names.txt` | agent-rules: `lib/*`; v `rule_dupes_allow.txt` sú mená v dôvodoch nahradené rolami, `retired_claims.txt` je bez 17 riadkov s menami agentov a ľudí (doplní ich krok 7 plánu v inej podobe) |
-| `lib/paths.mjs`, `lib/paths.sh`, `test/paths.test.mjs` | nové: cesty ku klonom (`AGENT_WORKFLOW`, `AGENT_BRAIN_GLOBAL`), register rozhodnutí `<mozog>/decisions` |
-| `bin/tk`, `bin/ask_agent.sh`, `bin/kontext.sh`, `bin/uloha-webu.sh`, `test/tk.test.mjs` | agent-rules: `bin/*`; `bin/tk.test.mjs` ide do `test/` |
-| `git-hooks/`, `git-hooks/global.test.mjs` | agent-rules: `git-hooks/` |
-| `test/fixtures/rozhodnutia-*/decisions/` | agent-rules: `test/fixtures/rozhodnutia-*/rozhodnutia/`, priečinok premenovaný; fixtúra pre kontrolu podľa logu starého repa agenta nepresunutá |
-| `test/run.sh` | nový: jeden spúšťač všetkých testov |
-| `lib/rozhodnutia.mjs`, `bin/rozhodni.sh`, `bin/chyba.sh` (dávka 1b2 ju presunula do `skills/error/scripts/error.sh`) | už tu boli: `configure()` zanikol, priečinok `decisions/`, meno operátora z `AGENT_OPERATOR_NAME`, skripty berú cesty z `lib/paths` |
+| `skills/<meno>/SKILL.md` | skill, nasadí ho `env/*/install.sh` odkazom do `~/.claude/skills`; skilly mozgu sú v jeho `skills/`, rovnaké meno v oboch je chyba |
+| `skills/error/scripts/error.sh` | zápis uznanej chyby do registra mozgu |
+| `skills/dokonci/scripts/dokonci.sh` | mechanické kroky skillu `dokonci` (ledger, merge `dev` do `main`) |
+| `skills/task-end/scripts/task-end.sh` | koniec úlohy: kontrola mozgu a kontrolný zoznam |
+| `agents/implementator.md` | definícia sub-agenta `implementator` (model `sonnet`), nasadí sa do `~/.claude/agents` |
 
-Nepresunuté obaly a kópie z `agent-rules`: `lib/deny.*`, `lib/deny_check.mjs`, `lib/agent_name.mjs`,
-`lib/tasker_read.mjs`, `lib/rozhodnutia.mjs`, `lib/session_id.mjs`, `lib/runtime_dir.*`, `lib/git_isolate.mjs`,
-`lib/wrappers.test.mjs`, `bin/rozhodni.sh`.
+### Mozog (šablóna)
 
-## Presun (úloha 663, dávka 1b2)
-
-Kód mozgu slúži repám bez kópie, register chýb je v mozgu, hooky nesú `requires:`
-a `check.mjs` stráži mŕtvy kód. Opis je v časti Mozog agentov.
-
-| nový súbor | odkiaľ |
+| cesta | čo to je |
 |---|---|
-| `skills/error/scripts/error.sh` | `bin/chyba.sh` (presun cez `git mv`): voľby `--class`, `--file`, `--mechanism`, `--description`, `--truth`, `--check`, `--brain`, `--open`, register `errors/REGISTER.md` mozgu namiesto TSV v `~/.local/state`, úloha cez `AGENT_TK`, premenné `ERROR_AGENT` a `ERROR_REVIEWER` namiesto `CHYBA_*` |
-| `test/error.test.mjs` | `test/chyba.test.mjs` |
-| `brain/bin/check.sh`, `adopt.sh`, `install.sh`, `pre-commit` | upravené: cieľ `check.sh [--install-hook] [<repo>]`, `scripts: none`, `adopt.sh` len dáta s prepínačmi `--standalone` a `--root`, `install.sh [<repo>]`, hook s cestou k `check.sh` |
-| `skills/task-end/scripts/task-end.sh` | upravený: `check.sh` tohto repa s cieľom repo pracovného priečinka |
-| `lib/hook_requires.mjs`, `lib/dead_code.mjs`, `lib/dead_code_allow.txt` a testy | nové, volá ich `check.mjs` |
-| `hooks/*.mjs` | druhý riadok `// requires:` v každom hooku |
-| `test/brain/task_end.test.sh` | nový test `task-end.sh`; `test/brain/fixtures/error.sh` zmazaný |
-| `hooks/objection_fix.mjs`, `hooks/own_rule_scope.mjs`, `lib/claude_md_guard.sh` | volajú `skills/error/scripts/error.sh` namiesto `bin/chyba.sh` |
+| `brain/` | šablóna mozgu: `RULES.md`, `artifacts/`, `errors/REGISTER.md`, `decisions/`, `memory/MEMORY.md`, `scratch/` (časť Mozog agentov) |
+| `brain/bin/` | `check.sh`, `adopt.sh`, `install.sh`, `decide.sh`, `pre-commit`, `repeat_guard.mjs` |
 
-Dokument `docs/PLAYBOOK.md` a `docs/PLAYBOOK.en.md` popisuje starý `bin/chyba.sh`, oprava
-je mimo tejto dávky.
+### Hooky
+
+| cesta | čo to je |
+|---|---|
+| `hooks/<hook>.mjs` | hook relácie claude; druhý riadok `// requires:` hovorí, čo hook potrebuje (`none`, `tasker`, `t3`, `inbox`, `mac`) |
+| `hooks/*.test.mjs`, `hooks/guard.replay.mjs` | testy hookov a replay chyby |
+| `env/hooks.mjs` | jediná tabuľka hookov: udalosť, matcher, timeout, requires a kde beží (`main`, `runs`, `mac`, `agent`); z nej píšu `settings.json` oba `install.sh` |
+| `env/hooks.test.mjs` | test tabuľky: hook existuje, `requires` sedí s hlavičkou, každý hook je v tabuľke alebo v `lib/dead_code_allow.txt` |
+| `git-hooks/global/` | globálne git hooky (`core.hooksPath` rootu a Macu), spúšťajú lokálny hook repa |
+| `git-hooks/enable_repo_hooks.sh` | zapne globálne hooky lokálne v klonoch z `repo_authors.txt` mozgu |
+| `agent-githooks/`, `.githooks/` | git hooky repa agenta a tohto repa (`public_check`, `check.mjs`) |
+
+### Knižnice a kontroly
+
+| cesta | čo to je |
+|---|---|
+| `lib/*.mjs`, `lib/*.sh` | knižnice hookov a skriptov: cesty ku klonom (`paths.mjs`, `paths.sh`), prostredie agenta (`agent_env.mjs`, `agent_name.mjs`), zamietnutie (`deny.*`), register rozhodnutí, kontroly (`public_check`, `path_check`, `dead_code`, `hook_requires`, `rule_dupes`, `word_cap`) |
+| `lib/*.txt` | dáta kontrol: `public_check.txt`, `retired_*.txt`, `dead_code_allow.txt`, `rule_dupes_allow.txt`, `global_word_cap.txt`, vzory `git_email.txt` a `repo_authors.txt` |
+| `check.mjs` | kontrola celého nasadenia: skilly, nastavenie z `env/hooks.mjs`, pravidlá, mŕtvy kód, zrušené mená |
+
+### Skripty
+
+| cesta | čo to je |
+|---|---|
+| `bin/tk` | obal `tasker` (používateľ a databáza podľa prostredia) |
+| `bin/ask_agent.sh`, `bin/kontext.sh`, `bin/rozhodni.sh`, `bin/uloha-webu.sh` | správa inému agentovi, odovzdávka čistého kontextu, zápis rozhodnutia, úloha agentovi webu |
+| `agent_vlakno.sh`, `github_repo.sh`, `github_device_login.sh`, `start_agent.mjs`, `setup_token.sh` | zriadenie agenta: kľúč, repo, vlákno T3, token |
+| `browser.sh`, `browser/` | Chrome so sandboxom pre `browser.sh --gaps` |
+| `secret_drop.sh`, `secret_drop.mjs` | jednorazová stránka na odovzdanie tajomstva |
+
+### Runtime
+
+| cesta | čo to je |
+|---|---|
+| `driver.mjs`, `lib.mjs`, `kontext.mjs`, `supervise.mjs`, `stuck.mjs`, `clear_watch.mjs`, `t3_autosettle.mjs` | budič (schránka do vlákna T3), klient T3, dozor behu, čistý kontext |
+| `reply.sh`, `route.mjs` | odpoveď zo schránky a trasa odpovede do vlákna témy |
+| `tasker_events.mjs`, `morning.mjs` | udalosti Taskera a ranný súhrn do schránky |
+| `mac_wake.sh` | zobudenie agenta na Macu webhookom T3 |
+| `systemd/` | šablóny jednotiek budiča, udalostí, ranného súhrnu a budenia Macu, `tmpfiles.d` schránok; `ExecStart` ide cez `${AGENT_WORKFLOW}` z `runtime.env`, predvolba `/opt/agentic-workflow` je v jednotke pred `EnvironmentFile` |
+
+### Prostredie
+
+| cesta | čo to je |
+|---|---|
+| `env/server/install.sh` | nasadenie na server (root): importy pravidiel, skilly, agenti, `settings.json` z `env/hooks.mjs` (`main` root, `runs` používateľ behov), git, jednotky sync |
+| `env/server/sync.sh` | časovač ťahá klon kódu aj mozgu a hlási zmenu `RULES.md` oboch a `env/server/` mozgu |
+| `env/server/systemd/` | `agentic-workflow-sync.service` a `.timer` (šablóna so zástupnými znakmi, `install.sh` ich nahradí cestami klonov) |
+| `env/server/config.env.example` | vzor `<mozog>/env/server/config.env` (`RUNS_USER`, `GIT_EMAIL`, `ENV_ROOT`, `LEGACY_PATHS`, `LEGACY_UNITS`) |
+| `env/server/tests/` | testy `install.sh` a `sync.sh` v dočasných priečinkoch (`run.sh` spustí shellcheck aj testy) |
+| `env/mac/install.sh` | nasadenie na Mac: importy pravidiel, `~/Work/CLAUDE.md`, skilly, agenti, `settings.json` z `env/hooks.mjs` (`mac`), gitignore, kontrola |
+| `env/mac/install.test.sh` | test `install.sh` Macu s `HOME` v dočasnom priečinku |
+| `env/mac/gitignore` | globálny gitignore Macu |
+
+### Dokumentácia a testy
+
+| cesta | čo to je |
+|---|---|
+| `docs/PLAYBOOK.md`, `docs/PLAYBOOK.en.md` | verejný playbook: ako postaviť agentov s pamäťou, pravidlami a hookmi |
+| `docs/decisions-schema.md` | schéma záznamov rozhodnutí a rozsahov moci |
+| `test/*.test.mjs` | testy runtime, hookov a skriptov, falošný T3 server `test/fake_t3.mjs` |
+| `test/brain/` | testy mozgu (`adopt`, `check`, `install`, `task_end` a `repeat_guard`) |
+| `test/fixtures/` | fixtúry registra rozhodnutí |
+| `test/run.sh` | jediný spúšťač všetkých testov (bez živého systému) |
+| `LICENSE` | licencia |
+
+### Premenné nasadenia
+
+| premenná | význam |
+|---|---|
+| `AGENT_WORKFLOW`, `AGENT_BRAIN_GLOBAL` | klon tohto repa a klon spoločného mozgu (predvolene `/opt/agentic-workflow` a `/opt/agentic-brain-global`, na Macu `~/Work/...`) |
+| `AR_CLAUDE_DIR`, `AR_ENV_ROOT`, `AR_RUNS_HOME`, `AR_UNIT_DIR` | cesty `env/server/install.sh` pre test: `~/.claude` rootu, koreň stromu agentov, domov používateľa behov, jednotky systemd |
+| `AR_NO_SYSTEMCTL`, `AR_SYSTEMCTL` | `1` vypne `systemctl` v `install.sh`; príkaz namiesto `systemctl` (test), `AR_UNIT_DIR` bez neho `systemctl` nevolá |
+| `AR_BACKUPS`, `AR_NO_CHECK` | `env/mac/install.sh`: priečinok záloh a `1` vynechá `check.mjs` |
+| `AR_CLONES`, `AR_INBOXES` | `env/server/sync.sh`: dva klony (kód, mozog) a schránky pre správu `pravidla-*` |
+| `AR_READONLY_DIRS` | `deploy_readonly.mjs`: cesty (cez `:`), ktoré hook chráni namiesto `/opt/tasker` a klonov |
+| `AR_PROJECT_ROOTS` | `project_branch.mjs`: priečinky repí projektov (cez `:`) |
+
+Hodnoty s menami (používateľ behov, e-mail, staré cesty a jednotky) berie `install.sh`
+len z `<mozog>/env/server/config.env` a `<mozog>/env/mac/config.env`, alebo z `runtime.env`.
+Voliteľný `<mozog>/env/<prostredie>/settings.base.json` doplní do `settings.json` kľúče
+mimo hookov (pluginy, jazyk), existujúca hodnota vyhráva.

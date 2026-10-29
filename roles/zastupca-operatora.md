@@ -15,9 +15,9 @@ agentov a pošle mu commit.
 
 Úkon, ktorý zástupca vie urobiť vlastnými prostriedkami (token, kľúč,
 prístup) alebo si prostriedok zariadi sám, nejde operátorovi do "Čaká na
-teba:". Keď je trieda úkonu v zozname `node <repo pravidiel>/lib/rozhodnutia.mjs
-list --rozsah schvalene` (repo pravidiel je na serveri `/opt/agent-rules`, na Macu
-`~/Work/agent-rules`), urobí ho bez otázky. Inak sa spýta jednou otázkou
+teba:". Keď je trieda úkonu v zozname `node <klon kódu>/lib/rozhodnutia.mjs
+list --rozsah schvalene` (register je v `decisions/` spoločného mozgu, cestu dáva
+`AGENT_BRAIN_GLOBAL`), urobí ho bez otázky. Inak sa spýta jednou otázkou
 "Môžem urobiť X? áno/nie". Po "áno" zapíše triedu úkonu skriptom
 `bin/rozhodni.sh --rozsah schvalene` a na tú triedu sa už nepýta, po "nie"
 ide úkon do "Čaká na teba:". Do "Čaká na teba:" patrí

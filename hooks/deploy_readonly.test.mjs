@@ -28,7 +28,7 @@ test("replay chyby 20. 10. 2026: Edit v /opt/tasker sa zamietne s postupom", () 
 
 test("Edit, Write, MultiEdit a NotebookEdit v /opt/tasker a /opt/agentic-workflow zamietne", () => {
   for (const tool of ["Edit", "Write", "MultiEdit"]) {
-    for (const f of ["/opt/tasker/a.js", "/opt/tasker/sub/dir/a.js", "/opt/agentic-workflow/global/CLAUDE.md", "/opt/agentic-workflow/hooks/x.mjs", "/opt/tasker/../tasker/a.js", "/opt/tasker/x/../../agentic-workflow/a"]) {
+    for (const f of ["/opt/tasker/a.js", "/opt/tasker/sub/dir/a.js", "/opt/agentic-workflow/RULES.md", "/opt/agentic-workflow/hooks/x.mjs", "/opt/tasker/../tasker/a.js", "/opt/tasker/x/../../agentic-workflow/a"]) {
       assert.equal(write(tool, f)?.permissionDecision, "deny", `${tool} ${f}`);
     }
   }
@@ -39,7 +39,7 @@ test("Edit, Write, MultiEdit a NotebookEdit v /opt/tasker a /opt/agentic-workflo
 });
 
 test("zápis inde a podobné cesty pustí", () => {
-  for (const f of ["/root/tasker/src/a.js", "/root/agentic-workflow/global/CLAUDE.md", "/opt/tasker-copy/a", "/opt/agentic-workflow2/a", "/opt/other/a", "/tmp/opt/tasker/a", "/root/adam/.scratch/x"]) {
+  for (const f of ["/root/tasker/src/a.js", "/root/agentic-workflow/RULES.md", "/opt/tasker-copy/a", "/opt/agentic-workflow2/a", "/opt/other/a", "/tmp/opt/tasker/a", "/root/adam/.scratch/x"]) {
     assert.equal(write("Write", f), null, f);
   }
   assert.equal(write("Write", "a.js", "/root/tasker"), null);

@@ -24,8 +24,8 @@ LEGACY_PATHS="$OLD"
 LEGACY_UNITS="old-sync.timer old-sync.service"
 EOF
 # Starý klon, z ktorého ostali odkazy.
-mkdir -p "$OLD/skills/stary-skill" "$OLD/global" "$OLD/agents"
-echo x > "$OLD/global/CLAUDE.md"
+mkdir -p "$OLD/skills/stary-skill" "$OLD/agents"
+echo x > "$OLD/pravidla.md"
 echo x > "$OLD/skills/stary-skill/SKILL.md"
 echo x > "$OLD/agents/stary.md"
 
@@ -35,7 +35,7 @@ export AR_NO_SYSTEMCTL=1
 mkdir -p "$AR_CLAUDE_DIR/skills/unslop" "$AR_CLAUDE_DIR/agents" "$AR_UNIT_DIR" "$AR_ENV_ROOT" "$AR_RUNS_HOME/.claude/skills"
 # Stav po starej inštalácii: CLAUDE.md je odkaz do starého klonu, unslop je
 # obyčajný priečinok, odkazy na zmazané veci, staré jednotky, cudzie veci.
-ln -s "$OLD/global/CLAUDE.md" "$AR_CLAUDE_DIR/CLAUDE.md"
+ln -s "$OLD/pravidla.md" "$AR_CLAUDE_DIR/CLAUDE.md"
 echo stary > "$AR_CLAUDE_DIR/skills/unslop/SKILL.md"
 ln -s "$OLD/skills/stary-skill" "$AR_CLAUDE_DIR/skills/stary-skill"
 ln -s "$OLD/agents/stary.md" "$AR_CLAUDE_DIR/agents/stary.md"
@@ -44,7 +44,7 @@ ln -s "$OLD/skills/stary-skill" "$AR_RUNS_HOME/.claude/skills/stary-skill"
 echo "stara jednotka" > "$AR_UNIT_DIR/old-sync.timer"
 echo "stara jednotka" > "$AR_UNIT_DIR/old-sync.service"
 # Používateľ behov má vlastné riadky a starý import v CLAUDE.md.
-printf 'vlastný riadok\n@%s/global/CLAUDE.md\n' "$OLD" > "$AR_RUNS_HOME/.claude/CLAUDE.md"
+printf 'vlastný riadok\n@%s/pravidla.md\n' "$OLD" > "$AR_RUNS_HOME/.claude/CLAUDE.md"
 # Existujúce nastavenia: cudzie kľúče, cudzí hook a hook zo starého klonu.
 echo '{"permissions": {"deny": ["Bash(mkfs *)"]}, "hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "iny"}]}, {"hooks": [{"type": "command", "command": "node /opt/stary/hooks/unslop.mjs"}]}], "Stop": [{"hooks": [{"type": "command", "command": "node /opt/stary/hooks/reply_guard.mjs"}]}]}}' > "$AR_CLAUDE_DIR/settings.json"
 echo '{"model": "x", "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "node /opt/stary/hooks/tool_failure_report.mjs"}]}, {"hooks": [{"type": "command", "command": "iny-beh"}]}]}}' > "$AR_RUNS_HOME/.claude/settings.json"

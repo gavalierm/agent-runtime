@@ -13,7 +13,7 @@ ich nemusel pri každej úlohe opravovať.
 
 ## Použitie
 
-1. Pred návrhom alebo implementáciou pozri zoznam `artifacts/` (na serveri `/opt/agent-rules/artifacts`, na Macu nasadená kópia repa). `ls` stačí, názov priečinka hovorí, čo artefakt pokrýva.
+1. Pred návrhom alebo implementáciou pozri zoznam `artifacts/` (`artifacts/` v klone spoločného mozgu, `AGENT_BRAIN_GLOBAL`). `ls` stačí, názov priečinka hovorí, čo artefakt pokrýva.
 2. Ak jeden sedí, prečítaj celý `PLAYBOOK.md` a otvor súbory v `reference/`. Playbook nesie pravidlá a dôvody, referencia nesie hodnoty a hotovú štruktúru.
 3. Hodnoty (farby, rozmery, písmo, štruktúru) preber z referencie, nepíš ich z pamäte. Pri rozpore medzi textom a referenciou platí referencia.
 4. Od artefaktu sa odchýľ len so zdôvodnením, napríklad "tabuľka mala 12 stĺpcov, na 390px ich skrývam od štvrtého". Odchýlku napíš do odpovede operátorovi jednou vetou. Pravidlo samotné neprepisuj.

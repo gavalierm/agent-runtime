@@ -71,7 +71,7 @@ test("iná relácia alebo iný text sa zamietne znova", () => {
 
 test("zápis do agentic-workflow (env/server/CLAUDE.md) prejde hneď", () => {
   const { e } = env();
-  for (const f of [join(RULES, "env/server/CLAUDE.md"), "/opt/agentic-workflow/env/server/CLAUDE.md", "/root/agentic-workflow/global/CLAUDE.md"]) {
+  for (const f of [join(RULES, "env/server/CLAUDE.md"), "/opt/agentic-workflow/env/server/CLAUDE.md", "/root/agentic-workflow/env/CLAUDE.md"]) {
     assert.equal(run(e, { ...real(e), tool_input: { ...real(e).tool_input, file_path: f } }), null, f);
   }
 });

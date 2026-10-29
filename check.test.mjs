@@ -6,8 +6,7 @@
 //
 // Založí dočasný worktree zo stavu tohto checkoutu (aj necommitnuté zmeny
 // sledovaných súborov, cez `git stash create`, ktorý nič nemení), spustí
-// v ňom check.mjs a čaká, že nenahlási nič okrem vecí, ktoré dopĺňa dávka 1c
-// (adaptéry prostredia env/, mapa repa v README.md). HOME a repá agentov
+// v ňom check.mjs a čaká, že nenahlási nič. HOME a repá agentov
 // (AR_AGENTS) ukazujú do prázdneho dočasného priečinka, živé klony sa nečítajú.
 // Worktree potom odstráni.
 //
@@ -25,8 +24,6 @@ const git = (...a) => execFileSync("git", a, { cwd: HERE, encoding: "utf8" }).tr
 
 const rev = git("stash", "create") || "HEAD";
 const empty = mkdtempSync(join(tmpdir(), "check-home-"));
-// Nálezy, ktoré zmizia s dávkou 1c: chýbajúce nastavenie prostredia a stará mapa v README.md.
-const PENDING_1C = [/env\/(mac|server)\//, /zastaraný odkaz .*\/README\.md:\d+ /];
 
 // Spustí check.mjs v dočasnom worktree; mutate(dir) upraví kópiu pred behom.
 function runCheck(mutate) {
@@ -43,10 +40,10 @@ function runCheck(mutate) {
 }
 
 const ok = runCheck();
-const unknown = ok.out.split("\n").filter((l) => /^\s+✗ /.test(l) && !PENDING_1C.some((re) => re.test(l)));
+const unknown = ok.out.split("\n").filter((l) => /^\s+✗ /.test(l));
 const okPass = (ok.code === 0 || ok.code === 1) && unknown.length === 0;
 if (!okPass) console.log(ok.out);
-console.log(okPass ? "check.mjs vo worktree: v poriadku (okrem vecí dávky 1c)" : `✗ check.mjs vo worktree skončil kódom ${ok.code}, nálezy mimo dávky 1c: ${unknown.length}`);
+console.log(okPass ? "check.mjs vo worktree: v poriadku" : `✗ check.mjs vo worktree skončil kódom ${ok.code}, nálezy: ${unknown.length}`);
 
 const bad = runCheck((dir) => {
   const f = join(dir, "agents", "implementator.md");

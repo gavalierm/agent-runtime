@@ -7,14 +7,14 @@ description: Použi, keď beh na úlohe Taskera ide bez dozoru (noc, operátor n
 
 Nikto sa nepozerá, takže hotovo je len to, čo má dôkaz v ledgeri. Vzor je
 `full-send` zo sady tstack, bez pull requestu a bez `gh` (D0182). Mechanické
-kroky robí `/opt/agent-rules/skills/dokonci/dokonci.sh` (ďalej `dokonci.sh`),
+kroky robí `skills/dokonci/scripts/dokonci.sh` klonu kódu (ďalej `dokonci.sh`),
 každé jeho zlyhanie nesie riadok `Správny postup:`.
 
 ## Pravidlá
 
 - Najmenšia zmena, ktorá splní podmienku hotového úlohy. Nič navyše.
 - Dôkaz pre každú zmenu: reprodukcia pred zmenou, test alebo príkaz po nej,
-  pri webe snímka z `/root/agent-runtime/browser.sh --gaps` (šírky 1440 a 390).
+  pri webe snímka z `browser.sh --gaps` z klonu kódu (šírky 1440 a 390).
 - Otázka na človeka ide len cez `dokonci.sh otazka <úloha> --summary "<otázka
   s ?, možnosti A) B) a odporúčanie>"` (zapíše ledger a zavolá
   `tasker result needs_human`).
@@ -64,4 +64,4 @@ v dočasnom worktree z origin, a pushne ich.
 `DOKONCI_TASKER` (príkaz Taskera, pod rootom predvolene `bin/tk`; môže byť
 príkaz s argumentmi, napríklad `node /opt/tasker/bin/tasker`),
 `DOKONCI_LEDGER_DIR` (predvolene `.scratch` repa, ak ho git ignoruje, inak
-`/tmp/dokonci`). Test: `node --test /opt/agent-rules/skills/dokonci/dokonci.test.mjs`.
+`/tmp/dokonci`). Test: `node --test test/dokonci.test.mjs` v klone kódu.

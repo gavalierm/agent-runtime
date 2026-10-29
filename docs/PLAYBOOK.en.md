@@ -170,7 +170,7 @@ A line of the memory index:
 ### Our example
 
 The start and end rules are in `env/server/CLAUDE.md`, part "Git on the server" (Slovak: "Git na serveri"). The rule on
-unfinished work is in `global/CLAUDE.md`, §6. That the persona has no runtime tool names is stated in
+unfinished work is in `RULES.md`, §6. That the persona has no runtime tool names is stated in
 `roles/spravca-agentov.md`, part "Persona of agents" (Slovak: "Persona agentov"). The pre-commit hook is
 `.githooks/pre-commit`. A sample persona is in the file `PERSONA.md` of the agent manager's repo.
 
@@ -199,7 +199,7 @@ Rules have five layers, from the widest to the narrowest. A narrower layer takes
 
 | layer | file | applies to |
 |---|---|---|
-| global | `global/CLAUDE.md` | every agent everywhere |
+| global | `RULES.md` | every agent everywhere |
 | environment | `env/<environment>/CLAUDE.md` | every agent on this machine |
 | role | `roles/<slug>.md` | an agent whose persona lists the role |
 | persona | `PERSONA.md` in the agent's repo | one agent |
@@ -238,10 +238,10 @@ every model call.
 
 ### How to build it
 
-1. Write `global/CLAUDE.md`. Start short (chapter 12) and keep it under a cap that you set. The cap is a number in a file,
+1. Write `RULES.md`. Start short (chapter 12) and keep it under a cap that you set. The cap is a number in a file,
    for example `1500`, and a check counts the words of the file and fails when there are more than the number. The number
    may only go down, so the check also compares with the state in the previous commit.
-2. Link it. In Claude Code it is `ln -s <rules clone>/global/CLAUDE.md ~/.claude/CLAUDE.md`. The line in the persona looks
+2. Link it. In Claude Code it is `ln -s <rules clone>/RULES.md ~/.claude/CLAUDE.md`. The line in the persona looks
    like `Role: zastupca-operatora, spravca-agentov`.
 3. Write `env/<environment>/CLAUDE.md` for things typical of the machine and link it to the root of the agent tree, for
    example `ln -s <rules clone>/env/server/CLAUDE.md /home/agents/CLAUDE.md`.
@@ -371,7 +371,7 @@ command for the check, a step after it is met and a done condition.
 The role is described in `roles/zastupca-operatora.md`, parts "What it does alone and what waits for the operator" ("Čo
 urobí sám a čo čaká na operátora"), "Order from the operator" ("Zadanie od operátora"), "Limits" ("Hranice") and
 "Continuity" ("Kontinuita"). What the operator reserved is in `roles/ROLES.md`. The decision with two paths is in
-`global/CLAUDE.md`, §6, the accepted objection in §1. The line "Waiting for you:" is checked by [hooks/reply_guard.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/reply_guard.mjs) with
+`RULES.md`, §6, the accepted objection in §1. The line "Waiting for you:" is checked by [hooks/reply_guard.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/reply_guard.mjs) with
 the variable `AR_ROZHODNUTIA=1`. The scope `schvalene` is in `rozhodnutia/ROZSAHY.md`.
 
 ## 4. Decision register
@@ -533,7 +533,7 @@ mistake is replayed and the check is shown failing. A replay never touches a liv
 cannot fall back to a live path, mailbox or service. After a change of a value, option or path, the agent finds the old
 value with `grep -rn` and fixes every hit, also in documents and comments.
 
-The mechanical part is done by [bin/chyba.sh](https://github.com/gavalierm/agent-runtime/blob/main/bin/chyba.sh). It takes the class of the mistake and the file that governs the behaviour,
+The mechanical part is done by [skills/error/scripts/error.sh](https://github.com/gavalierm/agent-runtime/blob/main/skills/error/scripts/error.sh). It takes the class of the mistake and the file that governs the behaviour,
 and does four things.
 
 1. It rejects a file that is not committed, so the report carries the number of the fixing commit.
@@ -567,7 +567,7 @@ A fix of the type "I wrote it into a skill" is not approved.
    into a file that governs behaviour and that the check must fail on the mistake.
 2. In the persona add a section "Own mistake" ("Vlastná chyba") that refers to the global rule and carries short lines about
    incidents.
-3. Write [bin/chyba.sh](https://github.com/gavalierm/agent-runtime/blob/main/bin/chyba.sh) with the options `--trieda` (class), `--subor` (file), `--popis` (description), `--pravda` (what was
+3. Write [skills/error/scripts/error.sh](https://github.com/gavalierm/agent-runtime/blob/main/skills/error/scripts/error.sh) with the options `--trieda` (class), `--subor` (file), `--popis` (description), `--pravda` (what was
    true), `--kontrola` (check). The register is a file with tabs outside the repo, for example
    `~/.local/state/<name>/chyby.tsv`. The script finds the commit with `git log -1 --format=%h -- <file>` and rejects a file
    with unsaved changes (`git status --porcelain -- <file>` is not empty).
@@ -588,7 +588,7 @@ A fix of the type "I wrote it into a skill" is not approved.
 Running it (the script is in the agent-runtime repo, in a clone next to your repo):
 
 ```
-bin/chyba.sh --trieda neoverene-tvrdenie --subor PERSONA.md \
+skills/error/scripts/error.sh --trieda neoverene-tvrdenie --subor PERSONA.md \
   --popis "I claimed a state without checking" --pravda "the state was different" \
   --kontrola "the hook rejects a reply without proof"
 ```
@@ -604,8 +604,8 @@ bin/chyba.sh --trieda neoverene-tvrdenie --subor PERSONA.md \
 
 ### Our example
 
-The mistake rules are in `global/CLAUDE.md`, §4, the accepted objection in §1. The script is [bin/chyba.sh](https://github.com/gavalierm/agent-runtime/blob/main/bin/chyba.sh), the skill
-`skills/chyba/SKILL.md`, the hook [hooks/objection_fix.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/objection_fix.mjs), the tests [test/chyba.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/chyba.test.mjs) and
+The mistake rules are in `RULES.md`, §4, the accepted objection in §1. The script is [skills/error/scripts/error.sh](https://github.com/gavalierm/agent-runtime/blob/main/skills/error/scripts/error.sh), the skill
+`skills/error/SKILL.md`, the hook [hooks/objection_fix.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/objection_fix.mjs), the tests [test/error.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/error.test.mjs) and
 [test/objection_fix.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/objection_fix.test.mjs). The decision on the loop is `rozhodnutia/D0142.md`, a private record that is not in the repo
 (its content is in the table "What is not in the repo" in `README.md`). The improvement procedure is in
 `roles/spravca-agentov.md`, part "Improving agents" ("Zlepšovanie agentov"). The section "Own mistake" is shown by
@@ -733,8 +733,8 @@ Wiring:
 ### Our example
 
 The hooks are in the `hooks/` folder of the agent-runtime repo and their tests in its `test/` folder, not in this repo. The rejection helper is [lib/deny.mjs](https://github.com/gavalierm/agent-runtime/blob/main/lib/deny.mjs) (for git hooks
-[lib/deny.sh](https://github.com/gavalierm/agent-runtime/blob/main/lib/deny.sh)), the guard is [lib/deny_check.mjs](https://github.com/gavalierm/agent-runtime/blob/main/lib/deny_check.mjs), the decision is `rozhodnutia/D0141.md`. The wiring is done by the function
-`settings` in `env/server/install.sh`, which are not in the repo (see the table "What is not in the repo" in `README.md`).
+[lib/deny.sh](https://github.com/gavalierm/agent-runtime/blob/main/lib/deny.sh)), the guard is [lib/deny_check.mjs](https://github.com/gavalierm/agent-runtime/blob/main/lib/deny_check.mjs), the decision is `rozhodnutia/D0141.md`. The wiring is done by the table `env/hooks.mjs`, which
+`env/server/install.sh` writes into `settings.json` (both are in this repo).
 The header comments of [hooks/reply_guard.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/reply_guard.mjs), [hooks/objection_fix.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/objection_fix.mjs), [hooks/todo_after_comment.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/todo_after_comment.mjs) and
 [hooks/tasker_work.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/tasker_work.mjs) describe what the hook enforces and what triggered it.
 
@@ -1121,7 +1121,7 @@ not in the repo" in `README.md`, including what you need from them to build your
 script, test `hooks/ask_agent.test.mjs`), `runtime/reply.sh` (the reply script), `runtime/driver.mjs` (the waker),
 `runtime/route.mjs` (reply routes and the list of topics) and `runtime/README.md` (the runtime description, part "Waking"
 ("Budenie")). The hook against waiting, `hooks/no_model_wait.mjs`, is not in the repo. The rules for messages to agents are in
-`global/CLAUDE.md`, §2.
+`RULES.md`, §2.
 
 ## 9. Delegation
 
@@ -1202,7 +1202,7 @@ agent looks at the latest work records on the task, so two do not work on it at 
 
 ### Our example
 
-The rule on models and handing over work is in `global/CLAUDE.md`, §6. Delegation is in `roles/spravca-agentov.md`, part
+The rule on models and handing over work is in `RULES.md`, §6. Delegation is in `roles/spravca-agentov.md`, part
 "Delegation" ("Delegovanie"), and the instructions to agents in the part "Instructions to agents and fixing" ("Pokyny agentom
 a oprava"). The hook [hooks/tasker_work.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/tasker_work.mjs) with the test [test/tasker_work.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/tasker_work.test.mjs) shows how the task number is found in
 the assignment. Skills for repeated procedures are in `skills/`. Our `skills/projekt-novy` (creating a web project) is not in
@@ -1294,7 +1294,7 @@ verification until deployment.
 
 The skill is `skills/unslop/SKILL.md`, the core is its section "Core" ("Jadro"). `hooks/unslop.mjs` inserts it into the
 context. It is not in the repo, you write your own. The reply cap is held by [hooks/reply_guard.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/reply_guard.mjs) with the test
-[test/reply_guard.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/reply_guard.test.mjs). The rules are in `global/CLAUDE.md`, §2 and §5. The rule on files for the operator is in
+[test/reply_guard.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/reply_guard.test.mjs). The rules are in `RULES.md`, §2 and §5. The rule on files for the operator is in
 `env/server/CLAUDE.md`, part "Mailboxes and the waker" ("Schránky a budič"). Approved patterns of repeated work are in
 `artifacts/`, and their use is described by `skills/artefakty/SKILL.md`. Neither is in the repo, they are our working
 outputs.
@@ -1419,7 +1419,7 @@ files `bin/kontext.sh`, `lib/kontext.mjs`, `hooks/clear_bridge.mjs` and the wake
 repo. The same goes for `hooks/context_warning.mjs`, which calls `bin/kontext.sh`. What each does is in the table "What is not
 in the repo" in `README.md`. The waker, the watcher of the other threads and clearing on the agent's word are in the repo
 `https://github.com/gavalierm/agent-runtime` (public, D0171). The rule on
-unfinished work is in `global/CLAUDE.md`, §6. The parts "Continuity" ("Kontinuita") and "Concurrency" ("Súbežnosť") are shown
+unfinished work is in `RULES.md`, §6. The parts "Continuity" ("Kontinuita") and "Concurrency" ("Súbežnosť") are shown
 by `PERSONA.md` in the agent manager's repo.
 
 ## 12. How to start on your own
@@ -1431,7 +1431,7 @@ Do not build everything at once. Each step has its own value, and the next one s
 1. Day one, one agent. Create the repo, `PERSONA.md`, the runtime file with the import and `memory/MEMORY.md`. Write the rule
    for the start and the end of a session. Done when a new session after a clean context knows who it is and what was done
    yesterday.
-2. Day two, global rules. Write `global/CLAUDE.md` on objectivity, replies, durability, mistakes and autonomy and link it to
+2. Day two, global rules. Write `RULES.md` on objectivity, replies, durability, mistakes and autonomy and link it to
    `~/.claude/CLAUDE.md`. Start with a few bullets, not six sections, and build them from the mistakes the agent already made
    for you. Done when the agent follows the rule in a new session.
 3. Day three, the decision register. Create `rozhodnutia/`, the schema, the write script and the check. Record the first three

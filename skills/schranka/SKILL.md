@@ -7,7 +7,7 @@ scripts-reason: Skill opisuje, ako čítať a vybaviť správu, skripty schránk
 
 # Schránka agenta
 
-Schránku, budič a skripty opisuje `/root/agent-runtime/README.md`, časť
+Schránku, budič a skripty opisuje `README.md` klonu kódu, časť
 Budenie. Tu sú pravidlá pre správy. Schránku `/var/lib/<meno>/inbox` cez `ls`
 ani `cat` nečítaj, správu doručí budič.
 

@@ -161,7 +161,7 @@ Riadok indexu pamäte:
 ### Náš príklad
 
 Pravidlá štartu a konca sú v `env/server/CLAUDE.md`, časť "Git na serveri", pravidlo nedokončenej práce v
-`global/CLAUDE.md`, §6. Že persona nemá mená nástrojov runtime, hovorí `roles/spravca-agentov.md`, časť "Persona
+`RULES.md`, §6. Že persona nemá mená nástrojov runtime, hovorí `roles/spravca-agentov.md`, časť "Persona
 agentov". Pre-commit hook je `.githooks/pre-commit`. Ukážku persony má repo správcu agentov v súbore `PERSONA.md`.
 
 ## 2. Vrstvy pravidiel
@@ -189,7 +189,7 @@ Pravidlá majú päť vrstiev od najširšej po najužšiu. Užšia vrstva má p
 
 | vrstva | súbor | komu platí |
 |---|---|---|
-| globálne | `global/CLAUDE.md` | každý agent všade |
+| globálne | `RULES.md` | každý agent všade |
 | prostredie | `env/<prostredie>/CLAUDE.md` | každý agent na tomto stroji |
 | rola | `roles/<slug>.md` | agent, ktorého persona rolu uvádza |
 | persona | `PERSONA.md` v repe agenta | jeden agent |
@@ -227,10 +227,10 @@ tokeny pri každom volaní modelu.
 
 ### Ako to postaviť
 
-1. Napíš `global/CLAUDE.md`. Začni krátko (kapitola 12) a drž ho pod stropom, ktorý si určíš. Strop je číslo v súbore,
+1. Napíš `RULES.md`. Začni krátko (kapitola 12) a drž ho pod stropom, ktorý si určíš. Strop je číslo v súbore,
    napríklad `1500`, a kontrola spočíta slová súboru a zlyhá, keď ich je viac než číslo. Číslo smie len klesať, takže
    kontrola porovná aj so stavom v predošlom commite.
-2. Linkni ho. Pri Claude Code to je `ln -s <klon pravidiel>/global/CLAUDE.md ~/.claude/CLAUDE.md`. Riadok v persone
+2. Linkni ho. Pri Claude Code to je `ln -s <klon pravidiel>/RULES.md ~/.claude/CLAUDE.md`. Riadok v persone
    vyzerá `Role: zastupca-operatora, spravca-agentov`.
 3. Napíš `env/<prostredie>/CLAUDE.md` pre veci typické pre stroj a linkni ho do koreňa stromu agentov, napríklad
    `ln -s <klon pravidiel>/env/server/CLAUDE.md /home/agenti/CLAUDE.md`.
@@ -355,7 +355,7 @@ a podmienkou hotového.
 
 Rolu opisuje `roles/zastupca-operatora.md`, časti "Čo urobí sám a čo čaká na operátora", "Zadanie od operátora",
 "Hranice" a "Kontinuita". Čo si operátor vyhradil, je v `roles/ROLES.md`. Rozhodnutie s dvoma cestami je v
-`global/CLAUDE.md`, §6, prijatá námietka v §1. Riadok "Čaká na teba:" kontroluje [hooks/reply_guard.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/reply_guard.mjs) s premennou
+`RULES.md`, §6, prijatá námietka v §1. Riadok "Čaká na teba:" kontroluje [hooks/reply_guard.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/reply_guard.mjs) s premennou
 `AR_ROZHODNUTIA=1`. Rozsah `schvalene` je v `rozhodnutia/ROZSAHY.md`.
 
 ## 4. Register rozhodnutí
@@ -513,7 +513,7 @@ zopakuje (replay) a kontrola sa ukáže, ako zlyháva. Replay nikdy nesiaha na �
 spadnúť na živú cestu, schránku alebo službu. Po zmene hodnoty, voľby alebo cesty agent nájde starú hodnotu príkazom
 `grep -rn` a opraví každý zásah, aj v dokumentoch a komentároch.
 
-Mechanickú časť robí [bin/chyba.sh](https://github.com/gavalierm/agent-runtime/blob/main/bin/chyba.sh). Prijme triedu chyby a súbor, ktorý správanie riadi, a urobí štyri veci.
+Mechanickú časť robí [skills/error/scripts/error.sh](https://github.com/gavalierm/agent-runtime/blob/main/skills/error/scripts/error.sh). Prijme triedu chyby a súbor, ktorý správanie riadi, a urobí štyri veci.
 
 1. Odmietne súbor, ktorý nie je commitnutý, aby hlásenie malo číslo commitu opravy.
 2. Zapíše do registra riadok (dátum, agent, trieda, súbor, commit, popis, číslo úlohy).
@@ -545,7 +545,7 @@ Opravu typu "zapísal som to do skillu" neschváli.
 1. Do globálnych pravidiel napíš sekciu o chybách. Definuj chybu, povedz, že je to chyba procesu, že oprava ide do
    súboru riadiaceho správanie a že kontrola musí na chybe zlyhať.
 2. Do persony daj sekciu "Vlastná chyba", ktorá na globálne pravidlo odkazuje a nesie krátke riadky incidentov.
-3. Napíš [bin/chyba.sh](https://github.com/gavalierm/agent-runtime/blob/main/bin/chyba.sh) s voľbami `--trieda`, `--subor`, `--popis`, `--pravda`, `--kontrola`. Register je súbor s
+3. Napíš [skills/error/scripts/error.sh](https://github.com/gavalierm/agent-runtime/blob/main/skills/error/scripts/error.sh) s voľbami `--trieda`, `--subor`, `--popis`, `--pravda`, `--kontrola`. Register je súbor s
    tabulátormi mimo repa, napríklad `~/.local/state/<názov>/chyby.tsv`. Skript zistí commit príkazom
    `git log -1 --format=%h -- <súbor>` a odmietne súbor, ktorý má neuložené zmeny (`git status --porcelain -- <súbor>`
    nie je prázdny).
@@ -564,7 +564,7 @@ Opravu typu "zapísal som to do skillu" neschváli.
 Spustenie (skript je v repe agent-runtime, v klone vedľa tvojho repa):
 
 ```
-bin/chyba.sh --trieda neoverene-tvrdenie --subor PERSONA.md \
+skills/error/scripts/error.sh --trieda neoverene-tvrdenie --subor PERSONA.md \
   --popis "tvrdil som stav bez kontroly" --pravda "stav bol iný" \
   --kontrola "hook odmietne odpoveď bez dôkazu"
 ```
@@ -580,8 +580,8 @@ bin/chyba.sh --trieda neoverene-tvrdenie --subor PERSONA.md \
 
 ### Náš príklad
 
-Pravidlá chýb sú v `global/CLAUDE.md`, §4, prijatá námietka v §1. Skript je [bin/chyba.sh](https://github.com/gavalierm/agent-runtime/blob/main/bin/chyba.sh), skill
-`skills/chyba/SKILL.md`, hook [hooks/objection_fix.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/objection_fix.mjs), testy [test/chyba.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/chyba.test.mjs) a [test/objection_fix.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/objection_fix.test.mjs).
+Pravidlá chýb sú v `RULES.md`, §4, prijatá námietka v §1. Skript je [skills/error/scripts/error.sh](https://github.com/gavalierm/agent-runtime/blob/main/skills/error/scripts/error.sh), skill
+`skills/error/SKILL.md`, hook [hooks/objection_fix.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/objection_fix.mjs), testy [test/error.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/error.test.mjs) a [test/objection_fix.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/objection_fix.test.mjs).
 Rozhodnutie o slučke je `rozhodnutia/D0142.md`, súkromný záznam, ktorý v repe nie je (obsah je v tabuľke "Čo v repe
 nie je" v `README.md`). Postup zlepšovania je v `roles/spravca-agentov.md`, časť "Zlepšovanie agentov". Sekciu
 "Vlastná chyba" ukazuje `PERSONA.md` v repe správcu agentov.
@@ -704,8 +704,8 @@ Zapojenie:
 ### Náš príklad
 
 Hooky sú v priečinku `hooks/` repa agent-runtime a ich testy v jeho priečinku `test/`, v tomto repe ich nie je. Helper zamietnutia je [lib/deny.mjs](https://github.com/gavalierm/agent-runtime/blob/main/lib/deny.mjs) (pre git hooky
-[lib/deny.sh](https://github.com/gavalierm/agent-runtime/blob/main/lib/deny.sh)), strážca [lib/deny_check.mjs](https://github.com/gavalierm/agent-runtime/blob/main/lib/deny_check.mjs), rozhodnutie `rozhodnutia/D0141.md`. Zapojenie robí funkcia `settings` v
-`env/server/install.sh`, ktoré v repe nie sú (v tabuľke "Čo v repe nie je" v `README.md`). Hlavičkové komentáre
+[lib/deny.sh](https://github.com/gavalierm/agent-runtime/blob/main/lib/deny.sh)), strážca [lib/deny_check.mjs](https://github.com/gavalierm/agent-runtime/blob/main/lib/deny_check.mjs), rozhodnutie `rozhodnutia/D0141.md`. Zapojenie robí tabuľka `env/hooks.mjs`, ktorú do `settings.json` zapisuje
+`env/server/install.sh` (obe sú v tomto repe). Hlavičkové komentáre
 [hooks/reply_guard.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/reply_guard.mjs), [hooks/objection_fix.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/objection_fix.mjs), [hooks/todo_after_comment.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/todo_after_comment.mjs) a [hooks/tasker_work.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/tasker_work.mjs)
 opisujú, čo hook vymáha a čo ho vyvolalo.
 
@@ -1071,7 +1071,7 @@ Skripty opisuje aj tabuľka "Čo v repe nie je" v `README.md`, vrátane toho, č
 `bin/ask_agent.sh` (skript odoslania, test `hooks/ask_agent.test.mjs`), `runtime/reply.sh` (skript odpovede),
 `runtime/driver.mjs` (budič), `runtime/route.mjs` (trasy odpovedí a zoznam tém) a `runtime/README.md` (opis runtime,
 časť "Budenie"). Hook proti čakaniu `hooks/no_model_wait.mjs` v repe nie je. Pravidlá pre správy agentom sú
-v `global/CLAUDE.md`, §2.
+v `RULES.md`, §2.
 
 ## 9. Delegovanie
 
@@ -1145,7 +1145,7 @@ Pred zadaním úlohy sub-agentovi agent pozrie posledné záznamy práce na úlo
 
 ### Náš príklad
 
-Pravidlo modelov a odovzdania práce je v `global/CLAUDE.md`, §6. Delegovanie je v `roles/spravca-agentov.md`, časť
+Pravidlo modelov a odovzdania práce je v `RULES.md`, §6. Delegovanie je v `roles/spravca-agentov.md`, časť
 "Delegovanie", pokyny agentom v časti "Pokyny agentom a oprava". Hook [hooks/tasker_work.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/tasker_work.mjs) s testom
 [test/tasker_work.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/tasker_work.test.mjs) ukazuje, ako sa číslo úlohy nájde v zadaní. Skilly pre opakované postupy sú v `skills/`.
 Náš `skills/projekt-novy` (založenie projektu webu) v repe nie je, je viazaný na naše účty a domény.
@@ -1232,7 +1232,7 @@ na nasadenie.
 
 Skill je `skills/unslop/SKILL.md`, jadro je jeho sekcia "Jadro". Do kontextu ho vkladá `hooks/unslop.mjs`, ktorý v repe nie je,
 píšeš si ho sám. Strop odpovede drží
-[hooks/reply_guard.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/reply_guard.mjs) s testom [test/reply_guard.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/reply_guard.test.mjs). Pravidlá sú v `global/CLAUDE.md`, §2 a §5. Pravidlo
+[hooks/reply_guard.mjs](https://github.com/gavalierm/agent-runtime/blob/main/hooks/reply_guard.mjs) s testom [test/reply_guard.test.mjs](https://github.com/gavalierm/agent-runtime/blob/main/test/reply_guard.test.mjs). Pravidlá sú v `RULES.md`, §2 a §5. Pravidlo
 súborov pre operátora je v `env/server/CLAUDE.md`, časť "Schránky a budič". Schválené vzory opakovanej práce sú v
 `artifacts/` a ich používanie opisuje `skills/artefakty/SKILL.md`. Ani jedno v repe nie je, sú to naše pracovné výstupy.
 
@@ -1348,7 +1348,7 @@ Pravidlá čistého kontextu sú v `env/server/CLAUDE.md`, časť "Schránky a b
 logika `lib/kontext.mjs`. Hooky sú `hooks/context_warning.mjs` a `hooks/clear_bridge.mjs`. Súbory `bin/kontext.sh`,
 `lib/kontext.mjs`, `hooks/clear_bridge.mjs` a budič sú viazané na náš runtime a v tomto repe nie sú. Rovnako
 `hooks/context_warning.mjs`, ktorý volá `bin/kontext.sh`. Čo každý robí, je v tabuľke "Čo v repe nie je" v `README.md`.
-Budič, sledovač ostatných vlákien a čistenie na slovo agenta sú v repe `https://github.com/gavalierm/agent-runtime` (verejné, D0171). Pravidlo nedokončenej práce je v `global/CLAUDE.md`, §6.
+Budič, sledovač ostatných vlákien a čistenie na slovo agenta sú v repe `https://github.com/gavalierm/agent-runtime` (verejné, D0171). Pravidlo nedokončenej práce je v `RULES.md`, §6.
 Časti "Kontinuita" a "Súbežnosť" ukazuje `PERSONA.md` v repe správcu agentov.
 
 ## 12. Ako začať u seba
@@ -1359,7 +1359,7 @@ Nestavaj všetko naraz. Každý krok má vlastnú hodnotu a ďalší na ňom sto
 
 1. Prvý deň, jeden agent. Založ repo, `PERSONA.md`, súbor runtime s importom a `memory/MEMORY.md`. Napíš pravidlo
    štartu a konca relácie. Hotovo, keď nová relácia po čistom kontexte vie, kto je a čo sa včera robilo.
-2. Druhý deň, globálne pravidlá. Napíš `global/CLAUDE.md` o objektivite, odpovediach, trvanlivosti, chybách a
+2. Druhý deň, globálne pravidlá. Napíš `RULES.md` o objektivite, odpovediach, trvanlivosti, chybách a
    autonómii a linkni ho do `~/.claude/CLAUDE.md`. Začni pár odrážkami, nie šiestimi sekciami, a stav ich z chýb,
    ktoré ti agent už urobil. Hotovo, keď agent v novej relácii pravidlo dodrží.
 3. Tretí deň, register rozhodnutí. Založ `rozhodnutia/`, schému, skript zápisu a kontrolu. Zapíš prvé tri

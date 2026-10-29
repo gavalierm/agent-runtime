@@ -22,7 +22,7 @@ pre úlohu s viac krokmi.
 - Názov pomenúva problém, ktorý vidí operátor, nie riešenie ("/opt/tasker beží
   bez 276db3a", nie "Nasadiť Tasker 276db3a"). Stráži to `task_title.mjs`.
 - Úlohu agentovi webu (meno alebo workdir končí na `-web`) zakladá len
-  `/opt/agent-rules/bin/uloha-webu.sh`. Úloha webu so zmenou vzhľadu chce
+  `bin/uloha-webu.sh` klonu kódu. Úloha webu so zmenou vzhľadu chce
   `--mockup <id>` schválenej úlohy dizajnéra (done, komentár `Mockup schválený:`
   od iného autora ako dizajnér), inak `--bez-mockupu "<dôvod>"` (zmena bez nového
   vzhľadu alebo priamy pokyn operátora).
