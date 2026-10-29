@@ -1,12 +1,15 @@
 # Prechody úloh Taskera do needs_human a failed do schránky agenta (tu príklad
 # adam). Systémová služba pod rootom ako agent-driver@<agent>.service, README.md.
+# Klon tohto repa je AGENT_WORKFLOW (predvolene /opt/agentic-workflow, runtime.env
+# ho prekryje).
 [Unit]
 Description=Agent, udalosti Taskera do schranky
 
 [Service]
 Environment=AGENT_NAME=adam
+Environment=AGENT_WORKFLOW=/opt/agentic-workflow
 EnvironmentFile=-%h/.config/adam/runtime.env
-ExecStart=/usr/bin/env node %h/agent-runtime/tasker_events.mjs
+ExecStart=/usr/bin/env node ${AGENT_WORKFLOW}/tasker_events.mjs
 Restart=always
 RestartSec=30
 
