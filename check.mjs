@@ -101,6 +101,13 @@ for (const e of entries(join(CLAUDE, "skills"))) {
     notes.push(`skill ${e} je nasadený z iného klonu, ${tilde(target)}`);
     continue;
   }
+  // Skill spoločného mozgu: symlink do $AGENT_BRAIN_GLOBAL/skills, nasadzuje ho
+  // env/*/install.sh vedľa skillov tohto repa.
+  if (target && target.startsWith(join(brainGlobalDir(), "skills") + "/")) {
+    if (!existsSync(target)) problems.push(`mŕtvy symlink ${tilde(p)} → ${tilde(target)}`);
+    else found.push({ name: e, id: e, source: `mozog ${tilde(brainGlobalDir())}` });
+    continue;
+  }
   if (target && (target.startsWith(join(MAIN, "skills") + "/") || agentRepos().some((a) => target.startsWith(join(AGENTI, a, "skills") + "/") || target.startsWith(join(AGENTI, a, ".claude", "skills") + "/")))) {
     if (!existsSync(target)) problems.push(`mŕtvy symlink ${tilde(p)} → ${tilde(target)}`);
     else if (!target.startsWith(join(MAIN, "skills") + "/")) found.push({ name: e, id: e, source: `agent ${tilde(dirname(dirname(target)).replace(/\/\.claude$/, ""))}` });
