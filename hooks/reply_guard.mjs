@@ -261,7 +261,7 @@ export function unverifiedPlan(text) {
   for (const s of parts.flatMap((x) => sentences(x))) {
     if (!UNVERIFIED.test(s)) continue;
     if (CANT_VERIFY.test(s) && NOT_READY.test(parts.join("\n"))) continue;
-    return `neoverená položka v návrhu: "${clip(s)}". Návrh ide na schválenie, až keď je všetko overené (global/CLAUDE.md §1). `
+    return `neoverená položka v návrhu: "${clip(s)}". Návrh ide na schválenie, až keď je všetko overené (RULES.md §1). `
       + "Over to teraz alebo napíš, prečo sa to overiť nedá, a že návrh nie je pripravený na schválenie.";
   }
   return null;
@@ -481,7 +481,7 @@ export function deadLinks(text, probe = curlProbe) {
 // decisionProblem a deadLinks vyššie.
 const ASK = "polož otázku ako úlohu `tasker ask <id> --body \"otázka, cesty A a B, odporúčanie\"` a v odpovedi daj jej odkaz";
 export const POSTUPY = [
-  [/^odpoveď nezačína menom|^za riadkom "/, "prepíš odpoveď: prvý riadok samotné `<Meno>:`, druhý prázdny, text od tretieho riadku (global/CLAUDE.md §2)"],
+  [/^odpoveď nezačína menom|^za riadkom "/, "prepíš odpoveď: prvý riadok samotné `<Meno>:`, druhý prázdny, text od tretieho riadku (RULES.md §2)"],
   [/viet prózy/, "skráť odpoveď na verdikt, dôvod a čo urobiť (najviac 3 vety prózy, zoznamy sa nerátajú); vynechaj, čo si neurobil a prečo, čo si nevedel zistiť a svoj názor; podrobnosti ulož do súboru v docs/ a v odpovedi uveď jeho cestu"],
   [/^veta so \d+ slovami/, "rozdeľ vetu na kratšie alebo ju zmaž a odpoveď prepíš"],
   [/^položka zoznamu/, "skráť položku zoznamu na jednu vetu a odpoveď prepíš"],
@@ -491,7 +491,7 @@ export const POSTUPY = [
   [/je localhost servera/, "nahraď adresu adresou z `tailscale serve status`: {HOST}:<port>"],
   [/^zmienka úlohy Taskera bez odkazu/, "vlož náhrady vypísané v dôvode (tvar `[úloha N]({WEB}/tasks/N)`) a odpoveď prepíš"],
   [/^položka "Čaká na teba" \(rozhodnutie\)/, "prepíš položku ako jednu vetu končiacu `?` (vec, voľba, odporúčanie), písmeno voľby (A/B) definuj ako `A) ...`; podrobnosti a čo spôsobí každá odpoveď patria do úlohy `tasker ask <id> --body \"...\"`"],
-  [/^položka "Čaká na teba" \(tvoj účet\)/, "pridaj riadok `Overené: <čo o stave operátorovho účtu si overil a ktorým príkazom alebo stránkou>; neoverené: <čo nevidíš>`; tvrdenie o jeho účte bez overenia napíš ako predpoklad, nie fakt (global/CLAUDE.md §1)"],
+  [/^položka "Čaká na teba" \(tvoj účet\)/, "pridaj riadok `Overené: <čo o stave operátorovho účtu si overil a ktorým príkazom alebo stránkou>; neoverené: <čo nevidíš>`; tvrdenie o jeho účte bez overenia napíš ako predpoklad, nie fakt (RULES.md §1)"],
   [/^"Čaká na teba" bez odkazu|v "Čaká na teba" v Taskeri neexistuje|v "Čaká na teba" je v stave/, ASK + "; stav práce drží Tasker, nie veta v odpovedi"],
   [/^Tasker neodpovedal/, `over Tasker \`${join(workflowDir(), "bin", "tk")} task list\` a odpoveď pošli znova`],
   [/^veta ".*" hlási nové rozhodnutie/, "zapíš rozhodnutie `bin/rozhodni.sh --nazov ... --kluc ...` (text na stdin) a v odpovedi uveď jeho číslo D, alebo polož otázku `tasker ask <id> --body \"...\"`; staré rozhodnutie označ číslom D alebo dátumom"],
@@ -500,7 +500,7 @@ export const POSTUPY = [
 // {HOST} a {WEB} v postupe sú adresa webu Taskera z TASKER_WEB_URL (webExample).
 export function postupFor(reason, webUrl = process.env.TASKER_WEB_URL) {
   for (const [re, step] of POSTUPY) if (re.test(reason)) return step.replaceAll("{HOST}", webHost(webUrl)).replaceAll("{WEB}", webExample(webUrl));
-  return "prepíš odpoveď podľa dôvodu vyššie, pravidlá odpovede sú v global/CLAUDE.md §2";
+  return "prepíš odpoveď podľa dôvodu vyššie, pravidlá odpovede sú v RULES.md §2";
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

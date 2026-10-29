@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // requires: tasker
 // own_mechanism.mjs — zadanie práce navrhuje nový vlastný mechanizmus a neukazuje,
-// že existujúci nástroj ho nemá (global/CLAUDE.md §6: "Before designing your own
+// že existujúci nástroj ho nemá (RULES.md §6: "Before designing your own
 // mechanism, check whether the tool already does it"). Dňa 25. 10. 2026 správca agentov zadal
 // Ronovi úlohu 585 s `systemd-run` na čakanie na koniec behu Taskera, hoci Tasker
 // vie čakať sám: `tasker wait --until` s kontrolou behov, blokér len na done úlohy
