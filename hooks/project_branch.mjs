@@ -11,7 +11,8 @@
 // `master`, bez `MERGE_HEAD` (dokončenie merge) a s existujúcou vetvou (prvý
 // commit nového repa prejde) sa zamietne. Repo projektu je repo pod
 // `/home/<používateľ>/projekty/`, `AR_PROJECT_ROOTS` (priečinky oddelené `:`)
-// to nahradí. Repo kódu a spoločného mozgu a /root/<meno> prejde, `git merge`
+// to nahradí. Repo kódu (workflowDir) a spoločného mozgu (brainGlobalDir), aj keď
+// leží pod priečinkom projektov, a /root/<meno> prejde, `git merge`
 // nie je commit a prejde. Cieľ, ktorý sa nedá určiť (premenná, `$(...)`), prejde.
 // Text v úvodzovkách a heredoci (správa commitu) hook nečíta.
 
@@ -21,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { stripHeredocs } from "./no_model_wait.mjs";
 import { cmdStart, gitTarget, stripData } from "./foreign_git.mjs";
 import { denyTool } from "../lib/deny.mjs";
+import { brainGlobalDir, workflowDir } from "../lib/paths.mjs";
 
 const DEFAULT_ROOT = /^\/home\/[^/]+\/projekty\//;
 const MAIN = new Set(["main", "master"]);
@@ -62,7 +64,14 @@ export function projectRoots(env = process.env) {
   return env.AR_PROJECT_ROOTS ? env.AR_PROJECT_ROOTS.split(":").filter(Boolean).map((r) => resolve(r)) : null;
 }
 
+// Repo kódu (workflowDir) a spoločného mozgu (brainGlobalDir) nie je repo projektu,
+// ani keď leží pod priečinkom z AR_PROJECT_ROOTS.
+function isOwnRepo(root) {
+  return [workflowDir(), brainGlobalDir()].some((d) => root === d || root.startsWith(d + "/"));
+}
+
 function isProjectRepo(root, roots) {
+  if (isOwnRepo(root)) return false;
   if (roots) return roots.some((r) => root === r || root.startsWith(r + "/"));
   return DEFAULT_ROOT.test(root + "/");
 }

@@ -120,3 +120,30 @@ test("Bash zápis cez cat > súbor hook neposudzuje (len git commit)", () => {
   assert.equal(bash("ls /opt/tasker"), null);
   assert.equal(bash("cat /opt/tasker/package.json"), null);
 });
+
+// Spustí hook s vlastným prostredím (AR_READONLY_DIRS, AGENT_WORKFLOW, AGENT_BRAIN_GLOBAL).
+function runEnv(input, extra, drop = []) {
+  const env = { ...process.env, ...extra };
+  for (const k of drop) delete env[k];
+  const out = execFileSync("node", [HOOK], { input: JSON.stringify(input), env }).toString();
+  return out ? JSON.parse(out).hookSpecificOutput : null;
+}
+
+test("AR_READONLY_DIRS prekryje chránené koreňe (predvolené /opt/tasker a klony sa nestrážia)", () => {
+  const extra = { AR_READONLY_DIRS: "/tmp/ro-kod:/tmp/ro-mozog" };
+  const w = (f) => runEnv({ tool_name: "Write", cwd: "/root/adam", tool_input: { file_path: f, content: "x" } }, extra);
+  assert.equal(w("/tmp/ro-kod/a.js")?.permissionDecision, "deny");
+  assert.equal(w("/tmp/ro-mozog/b/c.md")?.permissionDecision, "deny");
+  assert.equal(w("/tmp/ro-mozog2/a"), null);
+  assert.equal(w("/opt/tasker/a.js"), null);
+  assert.equal(runEnv({ tool_name: "Bash", cwd: "/root/adam", tool_input: { command: "git -C /tmp/ro-kod commit -m x" } }, extra)?.permissionDecision, "deny");
+});
+
+test("AGENT_WORKFLOW a AGENT_BRAIN_GLOBAL určujú chránené klony", () => {
+  const extra = { AGENT_WORKFLOW: "/tmp/wf-klon", AGENT_BRAIN_GLOBAL: "/tmp/mozog-klon" };
+  const w = (f) => runEnv({ tool_name: "Edit", cwd: "/root/adam", tool_input: { file_path: f } }, extra, ["AR_READONLY_DIRS"]);
+  assert.equal(w("/tmp/wf-klon/hooks/x.mjs")?.permissionDecision, "deny");
+  assert.equal(w("/tmp/mozog-klon/RULES.md")?.permissionDecision, "deny");
+  assert.equal(w("/opt/tasker/a.js")?.permissionDecision, "deny");
+  assert.equal(w("/opt/agentic-workflow/hooks/x.mjs"), null);
+});

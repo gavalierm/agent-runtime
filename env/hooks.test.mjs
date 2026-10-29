@@ -1,5 +1,5 @@
 // Test env/hooks.mjs: tabuľka sedí s hooks/, výsledok pre každý druh nesie dnešné
-// hooky (zoznam z dnešných zápisov install.sh a env/mac/settings.json),
+// hooky (zoznam z pôvodných zápisov install.sh a settings.json Macu),
 // zlúčenie nahradí naše skupiny a cudzie nechá, druhý beh nič nezmení.
 // Test píše len do mktemp, žiadny živý settings.json.
 import test from "node:test";

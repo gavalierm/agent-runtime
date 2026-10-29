@@ -2,7 +2,7 @@
 // requires: none
 // rozhodnutia_guard.mjs: rozhodnutie sa zapisuje len cez bin/rozhodni.sh
 // (návrh úlohy 390, kontrola K2). PreToolUse pre Write, Edit, MultiEdit,
-// NotebookEdit a Bash (zapojuje ho env/server/install.sh a env/mac/settings.json).
+// NotebookEdit a Bash (zapojuje ho tabuľka env/hooks.mjs cez env/server/install.sh a env/mac/install.sh).
 // Zamietne zápis do záznamov a indexu v decisions/ (D0001.md, INDEX.md)
 // inak než skriptom. DECISIONS.md a SCHVALENE.md chráni len zmrazený log:
 // súbor, ktorý má v prvých 10 riadkoch značku `<!-- rozhodnutia: zmrazene -->`. Značku mu pri

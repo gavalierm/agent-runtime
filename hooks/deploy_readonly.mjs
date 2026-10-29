@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // requires: none
 // deploy_readonly.mjs — /opt/tasker a nasadené klony kódu a spoločného mozgu
-// (workflowDir, brainGlobalDir) nikto nemení ani necommituje.
+// (workflowDir, brainGlobalDir; AR_READONLY_DIRS ich prekryje) nikto nemení
+// ani necommituje.
 // /opt/tasker je nasadenie správcu servera (D0052), klony sú kópia na
 // čítanie, ktorú pravidelne obnoví časovač. Chyba 20. 10. 2026: príznak `--quiet`
 // zapísaný a commitnutý priamo v /opt/tasker pod menom root. Pravidlo v persone
@@ -28,7 +29,14 @@ import { cmdStart, gitTarget, stripData } from "./foreign_git.mjs";
 import { denyTool } from "../lib/deny.mjs";
 import { brainGlobalDir, workflowDir } from "../lib/paths.mjs";
 
-export const PROTECTED = ["/opt/tasker", workflowDir(), brainGlobalDir()];
+// Chránené koreňe: /opt/tasker, klon kódu a klon spoločného mozgu. AR_READONLY_DIRS
+// (cesty oddelené `:`) ich celé prekryje, používa to test.
+export function protectedDirs(env = process.env) {
+  if (env.AR_READONLY_DIRS) return env.AR_READONLY_DIRS.split(":").filter(Boolean).map((d) => resolve(d));
+  return ["/opt/tasker", workflowDir(env), brainGlobalDir(env)];
+}
+
+export const PROTECTED = protectedDirs();
 
 const inside = (p) => PROTECTED.find((r) => p === r || p.startsWith(r + "/")) ?? null;
 

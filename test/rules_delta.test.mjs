@@ -64,3 +64,29 @@ test("dlhý diff sa skráti na strop, zlé id relácie nerobí nič", () => {
   assert.equal(delta({ ...a, sessionId: "../zle" }), null);
   assert.equal(delta({ ...a, sessionId: "" }), null);
 });
+
+test("hook: sleduje RULES.md klonu kódu a RULES.md a env/<prostredie>/ mozgu, nie env/ klonu kódu", () => {
+  const code = repo();
+  const brain = repo();
+  const state = join(mkdtempSync(join(tmpdir(), "rd-st-")), "state");
+  const home = mkdtempSync(join(tmpdir(), "rd-home-"));
+  const env = { ...process.env, HOME: home, AR_STATE: state, AGENT_WORKFLOW: code.clone, AGENT_BRAIN_GLOBAL: brain.clone, AR_ENV: "server" };
+  delete env.AR_ROZHODNUTIA;
+  const prompt = () => {
+    const r = spawnSync("node", [join(import.meta.dirname, "..", "hooks", "rules_delta.mjs")], { input: JSON.stringify({ session_id: "h1" }), encoding: "utf8", env });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout ? JSON.parse(r.stdout).hookSpecificOutput.additionalContext : "";
+  };
+  assert.equal(prompt(), "");
+  code.commit("RULES.md", "kod v2\n", "zmena pravidiel kodu");
+  assert.match(prompt(), /zmena pravidiel kodu/);
+  assert.equal(prompt(), "");
+  brain.commit("RULES.md", "mozog v2\n", "zmena pravidiel mozgu");
+  assert.match(prompt(), /zmena pravidiel mozgu/);
+  brain.commit("env/server/RULES.md", "s\n", "zmena servera v mozgu");
+  assert.match(prompt(), /zmena servera v mozgu/);
+  brain.commit("env/mac/RULES.md", "m\n", "zmena macu v mozgu");
+  assert.equal(prompt(), "");
+  code.commit("env/server/install.sh", "#!/bin/sh\n", "kod prostredia");
+  assert.equal(prompt(), "");
+});

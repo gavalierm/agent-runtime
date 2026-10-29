@@ -70,9 +70,28 @@ test("prvý commit nového repa (vetva ešte nemá commit) prejde", () => {
   assert.equal(v(`git -C ${fresh} commit -m init`), null);
 });
 
-test("repo mimo projektov (agentic-workflow, agentic-workflow, agent) prejde aj na main", () => {
+test("repo mimo projektov (repo kódu, mozgu a agenta) prejde aj na main", () => {
   assert.equal(v(`git -C ${outside} commit -m x -- a`), null);
   assert.equal(v(`git commit -m x`, { cwd: outside }), null);
+});
+
+test("repo kódu a mozgu pod priečinkom projektov prejde aj na main", () => {
+  const code = mkRepo(join(PROJECTS, "kod-klon"));
+  const brain = mkRepo(join(PROJECTS, "mozog-klon"));
+  assert.deepEqual(v(`git -C ${code} commit -m x`), { repo: code, branch: "main" });
+  const old = { w: process.env.AGENT_WORKFLOW, b: process.env.AGENT_BRAIN_GLOBAL };
+  process.env.AGENT_WORKFLOW = code;
+  process.env.AGENT_BRAIN_GLOBAL = brain;
+  try {
+    assert.equal(v(`git -C ${code} commit -m x`), null);
+    assert.equal(v(`git -C ${brain} commit -m x`), null);
+    assert.deepEqual(v(`git -C ${web} commit -m x`), { repo: web, branch: "main" });
+  } finally {
+    for (const [k, val] of [["AGENT_WORKFLOW", old.w], ["AGENT_BRAIN_GLOBAL", old.b]]) {
+      if (val === undefined) delete process.env[k];
+      else process.env[k] = val;
+    }
+  }
 });
 
 test("git merge --no-ff dev na main prejde, iné podpríkazy tiež", () => {

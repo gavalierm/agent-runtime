@@ -63,7 +63,7 @@
 // waitingProblem a decisionProblem sú vypnuté, kým prostredie nemá
 // AR_ROZHODNUTIA=1 (lib/agent_env.mjs, zapnute). Zapne ich nasadenie U5
 // jednou premennou v bloku env súboru settings.json (env/server/install.sh,
-// env/mac/settings.json). Bez prepínača sa správanie hooku nemení.
+// env/mac/install.sh, tabuľka env/hooks.mjs). Bez prepínača sa správanie hooku nemení.
 
 // Dňa 25. 10. 2026 zhrnutie behu úlohy 573 znelo "Čaká na operátorovo A/B k zápisu" a operátor
 // nevedel, čo sa ho pýta (úloha 575). waitingItemProblem (lib/human_question.mjs) zastaví

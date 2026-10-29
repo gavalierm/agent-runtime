@@ -344,3 +344,14 @@ test("611: podpis iného úseku reťazca && patrí jemu, podpis nástroja nástr
     assert.equal(Boolean(unreported([user("x"), ...fail(cmd, out)])), reported, cmd);
   }
 });
+
+test("programy z klonu kódu a mozgu podľa AGENT_WORKFLOW a AGENT_BRAIN_GLOBAL sú spoločné nástroje", () => {
+  const code = `import { SHARED } from ${JSON.stringify(join(dirname(HOOK), "tool_failure_report.mjs"))}; console.log(JSON.stringify(SHARED.map((s) => s.prefix)));`;
+  const r = spawnSync("node", ["--input-type=module", "-e", code], { encoding: "utf8", env: { ...process.env, AGENT_WORKFLOW: "/srv/wf-x", AGENT_BRAIN_GLOBAL: "/srv/mozog-x" } });
+  assert.equal(r.status, 0, r.stderr);
+  const prefixes = JSON.parse(r.stdout);
+  assert.ok(prefixes.includes("/srv/wf-x/"));
+  assert.ok(prefixes.includes("/srv/mozog-x/"));
+  assert.ok(prefixes.includes("/opt/tasker/"));
+  assert.ok(!prefixes.includes("/opt/agentic-workflow/"));
+});

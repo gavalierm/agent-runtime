@@ -8,11 +8,12 @@
 import "../lib/git_isolate.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { build } from "./rozhodnutia_context.mjs";
+import { applySettings } from "../env/hooks.mjs";
 import { bashTarget, reason as guardReason, ZMRAZENE } from "./rozhodnutia_guard.mjs";
 import { memoryProblems } from "../lib/memory_claims.mjs";
 import { formatRecord } from "../lib/rozhodnutia.mjs";
@@ -140,20 +141,19 @@ test("guard K2: Write, MultiEdit, zmrazené logy aj Bash zápisy", () => {
   ]) assert.equal(bashTarget(c, Z), null, c);
 });
 
-test("install.sh server zapíše oba hooky rozhodnutí a AR_ROZHODNUTIA, opakovaný beh nič nezdvojí", { skip: existsSync(join(HOOKS, "..", "env", "server", "install.sh")) ? false : "env/server/install.sh príde v dávke 1c" }, () => {
+test("env/hooks.mjs zapíše oba hooky rozhodnutí a AR_ROZHODNUTIA, opakovaný beh nič nezdvojí", () => {
   const dir = tmp();
   writeFileSync(join(dir, "settings.json"), JSON.stringify({ env: { X: "1" }, hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "iny" }] }] } }));
-  const src = readFileSync(join(HOOKS, "..", "env", "server", "install.sh"), "utf8");
-  const py = /python3 - "\$CLONE\/hooks" "\$RUNTIME\/hooks" "\$@" <<'EOF'\n([\s\S]*?)\nEOF\n/.exec(src)[1];
-  const run = () => spawnSync("python3", ["-", "/h/hooks", "/r/hooks", join(dir, "settings.json")], { input: py, encoding: "utf8" });
-  assert.equal(run().status, 0); assert.equal(run().status, 0);
+  const run = () => applySettings(join(dir, "settings.json"), "main", "/h/hooks", "/h");
+  run(); run();
   const d = JSON.parse(readFileSync(join(dir, "settings.json"), "utf8"));
   const cmds = (ev) => d.hooks[ev].flatMap((g) => g.hooks.map((h) => h.command));
   assert.equal(cmds("SessionStart").filter((c) => /rozhodnutia_context/.test(c)).length, 1);
   assert.equal(cmds("PreToolUse").filter((c) => /rozhodnutia_guard/.test(c)).length, 1);
   assert.match(d.hooks.PreToolUse.find((g) => g.hooks.some((h) => /rozhodnutia_guard/.test(h.command))).matcher, /Write\|Edit\|MultiEdit\|NotebookEdit\|Bash/);
   assert.ok(cmds("PreToolUse").includes("iny"));
-  assert.deepEqual(d.env, { X: "1", AR_ROZHODNUTIA: "1" });
+  assert.equal(d.env.X, "1");
+  assert.equal(d.env.AR_ROZHODNUTIA, "1");
 });
 
 test("K4: pamäť s 'čaká na Oskara' a rozhodnutím bez čísla", () => {

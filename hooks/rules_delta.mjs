@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // requires: none
 // rules_delta.mjs: zmena pravidiel do ťahu, ktorý beží aj tak. UserPromptSubmit
-// zo settings.json prostredia (env/server/install.sh, env/mac/settings.json).
+// zo settings.json prostredia (tabuľka env/hooks.mjs, zapisujú ju env/server/install.sh
+// a env/mac/install.sh).
 // Pri každom prompte porovná HEAD nasadených klonov (workflowDir a brainGlobalDir
 // v lib/paths.mjs) so stavom relácie $AR_STATE/<klon>/<session_id>. Sleduje
-// RULES.md v klone kódu a env/<prostredie>/ v spoločnom mozgu. Keď sa HEAD líši
+// RULES.md v klone kódu a RULES.md a env/<prostredie>/ v spoločnom mozgu. Keď sa HEAD líši
 // a zmena je v týchto cestách, vloží do kontextu log a diff, najviac MAX_BYTES,
 // a stav prepíše. Prvý prompt relácie len zapíše HEAD, pravidlá sa načítali čerstvé.
 // Rozhodnutia: s AR_ROZHODNUTIA=1 (lib/agent_env.mjs, zapnute) patrí do sledovaných
@@ -60,7 +61,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const envName = env.AR_ENV || (mac ? "mac" : "server");
   const clones = [
     { name: "workflow", clone: workflowDir(env), paths: ["RULES.md"] },
-    { name: "brain-global", clone: brainGlobalDir(env), paths: [`env/${envName}/`, ...(zapnute(env) ? ["decisions/"] : [])] },
+    { name: "brain-global", clone: brainGlobalDir(env), paths: ["RULES.md", `env/${envName}/`, ...(zapnute(env) ? ["decisions/"] : [])] },
   ];
   const parts = [];
   for (const c of clones) {
