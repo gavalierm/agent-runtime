@@ -36,3 +36,27 @@ test("príkaz s diakritikou len v úvodzovkách prejde", () => {
 test("bez --verify prejde aj body s diakritikou", () => {
   assert.equal(run("task", "add", "--body", "Dôvod: úloha").status, 0);
 });
+
+// Nasadenie 29. 10. 2026 (úloha 665): vlákno T3 nemá AGENT_TASKER_USER v
+// prostredí, tk ho číta z runtime.env agenta ako hooky.
+test("používateľ správcu úloh z runtime.env, keď ho prostredie nemá", () => {
+  const rt = join(dir, "runtime.env");
+  writeFileSync(rt, `# komentár\nAGENT_NAME=test\nexport AGENT_TASKER_USER="${userInfo().username}"\n`);
+  const r = spawnSync("bash", [TK, "task", "show", "1"], {
+    encoding: "utf8",
+    env: { PATH: `${dir}:${process.env.PATH}`, AGENT_NAME: "test", TK_HOME: dir, AGENT_RUNTIME_ENV: rt },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /FAKE task show 1/);
+});
+
+test("prostredie má prednosť pred runtime.env", () => {
+  const rt = join(dir, "runtime2.env");
+  writeFileSync(rt, "AGENT_TASKER_USER=niekto-iny\n");
+  const r = spawnSync("bash", [TK, "task", "show", "1"], {
+    encoding: "utf8",
+    env: { PATH: `${dir}:${process.env.PATH}`, AGENT_NAME: "test", TK_HOME: dir, AGENT_RUNTIME_ENV: rt, AGENT_TASKER_USER: userInfo().username },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /FAKE task show 1/);
+});

@@ -35,6 +35,15 @@ for a in "$@"; do
         exit 2
     fi
 done
+# Používateľ správcu úloh: vlákno T3 nemá runtime.env agenta načítaný, obal
+# ho číta sám ako hooky (lib/agent_env.mjs): AGENT_RUNTIME_ENV, inak
+# ~/.config/<agent>/runtime.env. Premenná procesu má prednosť.
+if [ -z "${AGENT_TASKER_USER:-}" ]; then
+    rt="${AGENT_RUNTIME_ENV:-${HOME:-/root}/.config/$name/runtime.env}"
+    if [ -r "$rt" ]; then
+        AGENT_TASKER_USER="$(sed -n 's/^[[:space:]]*\(export[[:space:]]\+\)\?AGENT_TASKER_USER=//p' "$rt" | tail -n1 | tr -d '"'"'"'')"
+    fi
+fi
 user="${TK_USER:-${AGENT_TASKER_USER:-tasker}}"
 home="${TK_HOME:-/home/$user/.tasker}"
 if [ "$(id -un)" = "$user" ]; then
