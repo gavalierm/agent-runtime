@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Jeden spúšťač testov repa: node testy v test/, hooks/, lib/, env/, koreňový
 # check.test.mjs, git-hooks/global.test.mjs, shellové testy lib/*.test.sh,
-# test/brain/run.sh a env/server/tests/run.sh (install.sh a sync.sh servera,
-# cesty cez AR_* do tmp). Skončí kódom 1 pri prvom zlyhaní a vypíše, ktorý test
+# env/mac/install.test.sh, test/brain/run.sh a env/server/tests/run.sh
+# (install.sh a sync.sh servera, cesty cez AR_* do tmp). Skončí kódom 1 pri prvom zlyhaní a vypíše, ktorý test
 # padol. Žiadny test sa nedotkne živého systému.
 #   ./test/run.sh            všetko
 #   ./test/run.sh <súbor>... len dané súbory (.test.mjs, .test.sh alebo run.sh)
@@ -24,7 +24,7 @@ if [ "$#" -gt 0 ]; then
   tests=("$@")
 else
   shopt -s nullglob
-  tests=(test/*.test.mjs hooks/*.test.mjs lib/*.test.mjs env/*.test.mjs check.test.mjs git-hooks/global.test.mjs lib/*.test.sh test/brain/run.sh env/server/tests/run.sh)
+  tests=(test/*.test.mjs hooks/*.test.mjs lib/*.test.mjs env/*.test.mjs check.test.mjs git-hooks/global.test.mjs lib/*.test.sh env/mac/*.test.sh test/brain/run.sh env/server/tests/run.sh)
 fi
 
 for t in "${tests[@]}"; do
