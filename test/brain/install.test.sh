@@ -56,16 +56,28 @@ HOME="$H3" bash "$H3/agentic-brain/bin/install.sh" --global > "$TMP/f1.out" 2>&1
 check "flat global: import @~/agentic-brain/RULES.md" grep -qxF '@~/agentic-brain/RULES.md' "$H3/.claude/CLAUDE.md"
 check "flat global: skill symlink" test "$(readlink "$H3/.claude/skills/error")" = "$H3/agentic-brain/skills/error"
 
-# 4. project installation
+# 4. project installation with a target (the install.sh of this repo, no copy in the target)
 P="$TMP/project"; mkdir -p "$P"
 cp -a "$SRC/." "$P/"; rm -rf "$P/.git"; git -C "$P" init -q
 rm "$P/.claude/skills/error"
-HOME="$TMP/h4" bash "$P/agentic-brain/bin/install.sh" > "$TMP/p1.out" 2>&1; RC=$?
+HOME="$TMP/h4" bash "$REPO/brain/bin/install.sh" "$P" > "$TMP/p1.out" 2>&1; RC=$?
 check "project: exits with code 0" test "$RC" -eq 0
 check "project: symlink restored" test "$(readlink "$P/.claude/skills/error")" = "../../agentic-brain/skills/error"
 check "project: hook installed" test -x "$P/.git/hooks/pre-commit"
-HOME="$TMP/h4" bash "$P/agentic-brain/bin/install.sh" > "$TMP/p2.out" 2>&1; RC=$?
+HOME="$TMP/h4" bash "$REPO/brain/bin/install.sh" "$P" > "$TMP/p2.out" 2>&1; RC=$?
 check "project: second run passes" test "$RC" -eq 0
+
+# 5. project installation without a target: the repo of the current folder
+rm "$P/.claude/skills/task-end"
+(cd "$P/agentic-brain/memory" && HOME="$TMP/h4" bash "$REPO/brain/bin/install.sh" > "$TMP/p3.out" 2>&1); RC=$?
+check "project (no target): exits with code 0" test "$RC" -eq 0
+check "project (no target): symlink restored in the repo of the current folder" test -L "$P/.claude/skills/task-end"
+
+# 6. usage errors
+bash "$REPO/brain/bin/install.sh" --bogus > /dev/null 2>&1; RC=$?
+check "usage: an unknown option" test "$RC" -eq 2
+bash "$REPO/brain/bin/install.sh" "$P" "$P" > /dev/null 2>&1; RC=$?
+check "usage: two targets" test "$RC" -eq 2
 
 echo
 if [ "$FAILS" -gt 0 ]; then echo "install.test.sh: $FAILS failures"; exit 1; fi

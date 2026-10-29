@@ -94,12 +94,11 @@ expect "skill without description" 1 "ERROR agentic-brain/skills/error/SKILL.md:
 fresh; rm "$W/agentic-brain/skills/error/SKILL.md"; run_check
 expect "skill without SKILL.md" 1 "SKILL.md is missing"
 
-# error register
-fresh; bash "$W/agentic-brain/skills/error/scripts/error.sh" class1 "first occurrence" > "$TMP/c1.out"; run_check
+# error register (rows are written by hand here, skills/error/scripts/error.sh has its own test)
+fresh; printf '%s\n' '| 2026-01-01 | class1 | first occurrence | | |' >> "$W/agentic-brain/errors/REGISTER.md"; run_check
 expect "one open error is only a warning" 0 "WARNING .*class class1 is open"
-bash "$W/agentic-brain/skills/error/scripts/error.sh" class1 "second occurrence" > "$TMP/c2.out"; run_check
+printf '%s\n' '| 2026-01-02 | class1 | second occurrence | | |' >> "$W/agentic-brain/errors/REGISTER.md"; run_check
 expect "duplicate error without a fix" 1 "ERROR agentic-brain/errors/REGISTER.md: class class1 has 2 rows without a fix"
-expect_true "error.sh prints the occurrence count" grep -q 'Occurrences of class "class1": 2' "$TMP/c2.out"
 
 fresh
 printf '%s\n' '| 2026-01-01 | t | a | fixed | test |' '| 2026-01-02 | t | b | fixed | test |' >> "$W/agentic-brain/errors/REGISTER.md"; run_check
@@ -287,11 +286,58 @@ fi
 
 fresh; mkdir -p "$W/.git/hooks"; printf '#!/bin/sh\n# old agentic-brain hook\nbash agentic-brain/bin/check.sh\n' > "$W/.git/hooks/pre-commit"
 (cd "$W" && bash agentic-brain/bin/check.sh --install-hook) > /dev/null 2>&1
-expect_true "an older own hook is replaced" cmp -s "$W/agentic-brain/bin/pre-commit" "$W/.git/hooks/pre-commit"
+expect_true "an older own hook is replaced" grep -q 'agentic-brain check hook' "$W/.git/hooks/pre-commit"
 
 fresh; mkdir -p "$W/.git/hooks"; printf '#!/bin/sh\nexit 0\n' > "$W/.git/hooks/pre-commit"
 (cd "$W" && bash agentic-brain/bin/check.sh --install-hook) > "$TMP/hook3.out" 2>&1; RC=$?; OUT=$(cat "$TMP/hook3.out")
 expect "foreign hook is not overwritten" 1 "another pre-commit hook exists"
+
+# skills with "scripts: none"
+fresh; mkdir -p "$W/agentic-brain/skills/rules-only"
+printf -- '---\nname: rules-only\ndescription: Use when only rules are needed.\nscripts: none\nscripts-reason: The skill has no mechanical step.\n---\n' > "$W/agentic-brain/skills/rules-only/SKILL.md"; run_check
+expect "scripts: none with a reason passes without scripts/" 0 "^check.sh: ok$"
+expect_true "scripts: none skill gets a symlink" test -L "$W/.claude/skills/rules-only"
+printf -- '---\nname: rules-only\ndescription: Use when only rules are needed.\nscripts: none\n---\n' > "$W/agentic-brain/skills/rules-only/SKILL.md"; run_check
+expect "scripts: none without a reason" 1 "ERROR agentic-brain/skills/rules-only/SKILL.md: scripts: none needs a scripts-reason line"
+printf -- '---\nname: rules-only\ndescription: Use when only rules are needed.\nscripts: none\nscripts-reason:\n---\n' > "$W/agentic-brain/skills/rules-only/SKILL.md"; run_check
+expect "scripts: none with an empty reason" 1 "scripts: none needs a scripts-reason line"
+printf -- '---\nname: rules-only\ndescription: Use when only rules are needed.\n---\n' > "$W/agentic-brain/skills/rules-only/SKILL.md"; run_check
+expect "a skill without the scripts line still needs scripts/" 1 "ERROR agentic-brain/skills/rules-only/scripts: scripts/ is missing"
+
+# check.sh with a target, run from elsewhere
+RT="$REPO/brain/bin/check.sh"
+run_target() { OUT=$(cd "$TMP" && bash "$RT" "$@" 2>&1); RC=$?; }
+fresh; run_target "$W"
+expect "target: repo root with agentic-brain/ passes" 0 "^check.sh: ok$"
+fresh; run_target "$W/agentic-brain"
+expect "target: the brain folder of a repo passes" 0 "^check.sh: ok$"
+fresh; touch "$W/agentic-brain/scratch/junk"; run_target "$W"
+expect "target: errors are reported with the target paths" 1 "ERROR agentic-brain/scratch/junk: scratch is not empty"
+fresh; rm "$W/.claude/skills/error"; run_target "$W"
+expect "target: the symlink is created in the target" 0 "CREATED symlink .claude/skills/error"
+expect_true "target: the created symlink exists" test -L "$W/.claude/skills/error"
+N=$((N + 1)); W="$TMP/flat$N"; mkdir -p "$W"; cp -a "$SRC/agentic-brain/." "$W/"; git -C "$W" init -q
+run_target "$W"
+expect "target: a brain at the root of a repo passes (global mode)" 0 "^check.sh: ok$"
+N=$((N + 1)); W="$TMP/nobrain$N"; mkdir -p "$W"; git -C "$W" init -q
+run_target "$W"
+expect "target: a folder without a brain" 1 "has no brain"
+run_target "$TMP/does-not-exist"
+expect "target: a missing folder" 2 "is not a folder"
+run_target "$W" "$W"
+expect "two targets are a usage error" 2 "Usage: check.sh"
+
+# hook of a repo without a copy of bin/ (the hook runs the check.sh it was installed from)
+N=$((N + 1)); W="$TMP/def$N"; mkdir -p "$W"; git -C "$W" init -q
+bash "$REPO/brain/bin/adopt.sh" "$W" > /dev/null 2>&1
+OUT=$(cd "$TMP" && bash "$RT" --install-hook "$W" 2>&1); RC=$?
+expect "target: --install-hook for a repo without bin/" 0 "Hook installed"
+expect_true "target: the installed hook names this check.sh" grep -q "$REPO/brain/bin/check.sh" "$W/.git/hooks/pre-commit"
+GC=(git -C "$W" -c user.name=t -c user.email=t@example.org)
+"${GC[@]}" add -A >/dev/null 2>&1
+if "${GC[@]}" commit -qm first >/dev/null 2>&1; then echo "ok   target hook: a commit in a clean repo passes"; else echo "FAIL target hook: a commit in a clean repo passes"; FAILS=$((FAILS + 1)); fi
+touch "$W/agentic-brain/scratch/junk" "$W/new-file"; "${GC[@]}" add new-file >/dev/null 2>&1
+if "${GC[@]}" commit -qm second >/dev/null 2>&1; then echo "FAIL target hook rejects a commit on error"; FAILS=$((FAILS + 1)); else echo "ok   target hook rejects a commit on error"; fi
 
 echo
 if [ "$FAILS" -gt 0 ]; then echo "check.test.sh: $FAILS failures"; exit 1; fi

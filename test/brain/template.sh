@@ -12,12 +12,6 @@ build_template() { # destination folder, printed on stdout
   for s in error task-end; do
     cp -a "$REPO/skills/$s" "$d/agentic-brain/skills/$s"
   done
-  # Until skills/error/scripts/error.sh exists (batch 1b) the test uses the stand-in
-  # test/brain/fixtures/error.sh, the script of the old template.
-  if [ ! -f "$d/agentic-brain/skills/error/scripts/error.sh" ]; then
-    mkdir -p "$d/agentic-brain/skills/error/scripts"
-    cp -p "$HERE/fixtures/error.sh" "$d/agentic-brain/skills/error/scripts/error.sh"
-  fi
   printf '@agentic-brain/RULES.md\n' > "$d/CLAUDE.md"
   cp "$d/CLAUDE.md" "$d/AGENTS.md"
   mkdir -p "$d/.claude/skills"
