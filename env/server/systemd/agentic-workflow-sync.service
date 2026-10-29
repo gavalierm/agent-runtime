@@ -1,0 +1,16 @@
+# Stiahne klon kódu a klon spoločného mozgu agentov (sync.sh). Zmenu pravidiel
+# vloží do ťahu relácie hook rules_delta.mjs, preto má sync.sh prázdne
+# AR_INBOXES a do schránok nepíše. Spúšťa ho agentic-workflow-sync.timer, chyba
+# ide do journalu. env/server/install.sh nahradí @WORKFLOW@ a @BRAIN@ cestami
+# klonov a jednotku nainštaluje.
+[Unit]
+Description=Stiahnutie klonu kódu a spoločného mozgu agentov
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=AGENT_WORKFLOW=@WORKFLOW@
+Environment=AGENT_BRAIN_GLOBAL=@BRAIN@
+Environment=AR_INBOXES=
+ExecStart=/usr/bin/env bash ${AGENT_WORKFLOW}/env/server/sync.sh

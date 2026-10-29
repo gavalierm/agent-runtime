@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Jeden spúšťač testov repa: node testy v test/, hooks/, lib/, koreňový check.test.mjs,
-# git-hooks/global.test.mjs, shellové testy lib/*.test.sh a test/brain/run.sh.
-# Testy env/server/tests pridá dávka s adaptérmi prostredia. Skončí kódom 1 pri
-# prvom zlyhaní a vypíše, ktorý test padol. Žiadny test sa nedotkne živého systému.
+# Jeden spúšťač testov repa: node testy v test/, hooks/, lib/, env/, koreňový
+# check.test.mjs, git-hooks/global.test.mjs, shellové testy lib/*.test.sh,
+# test/brain/run.sh a env/server/tests/run.sh (install.sh a sync.sh servera,
+# cesty cez AR_* do tmp). Skončí kódom 1 pri prvom zlyhaní a vypíše, ktorý test
+# padol. Žiadny test sa nedotkne živého systému.
 #   ./test/run.sh            všetko
-#   ./test/run.sh <súbor>... len dané súbory (.test.mjs, .test.sh alebo test/brain/run.sh)
+#   ./test/run.sh <súbor>... len dané súbory (.test.mjs, .test.sh alebo run.sh)
 set -u
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 cd "$ROOT" || exit 1
@@ -23,7 +24,7 @@ if [ "$#" -gt 0 ]; then
   tests=("$@")
 else
   shopt -s nullglob
-  tests=(test/*.test.mjs hooks/*.test.mjs lib/*.test.mjs check.test.mjs git-hooks/global.test.mjs lib/*.test.sh test/brain/run.sh)
+  tests=(test/*.test.mjs hooks/*.test.mjs lib/*.test.mjs env/*.test.mjs check.test.mjs git-hooks/global.test.mjs lib/*.test.sh test/brain/run.sh env/server/tests/run.sh)
 fi
 
 for t in "${tests[@]}"; do
