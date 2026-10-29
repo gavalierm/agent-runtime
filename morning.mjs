@@ -308,7 +308,7 @@ export function runningSection(cfg, now = Date.now()) {
     const lines = ["", `Beží (úlohy in_progress: ${rows.length}), od vstupu do stavu:`, ""];
     if (!rows.length) lines.push("- žiadne");
     for (const { t, start } of rows) {
-      const open = work.filter((w) => w.task_id === t.id).map((w) => `pracuje ${w.agent} od ${hhmm(w.since)}`);
+      const open = work.filter((w) => w.task_id === t.id).map((w) => `pracuje ${w.agent} od ${now - w.since > 24 * 3600_000 ? fmtAt(w.since) : hhmm(w.since)}`);
       lines.push(`- úloha ${t.id} ${t.assignee || "bez riešiteľa"}, ${t.project || "bez projektu"}, "${cut(t.title, 70)}": od ${fmtAt(start)} (${fmtDur(now - start)}), ${open.length ? open.join("; ") : "bez otvorenej práce"}`);
     }
     return lines;

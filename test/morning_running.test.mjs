@@ -49,6 +49,10 @@ function taskerDb({ empty = false } = {}) {
     e.run(5, NOW - H, "tasker", "status", "queued", "in_progress");
     w.run(5, "eva", "t-5", NOW - 30 * M, NOW + 10 * M, null);
     w.run(5, "adam", "t-6", NOW - 15 * M, NOW + 10 * M, null);
+    // 6: otvorená práca staršia než deň nesie dátum
+    t.run(6, "Dlhá práca", "in_progress", "adam", "beta", NOW - 40 * H);
+    e.run(6, NOW - 40 * H, "tasker", "status", "queued", "in_progress");
+    w.run(6, "adam", "t-7", NOW - 30 * H, NOW + 10 * M, null);
   }
   db.close();
   return path;
@@ -56,7 +60,7 @@ function taskerDb({ empty = false } = {}) {
 
 test("beží: číslo, riešiteľ, projekt, názov, trvanie od posledného vstupu a otvorená práca", () => {
   const out = runningSection({ taskerDb: taskerDb() }, NOW).join("\n");
-  assert.match(out, /^\nBeží \(úlohy in_progress: 4\), od vstupu do stavu:\n\n- /);
+  assert.match(out, /^\nBeží \(úlohy in_progress: 5\), od vstupu do stavu:\n\n- /);
   assert.match(out, /- úloha 1 eva, alfa, "Adamova hlavná úloha": od 26\. 10\. 02:00 \(5 h 00 min\), pracuje eva od 06:40$/m);
 });
 
@@ -69,12 +73,13 @@ test("beží: starý work s until v minulosti a ukončený work sa nepočítajú
   const out = runningSection({ taskerDb: taskerDb() }, NOW).join("\n");
   assert.match(out, /- úloha 3 adam, beta, "Starý work": .*\(2 h 00 min\), bez otvorenej práce$/m);
   assert.match(out, /- úloha 5 eva, alfa, "Dvaja pracujú": .*, pracuje eva od \d\d:\d\d; pracuje adam od \d\d:\d\d$/m);
+  assert.match(out, /- úloha 6 adam, beta, "Dlhá práca": .*\(40 h 00 min\), pracuje adam od 25\. 10\. \d\d:\d\d$/m);
 });
 
 test("beží: done sa nevypíše a poradie ide od najstaršieho vstupu", () => {
   const out = runningSection({ taskerDb: taskerDb() }, NOW).join("\n");
   assert.doesNotMatch(out, /úloha 4 /);
-  const pos = [2, 1, 3, 5].map((n) => out.indexOf(`- úloha ${n} `));
+  const pos = [6, 2, 1, 3, 5].map((n) => out.indexOf(`- úloha ${n} `));
   assert.ok(pos.every((p) => p >= 0), String(pos));
   assert.deepEqual([...pos].sort((a, b) => a - b), pos);
 });
