@@ -126,7 +126,7 @@ project_brain() {
   printf '%s' "$abs"
 }
 
-# the hook of the target repo: its own agentic-brain/bin/check.sh when the repo has a copy
+# the hook of the target repo (the template is bin/pre-commit): its own agentic-brain/bin/check.sh when the repo has a copy
 # (adopt.sh --standalone), otherwise this script by the absolute path written at install time
 install_hook() {
   local src="$SELF_DIR/pre-commit" gitdir hooks dst tmp

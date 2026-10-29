@@ -22,5 +22,4 @@ lib/claude_md_guard.sh volá ho pre-commit hook, ktorý inštaluje prostredie v 
 lib/path_check.mjs spúšťa ho človek ručne (`node lib/path_check.mjs`), opis v README
 lib/git_isolate.mjs pomocník testov, importujú ho len testy
 github_device_login.sh spúšťa ho človek ručne pri zriadení strojového účtu, opis v README
-brain/bin/adopt.sh spúšťa ho človek ručne pri založení mozgu v repe, opis v README a v brain/RULES.md
 brain/bin/decide.sh spúšťa ho agent podľa brain/RULES.md, opis v README

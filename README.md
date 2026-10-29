@@ -34,7 +34,7 @@ Operátor píše do vlákna priamo z T3 desktopu alebo mobilu.
 | `lib/public_check.mjs` | kontrola mien a adries pred commitom (`.githooks/pre-commit` súbory, `.githooks/commit-msg` meno autora a committera a správa, `--commit-msg`) a pushom (`.githooks/pre-push` commity), slúži aj repu playbooku |
 | `hooks/` | hooky relácie claude (časť Hooky relácie): `identity`, `memory_context`, `no_operator_commands`, `objection_fix`, `own_rule_scope`, `reply_guard`, `rules_delta`, `tasker_work`, `todo_after_comment`, `done_related`, `idle_wake`, `topic_task`, testy v `test/<hook>.test.mjs` |
 | `lib/agent_env.mjs`, `lib/agent_name.mjs`, `lib/deny.mjs`, `lib/tasker_read.mjs` | knižnice hookov: hodnoty z `runtime.env` agenta, meno a persona agenta (aj vo vlákne témy cez T3 a `topics.json`), zamietnutie s riadkom "Správny postup:" (D0141), čítanie úloh Taskera |
-| `bin/chyba.sh`, `bin/rozhodni.sh` | zápis uznanej chyby a zápis rozhodnutia, opis v časti Skripty a knižnice |
+| `skills/error/scripts/error.sh`, `bin/rozhodni.sh` | zápis uznanej chyby do registra mozgu a zápis rozhodnutia, opis v časti Skripty a knižnice |
 | `lib/rozhodnutia.mjs`, `lib/deny.sh`, `lib/deny_check.mjs`, `lib/session_id.mjs`, `lib/path_check.mjs`, `lib/paths.mjs`, `lib/paths.sh` | register rozhodnutí, zamietnutie pre shell, strážca zamietnutí, id relácie T3, kontrola odkazov na cesty, cesty ku klonu kódu a spoločného mozgu (`AGENT_WORKFLOW`, `AGENT_BRAIN_GLOBAL`) |
 
 Node 22.13 alebo novší, bez npm závislostí.
@@ -598,10 +598,10 @@ text pre model ho berie z `AGENT_OPERATOR_NAME` (bez neho slovo "operátor").
 | `memory_context.mjs` | SessionStart | vloží prvých 200 riadkov `memory/MEMORY.md` repa agenta (index pamäte) do kontextu, aj po `/clear`; úvodná správa budiča preto pamäť čítať nehovorí (úloha 614). Bez `PERSONA.md` alebo `MEMORY.md` mlčí |
 | `rules_delta.mjs` | UserPromptSubmit | vloží zmenu `RULES.md` klonu kódu a `env/<prostredie>/` klonu spoločného mozgu od posledného videného HEAD (s `AR_ROZHODNUTIA=1` aj `decisions/`) |
 | `tasker_work.mjs` | UserPromptSubmit, PreToolUse (Agent, zapisujúce nástroje), SubagentStop | ohlási prácu na úlohe Taskera (`tk work N`), prevezme úlohu v poradí, zámok úlohy držanej inou reláciou; vlastnú reláciu po /clear pozná `sameSession` podľa symlinku prepisu a podľa reťaze id v `<pôvodné id>.sessions` (úlohy 595 a 656) |
-| `own_rule_scope.mjs` | PreToolUse (Write, Edit, MultiEdit, Bash) | prvý zápis nového textu do `CLAUDE.md` alebo `PERSONA.md` repa agenta sa zamietne s otázkou, či to nepatrí do repa pravidiel; nový odsek `Chyba <dátum>` do akéhokoľvek `CLAUDE.md` alebo `PERSONA.md` (aj cez Bash: `>`, `>>`, `tee`, `sed -i`, `perl -i`, `python` so zápisom) sa zamietne vždy, chyba patrí do registra `chyba.sh` (úloha 613); príkaz `sed -i`, `perl -i` alebo `python` s prepisom súboru, ktorého odsek `Chyba <dátum>` je v cieľovom súbore už teraz (mazanie, preformulovanie), prejde, zamietne sa len odsek, ktorý v súbore ešte nie je (úloha 625) |
-| `reply_guard.mjs` | Stop | odpoveď operátorovi: strop 3 viet prózy (6, keď posledná správa operátora žiada postup, podrobnosti, vysvetlenie alebo dokument; zoznamy, kód a štyri vety hlásenia z `bin/chyba.sh` sa nerátajú) a 35 slov na vetu, meno na prvom riadku, priebežná správa v ťahu so slovesom v budúcom čase (zámer namiesto hotového kroku), mŕtvy alebo lokálny odkaz, zmienka úlohy Taskera bez odkazu, položka "(rozhodnutie)" v "Čaká na teba:" bez `?`, s nedefinovaným A/B alebo s neoverenou vetou (`lib/human_question.mjs`: `questionProblem`, `unverifiedClaim`, úlohy 575 a 656), s `AR_ROZHODNUTIA=1` aj "Čaká na teba" a nezapísané rozhodnutie |
+| `own_rule_scope.mjs` | PreToolUse (Write, Edit, MultiEdit, Bash) | prvý zápis nového textu do `CLAUDE.md` alebo `PERSONA.md` repa agenta sa zamietne s otázkou, či to nepatrí do repa pravidiel; nový odsek `Chyba <dátum>` do akéhokoľvek `CLAUDE.md` alebo `PERSONA.md` (aj cez Bash: `>`, `>>`, `tee`, `sed -i`, `perl -i`, `python` so zápisom) sa zamietne vždy, chyba patrí do registra mozgu (`skills/error/scripts/error.sh`, úloha 613); príkaz `sed -i`, `perl -i` alebo `python` s prepisom súboru, ktorého odsek `Chyba <dátum>` je v cieľovom súbore už teraz (mazanie, preformulovanie), prejde, zamietne sa len odsek, ktorý v súbore ešte nie je (úloha 625) |
+| `reply_guard.mjs` | Stop | odpoveď operátorovi: strop 3 viet prózy (6, keď posledná správa operátora žiada postup, podrobnosti, vysvetlenie alebo dokument; zoznamy, kód a štyri vety hlásenia zo `skills/error/scripts/error.sh` sa nerátajú) a 35 slov na vetu, meno na prvom riadku, priebežná správa v ťahu so slovesom v budúcom čase (zámer namiesto hotového kroku), mŕtvy alebo lokálny odkaz, zmienka úlohy Taskera bez odkazu, položka "(rozhodnutie)" v "Čaká na teba:" bez `?`, s nedefinovaným A/B alebo s neoverenou vetou (`lib/human_question.mjs`: `questionProblem`, `unverifiedClaim`, úlohy 575 a 656), s `AR_ROZHODNUTIA=1` aj "Čaká na teba" a nezapísané rozhodnutie |
 | `no_operator_commands.mjs` | Stop | odpoveď bez príkazu shellu pre operátora a bez položky "Čaká na teba", ktorú urobí agent |
-| `objection_fix.mjs` | Stop | uznaná chyba alebo námietka sa nezaobíde bez `chyba.sh` a commitu súboru, ktorý agenta riadi |
+| `objection_fix.mjs` | Stop | uznaná chyba alebo námietka sa nezaobíde bez `error.sh` a commitu súboru, ktorý agenta riadi |
 | `todo_after_comment.mjs` | Stop | úloha agenta s jeho komentárom nesmie ostať v poradí |
 | `done_related.mjs` | Stop | po zavretí úlohy nesmie v jej projekte ostať otázka `needs_human` toho istého riešiteľa bez jeho komentára v ťahu (zruš s dôvodom, alebo napíš, prečo platí; úloha 609 po audite 612, 27. 10. 2026) |
 | `idle_wake.mjs`, `topic_task.mjs` | Stop, PostToolUse | zbytočné zobudenie a úloha vo vlákne témy (časti vyššie) |
@@ -630,7 +630,7 @@ a re-exporty, playbook naň odkazuje odkazom na zdroj. Nič z toho nepredpoklad�
 |---|---|
 | `bin/rozhodni.sh` | jediný zápis rozhodnutia do `rozhodnutia/` repa s rozhodnutiami: pridelí číslo, zapíše súbor a `INDEX.md`, commitne pod menom agenta (`<Agent> (<stroj>)`), pushne, nepushnutý lokálny záznam po cudzom zápise s rovnakým číslom prečísluje, `--z-ulohy N` doplní zdroj a úlohu z Taskera, `--dry-run` nezapíše nič |
 | `lib/rozhodnutia.mjs` | register: `list`, `show`, `check`, `index`, `zapis`; exportuje aj `configure({ repo, operatori, kontroly })`, ktorým repo pravidiel doplní meno operátora a vlastné kontroly záznamov |
-| `bin/chyba.sh` | uznaná chyba agenta: zapíše riadok do registra (ôsmy stĺpec je povinný `--mechanizmus hook:<cesta>`, `test:<cesta>`, `deny:<vzor>` alebo `rozhodnutie:D<nnnn>`, bez neho kód 1 a `Správny postup:`) a pri druhom výskyte tej istej triedy založí v Taskeri úlohu na kontrolu; `--otvorene` vypíše riadky registra bez mechanizmu, nič nezapíše (úloha 613) |
+| `skills/error/scripts/error.sh` | uznaná chyba agenta: pridá riadok `\| dátum \| trieda \| opis \| oprava \| test \|` do `errors/REGISTER.md` mozgu (`--brain <priečinok>`, inak z pracovného priečinka: `agentic-brain/errors`, `errors/` v koreni repa, nakoniec register spoločného mozgu cez `lib/paths.sh`); voľby `--class`, `--file` (commitnutý súbor opravy), `--mechanism` (povinná, `hook:<cesta>`, `test:<cesta>`, `deny:<vzor>` alebo `decision:D<nnnn>`, bez nej kód 1, `Správny postup:` a nič sa nezapíše), voliteľné `--description`, `--truth`, `--check`; pri druhom výskyte tej istej triedy v tom istom registri založí úlohu na kontrolu príkazom z `AGENT_TK` (bez neho napíše, že úloha sa nezakladá) a číslo úlohy zapíše do stĺpca opravy; vypíše hlásenie v štyroch vetách; `--open` vypíše riadky registra bez opravy, nič nezapíše. Skript je sebestačný, skopíruje sa aj do cudzieho mozgu (`adopt.sh --standalone`) |
 | `lib/deny.sh`, `lib/deny_check.mjs` | `deny_postup` pre git hooky (dôvod a riadok "Správny postup:") a strážca, ktorý zlyhá na hooku so zamietnutím bez postupu (`denyProblems(koreň)`) |
 | `lib/session_id.mjs` | `originalId()`: pôvodné id relácie claude vlákna T3 z príkazového riadku predkov procesu; `recordChain(dir, id, ids)` zapíše reťaz relácií do `<dir>/<id>.sessions`, `chainedSessions(dir, id)` ju prečíta (úloha 656) |
 | `lib/path_check.mjs` | kontrola, že každá cesta v apostrofoch v `*.md` repa je v ňom alebo je uvedená v jeho `README.md` v sekcii "Čo v repe nie je" (`PATH_CHECK_ROOT` ukáže na iné repo) |
@@ -644,12 +644,12 @@ Premenné:
 | `ROZHODNUTIA_DIR` | priečinok záznamov namiesto `decisionsDir()` (`<AGENT_BRAIN_GLOBAL>/decisions`), alebo parameter `--dir`; `rozhodni.sh` používa vždy `decisions_dir` |
 | `ROZHODNI_SYNC_UNIT` | jednotka systemd, ktorú `rozhodni.sh` po pushi spustí, bez nej sa sync nespúšťa |
 | `ROZHODNI_STROJ`, `ROZHODNI_TASKER` | meno stroja v mene autora commitu a príkaz Taskera pre `--z-ulohy` |
-| `CHYBA_AGENT`, `CHYBA_REGISTER`, `CHYBA_TASKER` | agent, súbor registra (`~/.local/state/agentic-workflow/chyby.tsv`) a príkaz Taskera pre `chyba.sh` |
-| `CHYBA_REVIEWER`, `CHYBA_TASKER_USER` | riešiteľ úlohy na kontrolu (predvolene `spravca-agentov`) a používateľ Taskera na serveri (predvolene `tasker`) |
+| `ERROR_AGENT`, `AGENT_TK` | meno agenta pre názov úlohy a príkaz Taskera (obal `bin/tk`), ktorým `error.sh` zakladá úlohu na kontrolu |
+| `ERROR_REVIEWER` | riešiteľ úlohy na kontrolu z `error.sh` (predvolene `spravca-agentov`) |
 | `AGENT_WORKFLOW` | klon tohto repa, z ktorého sa berie `bin/tk` a ostatné skripty (predvolene server `/opt/agentic-workflow`, Mac `~/Work/agentic-workflow`) |
 | `AGENT_BRAIN_GLOBAL` | klon spoločného mozgu s priečinkom `decisions/` (`D0001.md`), `roles/agents.md` a `commit_guard/` (predvolene server `/opt/agentic-brain-global`, Mac `~/Work/agentic-brain-global`) |
 
-Testy sú `test/rozhodnutia.test.mjs`, `test/chyba.test.mjs`, `test/deny_check.test.mjs`
+Testy sú `test/rozhodnutia.test.mjs`, `test/error.test.mjs`, `test/deny_check.test.mjs`
 a `test/path_check.test.mjs`, bežia v dočasných priečinkoch s falošným Taskerom.
 
 ## Premenné prostredia
@@ -834,6 +834,62 @@ sem nepatria (vzory sú v `lib/public_check.txt` v base64), `--commits <rozsah>`
 skontroluje meno autora a správy commitov. Hooky `.githooks/pre-commit` a
 `.githooks/pre-push` ho spúšťajú, zapnutie: `git config core.hooksPath .githooks`.
 
+## Mozog agentov (`brain/`)
+
+`brain/` je šablóna mozgu: dáta, ktoré repo dostane (`RULES.md`, `artifacts/`,
+`errors/REGISTER.md`, `decisions/`, `memory/MEMORY.md`, `scratch/`), a skripty
+`brain/bin/` (`check.sh`, `adopt.sh`, `install.sh`, `decide.sh`, `pre-commit`,
+`repeat_guard.mjs`). Kód mozgu ostáva v tomto repe a slúži repám bez kópie. Skilly
+šablóny sú `skills/error` a `skills/task-end` tohto repa, nie `brain/skills/`.
+
+Mozog má tri tvary:
+
+| tvar | ako vznikne | čo je v cieli |
+|---|---|---|
+| repo s `agentic-brain/` (režim project, predvolený) | `brain/bin/adopt.sh <repo>` | len dáta: `agentic-brain/{RULES.md,skills/,artifacts/README.md,errors/REGISTER.md,decisions/README.md,memory/MEMORY.md,scratch/.gitkeep}`, symlinky `.claude/skills`, riadok `@agentic-brain/RULES.md` v `CLAUDE.md` a `AGENTS.md`, `.gitignore` |
+| samostatná kópia pre cudzieho operátora | `adopt.sh --standalone <repo>` | navyše `agentic-brain/bin/`, skilly `error` a `task-end` a `.claude/settings.json` s `repeat_guard.mjs`; `install.sh --global` pridá import `RULES.md` a symlinky skillov do `~/.claude` |
+| repo, ktorého celý obsah je mozog (režim global) | `adopt.sh --root <repo>` | `RULES.md`, `skills/`, `artifacts/`, `errors/`, `decisions/`, `memory/`, `scratch/` v koreni, `CLAUDE.md` s jediným riadkom `@RULES.md` |
+
+`--project <cesta>` pridá k ľubovoľnému tvaru vrstvu projektu (riadok `project:` v
+`RULES.md` a symlinky jej skillov). `adopt.sh` nič nezapíše do existujúcich súborov a nič
+nescommituje.
+
+Kontrola a hook sa spúšťajú z tohto repa s cieľom, kópia v cieli netreba:
+
+```
+brain/bin/check.sh [<repo alebo priečinok mozgu>]            # bez cieľa mozog, v ktorom skript leží
+brain/bin/check.sh --install-hook [<repo>]                   # pre-commit hook repa
+brain/bin/install.sh [<repo>]                                # check.sh <repo> a hook, bez cieľa repo z pracovného priečinka
+```
+
+Cieľ je koreň repa (mozog v `agentic-brain/`) alebo priečinok mozgu v koreni repa; folder
+bez `RULES.md` a `errors/REGISTER.md` skončí chybou. Hook zapísaný do `.git/hooks`
+volá `check.sh` z `bin/` mozgu repa, ak ho má, inak `check.sh` s absolútnou cestou
+zapísanou pri inštalácii. Skill s riadkom `scripts: none` v hlavičke musí mať aj neprázdny
+riadok `scripts-reason:` a `scripts/` nepotrebuje, inak má `scripts/` aspoň jeden súbor.
+`skills/task-end/scripts/task-end.sh` spustí `check.sh` pre repo pracovného priečinka a
+vypíše kontrolný zoznam z `RULES.md` mozgu, repo bez mozgu skončí kódom 1.
+
+Register chýb zapisuje `skills/error/scripts/error.sh` (časť Skripty a knižnice).
+
+### `requires:` hookov a mŕtvy kód
+
+Druhý riadok každého hooku v `hooks/` (okrem testov a `*.replay.mjs`) je
+`// requires: <hodnota>`: `none`, `tasker` (hook volá `tk` alebo `tasker`, číta databázu
+Taskera alebo stráži jeho príkazy), `t3` (klient T3 alebo id vlákna T3), `inbox` (schránky
+v `/var/lib`) alebo `mac` (hook len pre Mac). Viac hodnôt sa píše cez čiarku (`tasker, t3`),
+`none` je vždy samo. Hodnotu určuje import a kód hooku, nie jeho názov. `node check.mjs`
+nahlási hook bez riadku alebo s inou hodnotou (`lib/hook_requires.mjs`).
+
+`node check.mjs` stráži aj mŕtvy kód (`lib/dead_code.mjs`): každý súbor `.mjs` a `.sh`
+v `hooks/`, `lib/`, `bin/`, `brain/bin/`, `skills/*/scripts/` a v koreni repa musí byť
+niekde mimo seba a mimo testov (`*.test.*`, `*.replay.mjs`, `test/`) importovaný, volaný
+alebo menovaný v kóde, skripte, konfigurácii, systemd alebo v `SKILL.md`; zmienka v
+README a v ostatných `.md` nestačí. Výnimka je riadok `<cesta> <dôvod>` v
+`lib/dead_code_allow.txt`; výnimka bez dôvodu, na neexistujúci súbor alebo na súbor,
+ktorý mŕtvy nie je, je chyba. Hooky, ktoré volá nastavenie prostredia `env/`, majú
+dočasnú výnimku do dávky 1c.
+
 ## Presun (úloha 663, dávka 1a)
 
 Texty a kostra mozgu presunuté z troch zdrojov, kód hookov a knižníc sa v tejto
@@ -855,7 +911,7 @@ dávke nemenil (dávka 1b). Plná mapa repa príde v dávke 1c. Zdroje: `agent-r
 | `skills/dokonci/SKILL.md` | agent-rules: `skills/dokonci/SKILL.md` (cesty v texte na `dokonci.sh` a skúšku ostali pôvodné) |
 | `skills/dokonci/scripts/dokonci.sh` | agent-rules: `skills/dokonci/dokonci.sh` |
 | `test/dokonci.test.mjs` | agent-rules: `skills/dokonci/dokonci.test.mjs`, cesta k skriptu opravená |
-| `skills/error/SKILL.md` | nový, po anglicky: zlúčenie `skills/chyba/SKILL.md` z agent-rules a `skills/error/SKILL.md` zo šablóny. `scripts/error.sh` príde v dávke 1b (dnešný `bin/chyba.sh`) |
+| `skills/error/SKILL.md` | nový, po anglicky: zlúčenie `skills/chyba/SKILL.md` z agent-rules a `skills/error/SKILL.md` zo šablóny. `scripts/error.sh` prišiel v dávke 1b2 z `bin/chyba.sh` |
 | `skills/task-end/SKILL.md` | agentic-brain-template: `agentic-brain/skills/task-end/SKILL.md` |
 | `skills/task-end/scripts/task-end.sh` | agentic-brain-template: `agentic-brain/skills/task-end/scripts/task-end.sh` (bez zmeny, hľadá `bin/check.sh` o tri úrovne vyššie, v tomto repe ju treba nasmerovať na `brain/bin/check.sh`) |
 | `skills/browser/SKILL.md` | klon zástupcu operátora: `.claude/skills/prehliadac/SKILL.md` |
@@ -869,7 +925,7 @@ dávke nemenil (dávka 1b). Plná mapa repa príde v dávke 1c. Zdroje: `agent-r
 | `brain/scratch/.gitkeep` | agentic-brain-template: `agentic-brain/scratch/.gitkeep` |
 | `test/brain/check.test.sh`, `adopt.test.sh`, `install.test.sh`, `repeat_guard.test.mjs`, `run.sh` | agentic-brain-template: `agentic-brain/test/*`, cesty opravené |
 | `test/brain/template.sh` | nový pomocník testov: zloží z `brain/` a zo `skills/error`, `skills/task-end` rozloženie šablóny (`agentic-brain/` s `skills/`) |
-| `test/brain/fixtures/error.sh`, `settings.json`, `template-ignore` | agentic-brain-template: `agentic-brain/skills/error/scripts/error.sh`, `.claude/settings.json`, ignorovací súbor koreňa. Náhrada, kým nevznikne `skills/error/scripts/error.sh` (dávka 1b) |
+| `test/brain/fixtures/error.sh`, `settings.json`, `template-ignore` | agentic-brain-template: `agentic-brain/skills/error/scripts/error.sh`, `.claude/settings.json`, ignorovací súbor koreňa. Náhrada, kým nevznikol `skills/error/scripts/error.sh`; `error.sh` z fixtúr dávka 1b2 zmazala |
 | `docs/PLAYBOOK.md`, `docs/PLAYBOOK.en.md` | agent-playbook: `PLAYBOOK.md`, `PLAYBOOK.en.md` |
 | `LICENSE` | agent-playbook: `LICENSE` |
 | `docs/decisions-schema.md` | agent-playbook: `rozhodnutia/README.md` a `rozhodnutia/ROZSAHY.md` za sebou, nadpisy o stupeň nižšie |
@@ -895,8 +951,27 @@ Cesty sú relatívne ku koreňu zdroja, nové cesty sú rovnaké, ak nie je uved
 | `git-hooks/`, `git-hooks/global.test.mjs` | agent-rules: `git-hooks/` |
 | `test/fixtures/rozhodnutia-*/decisions/` | agent-rules: `test/fixtures/rozhodnutia-*/rozhodnutia/`, priečinok premenovaný; fixtúra pre kontrolu podľa logu starého repa agenta nepresunutá |
 | `test/run.sh` | nový: jeden spúšťač všetkých testov |
-| `lib/rozhodnutia.mjs`, `bin/rozhodni.sh`, `bin/chyba.sh` | už tu boli: `configure()` zanikol, priečinok `decisions/`, meno operátora z `AGENT_OPERATOR_NAME`, skripty berú cesty z `lib/paths` |
+| `lib/rozhodnutia.mjs`, `bin/rozhodni.sh`, `bin/chyba.sh` (dávka 1b2 ju presunula do `skills/error/scripts/error.sh`) | už tu boli: `configure()` zanikol, priečinok `decisions/`, meno operátora z `AGENT_OPERATOR_NAME`, skripty berú cesty z `lib/paths` |
 
 Nepresunuté obaly a kópie z `agent-rules`: `lib/deny.*`, `lib/deny_check.mjs`, `lib/agent_name.mjs`,
 `lib/tasker_read.mjs`, `lib/rozhodnutia.mjs`, `lib/session_id.mjs`, `lib/runtime_dir.*`, `lib/git_isolate.mjs`,
-`lib/wrappers.test.mjs`, `bin/chyba.sh`, `bin/rozhodni.sh`.
+`lib/wrappers.test.mjs`, `bin/rozhodni.sh`.
+
+## Presun (úloha 663, dávka 1b2)
+
+Kód mozgu slúži repám bez kópie, register chýb je v mozgu, hooky nesú `requires:`
+a `check.mjs` stráži mŕtvy kód. Opis je v časti Mozog agentov.
+
+| nový súbor | odkiaľ |
+|---|---|
+| `skills/error/scripts/error.sh` | `bin/chyba.sh` (presun cez `git mv`): voľby `--class`, `--file`, `--mechanism`, `--description`, `--truth`, `--check`, `--brain`, `--open`, register `errors/REGISTER.md` mozgu namiesto TSV v `~/.local/state`, úloha cez `AGENT_TK`, premenné `ERROR_AGENT` a `ERROR_REVIEWER` namiesto `CHYBA_*` |
+| `test/error.test.mjs` | `test/chyba.test.mjs` |
+| `brain/bin/check.sh`, `adopt.sh`, `install.sh`, `pre-commit` | upravené: cieľ `check.sh [--install-hook] [<repo>]`, `scripts: none`, `adopt.sh` len dáta s prepínačmi `--standalone` a `--root`, `install.sh [<repo>]`, hook s cestou k `check.sh` |
+| `skills/task-end/scripts/task-end.sh` | upravený: `check.sh` tohto repa s cieľom repo pracovného priečinka |
+| `lib/hook_requires.mjs`, `lib/dead_code.mjs`, `lib/dead_code_allow.txt` a testy | nové, volá ich `check.mjs` |
+| `hooks/*.mjs` | druhý riadok `// requires:` v každom hooku |
+| `test/brain/task_end.test.sh` | nový test `task-end.sh`; `test/brain/fixtures/error.sh` zmazaný |
+| `hooks/objection_fix.mjs`, `hooks/own_rule_scope.mjs`, `lib/claude_md_guard.sh` | volajú `skills/error/scripts/error.sh` namiesto `bin/chyba.sh` |
+
+Dokument `docs/PLAYBOOK.md` a `docs/PLAYBOOK.en.md` popisuje starý `bin/chyba.sh`, oprava
+je mimo tejto dávky.

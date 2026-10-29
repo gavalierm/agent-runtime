@@ -8,10 +8,10 @@ All agent data is in one visible folder, `agentic-brain/`.
 - `agentic-brain/skills/<name>/`: a skill, with `SKILL.md` and `scripts/`. Claude Code reads it through the symlink `.claude/skills/<name>`, which `agentic-brain/bin/check.sh` creates.
 - `agentic-brain/artifacts/<name>/`: an approved pattern of work, with `PLAYBOOK.md` and `reference/`.
 - `agentic-brain/errors/REGISTER.md`: the error register. The script `skills/error/scripts/error.sh` adds a row.
-- `agentic-brain/decisions/`: decisions, one file `D0001-<slug>.md` per decision. `bin/decide.sh` creates new ones.
+- `agentic-brain/decisions/`: decisions, one file `D0001-<slug>.md` per decision. `decide.sh` creates new ones.
 - `agentic-brain/memory/MEMORY.md`: the memory index. The content is in `memory/<file>.md`.
 - `agentic-brain/scratch/`: working files of a task. Git ignores them, and the folder is empty at the end of a task.
-- `agentic-brain/bin/`: the check `check.sh`, the installer `install.sh`, the rollout `adopt.sh`, `decide.sh` and the hook `repeat_guard.mjs`.
+- `agentic-brain/bin/`: only in a standalone copy (`adopt.sh --standalone`): the check `check.sh`, the installer `install.sh`, the rollout `adopt.sh`, `decide.sh` and the hook `repeat_guard.mjs`. Otherwise these scripts stay in the agent-runtime repo (`brain/bin/`) and serve the repo without a copy: `check.sh <repo>`.
 
 The `.claude/` folder holds only symlinks to skills and `settings.json`. It holds no data.
 
@@ -24,13 +24,13 @@ A mechanical step is an upload, a download, a search, a comparison, a move or a 
 - A manual run of a mechanical step is an error. Record it in the register with the skill `error`.
 - Each skill has `scripts/`. `SKILL.md` says what the agent decides and what the script does.
 - A script you can reuse belongs in a skill, not in `scratch/`.
-- The hook `bin/repeat_guard.mjs` (optional, Claude Code only) rejects the third manual run of the same program with different arguments in one session. The rule applies without the hook too.
+- The hook `repeat_guard.mjs` of a standalone copy (optional, Claude Code only) rejects the third manual run of the same program with different arguments in one session. The rule applies without the hook too.
 
 ## End of task
 
 Before you report the end of a task, run the skill `task-end`. It verifies these points.
 
-- `agentic-brain/bin/check.sh` passed without errors.
+- `check.sh` passed without errors (the skill `task-end` runs it for the repo).
 - `agentic-brain/scratch/` is empty.
 - A repeated procedure is a skill with a script.
 - An error from the run is in the error register.
@@ -41,7 +41,7 @@ Before you report the end of a task, run the skill `task-end`. It verifies these
 
 The brain has three layers with the same structure: `RULES.md`, `skills/`, `artifacts/`, `errors/`, `decisions/`, `memory/`, `scratch/` and `bin/`. One `check.sh`, `install.sh` and `adopt.sh` serve all of them.
 
-- Global layer: the repo `~/agentic-brain` on the agent's machine. Rules and skills for all projects on that machine. The user installs it with `bin/install.sh --global`.
+- Global layer: the repo `~/agentic-brain` on the agent's machine. Rules and skills for all projects on that machine. The user installs it with `install.sh --global`.
 - Project layer: the folder `agentic-brain/` in the repo of a project that stands above several code repos. It holds the knowledge of the project: artifacts, source material and domain memory. It is optional, a project with one repo has no project layer.
 - Repo layer: the folder `agentic-brain/` in each code repo, with its own content. It is not a clone or a submodule of the project layer. This folder is the repo layer.
 
