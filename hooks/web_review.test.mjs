@@ -6,8 +6,11 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { webReviewReason, ASSIGN_MESSAGE, ASSIGN_POSTUP } from "./web_review.mjs";
-import { parseAgents, isWebAgent, createWebTask, parseCreateArgs, mockupProblems } from "../lib/web_gate.mjs";
+// Používateľ správcu úloh a dizajnér sa čítajú pri načítaní modulov.
+process.env.AGENT_TASKER_USER = "tasker-svc";
+process.env.WEB_DESIGNER = "eva";
+const { webReviewReason, ASSIGN_MESSAGE, ASSIGN_POSTUP } = await import("./web_review.mjs");
+const { parseAgents, isWebAgent, createWebTask, parseCreateArgs, mockupProblems } = await import("../lib/web_gate.mjs");
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), "web_review.mjs");
 const AGENTS = parseAgents("dan\tenabled\t/home/tasker-svc/projekty/webproject/webproject-web\neva\tenabled\t/home/tasker-svc/agenti/eva\nadam\tdisabled\t/root/adam\nwebclient-web\tenabled\t/x/webclient-web\n");

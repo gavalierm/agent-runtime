@@ -19,7 +19,20 @@ test.after(() => rmSync(dir, { recursive: true, force: true }));
 
 const gitconfig = join(dir, "gitconfig");
 writeFileSync(gitconfig, "");
-const env = { PATH: process.env.PATH, HOME: dir, GIT_CONFIG_GLOBAL: gitconfig, GIT_CONFIG_SYSTEM: "/dev/null", GIT_AUTHOR_NAME: "Dan (examplehost)", GIT_COMMITTER_NAME: "Dan (examplehost)", GIT_AUTHOR_EMAIL: EMAIL, GIT_COMMITTER_EMAIL: EMAIL };
+// Spoločný mozog skúšky: tabuľka agentov a autori repí (dáta nasadenia commit_guard.sh).
+const brain = join(dir, "brain");
+mkdirSync(join(brain, "roles"), { recursive: true });
+mkdirSync(join(brain, "commit_guard"), { recursive: true });
+writeFileSync(join(brain, "roles", "agents.md"), `| Meno | Rola |
+|---|---|
+| Oskar | operátor |
+| Adam | správca agentov |
+| Boris | správca servera |
+| Cyril | zástupca operátora |
+| Dan | vedúci vývoja |
+`);
+writeFileSync(join(brain, "commit_guard", "repo_authors.txt"), "tasker\tDan\tD0172\n");
+const env = { PATH: process.env.PATH, HOME: dir, AGENT_BRAIN_GLOBAL: brain, GIT_CONFIG_GLOBAL: gitconfig, GIT_CONFIG_SYSTEM: "/dev/null", GIT_AUTHOR_NAME: "Dan (examplehost)", GIT_COMMITTER_NAME: "Dan (examplehost)", GIT_AUTHOR_EMAIL: EMAIL, GIT_COMMITTER_EMAIL: EMAIL };
 
 const git = (cwd, ...args) => spawnSync("git", args, { cwd, env, encoding: "utf8", timeout: 20000, stdio: ["ignore", "pipe", "pipe"] });
 

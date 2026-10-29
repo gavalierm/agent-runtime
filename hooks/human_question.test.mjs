@@ -7,7 +7,9 @@ import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from "no
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { humanQuestionReason, POSTUP } from "./human_question.mjs";
+// Používateľ správcu úloh pre rozbor `runuser -u <používateľ>` (web_review.mjs ho berie pri načítaní).
+process.env.AGENT_TASKER_USER = "tasker-svc";
+const { humanQuestionReason, POSTUP } = await import("./human_question.mjs");
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), "human_question.mjs");
 const TK = "AGENT_NAME=eva /opt/agentic-workflow/bin/tk";

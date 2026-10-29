@@ -22,7 +22,7 @@ test("replay chyby 23. 10. 2026: výpis tokenu a claude setup-token sa zamietne 
   assert.match(cat.permissionDecisionReason, /Správny postup:.*setup_token\.sh.*test -f.*stat -c %a/);
   const st = run("claude setup-token");
   assert.equal(st.permissionDecision, "deny");
-  assert.match(st.permissionDecisionReason, /Správny postup:.*\/root\/agentic-workflow\/setup_token\.sh/);
+  assert.match(st.permissionDecisionReason, /Správny postup:.*\/opt\/agentic-workflow\/setup_token\.sh/);
 });
 
 test("výpis súboru s tajomstvom v rôznych tvaroch a obaloch zamietne", () => {

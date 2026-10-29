@@ -13,7 +13,14 @@ import { blockReason } from "./tool_failure_block.mjs";
 const DIR = dirname(fileURLToPath(import.meta.url));
 const BLOCK = join(DIR, "tool_failure_block.mjs");
 const LOG = join(DIR, "tool_failure_log.mjs");
-const REPO_LIST = join(DIR, "..", "env", "server", "nastroje.tsv");
+// Vzorový zoznam nefunkčných nástrojov (program, prepínače, používateľ, náhrada); živý zoznam je
+// dáta prostredia a test ho nečíta.
+const KNOWN_LIST = [
+  "gh\t*\t*\tgit s tokenom z ~/.config/<meno>/ (skill github-repo); PR sa nerobí, projekt ide dev -> main",
+  "sudo\t*\troot\tpod rootom bez sudo: spusti príkaz priamo",
+  "doas\t*\troot\tpod rootom bez doas: spusti príkaz priamo",
+  "",
+].join("\n");
 
 function sandbox() {
   const dir = mkdtempSync(join(tmpdir(), "u615-block-"));
@@ -57,7 +64,7 @@ test("gh --version: prvý pokus prejde, log zapíše, druhý zamietne s postupom
 test("sudo ls pod rootom zo zoznamu zamietne hneď, pod iným používateľom prejde", () => {
   const sb = sandbox();
   try {
-    writeFileSync(sb.known, readFileSync(REPO_LIST));
+    writeFileSync(sb.known, KNOWN_LIST);
     const d = pre(sb, "sudo ls", "root");
     assert.equal(d.permissionDecision, "deny");
     assert.match(d.permissionDecisionReason, /zozname nefunkčných nástrojov servera/);

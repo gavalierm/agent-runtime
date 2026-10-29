@@ -64,7 +64,7 @@ export function taskerCommands(raw, depth = 0) {
     // `sh -c '...'`, `su - <používateľ> -c '...'`: vnorený príkaz.
     const c = words.indexOf("-c");
     if (c >= 0 && words[c + 1] !== undefined && depth < 3) calls.push(...taskerCommands(words[c + 1], depth + 1));
-    const i = words.findIndex((w) => basename(w) === "tasker" || basename(w) === "tk");
+    const i = words.findIndex((w, j) => (basename(w) === "tasker" || basename(w) === "tk") && !["-u", "--user", "su", "-"].includes(words[j - 1]));
     if (i < 0) continue;
     const before = words.slice(0, i);
     if (!before.every((w) => WRAPPERS.has(w) || /^[A-Za-z_]\w*=/.test(w) || w.startsWith("-"))) continue;

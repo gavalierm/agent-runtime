@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Testy topic.mjs. Spúšťa hook ako proces s dočasným stavom v CYRIL_TOPICS
-// a pamäťou v CYRIL_MEMORY, skutočný .scratch/topics sa nemení. Repo agenta
+// Testy topic.mjs. Spúšťa hook ako proces s dočasným stavom v TOPIC_STATE_DIR
+// a pamäťou v TOPIC_MEMORY_DIR, skutočný .scratch/topics sa nemení. Repo agenta
 // je dočasný priečinok v CLAUDE_PROJECT_DIR, nie repo pravidiel, v ktorom
 // hook leží (chyba 19. 10. 2026, hooks/agent_repo.mjs).
 
@@ -14,7 +14,7 @@ const HOOK = join(dirname(fileURLToPath(import.meta.url)), "topic.mjs");
 const T = mkdtempSync(join(tmpdir(), "topic-"));
 const AGENT = join(T, "agent");
 mkdirSync(AGENT);
-const env = { ...process.env, CLAUDE_PROJECT_DIR: AGENT, CYRIL_TOPICS: join(T, "state"), CYRIL_MEMORY: join(T, "memory") };
+const env = { ...process.env, CLAUDE_PROJECT_DIR: AGENT, AGENT_OPERATOR_NAME: "Oskar", TOPIC_STATE_DIR: join(T, "state"), TOPIC_MEMORY_DIR: join(T, "memory") };
 const A = "aaaaaaaa-1111-2222-3333-444444444444";
 const B = "bbbbbbbb-1111-2222-3333-444444444444";
 
@@ -170,12 +170,12 @@ ok("bez témy set cudzieho topic.mjs zamietnutý", check(A, "Bash", { command: "
 cli(B, "set", "projekty");
 ok("vlastník tému smie zapisovať", check(B, "Edit", { file_path: join(REPO, "STRUCTURE.md") }) === "");
 
-// Bez CYRIL_TOPICS a CYRIL_MEMORY berie hook stav a pamäť z repa agenta
+// Bez TOPIC_STATE_DIR a TOPIC_MEMORY_DIR berie hook stav a pamäť z repa agenta
 // v CLAUDE_PROJECT_DIR, aj z jeho worktree (replay 19. 10. 2026).
 {
-  const own = { ...process.env, CLAUDE_PROJECT_DIR: AGENT };
-  delete own.CYRIL_TOPICS;
-  delete own.CYRIL_MEMORY;
+  const own = { ...process.env, CLAUDE_PROJECT_DIR: AGENT, AGENT_OPERATOR_NAME: "Oskar" };
+  delete own.TOPIC_STATE_DIR;
+  delete own.TOPIC_MEMORY_DIR;
   mkdirSync(join(AGENT, "memory", "topics"), { recursive: true });
   writeFileSync(join(AGENT, "memory", "topics", "agent_tema.md"), "# Téma\n\n## Čaká na Oskara\n\n- vec agenta\n");
   const run = (dir, ...args) => spawnSync("node", [HOOK, ...args], { cwd: dirname(HOOK), env: { ...own, CLAUDE_PROJECT_DIR: dir, CLAUDE_CODE_SESSION_ID: A, CLAUDE_PID: DEAD }, encoding: "utf8" });
@@ -183,7 +183,7 @@ ok("vlastník tému smie zapisovať", check(B, "Edit", { file_path: join(REPO, "
   const l = run(AGENT, "list").stdout;
   ok("list číta pamäť repa agenta", l.includes("agent_tema") && l.includes("vec agenta"), l);
   ok("whoami z worktree repa agenta", run(join(AGENT, ".worktrees", "x"), "whoami").stdout.includes("agent_tema"));
-  ok("repo pravidiel stav nedostane", !existsSync(join(dirname(HOOK), "..", ".scratch", "topics", "locks", "agent_tema")));
+  ok("repo kódu stav nedostane", !existsSync(join(dirname(HOOK), "..", ".scratch", "topics", "locks", "agent_tema")));
 }
 
 rmSync(T, { recursive: true, force: true });

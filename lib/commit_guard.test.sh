@@ -5,10 +5,24 @@
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GUARD="$HERE/commit_guard.sh"
-GOOD="$(tr -d '[:space:]' < "$HERE/git_email.txt")"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 export HOME="$T"
+# Spoločný mozog skúšky: tabuľka agentov, e-mail a autori repí (dáta nasadenia).
+export AGENT_BRAIN_GLOBAL="$T/brain"
+mkdir -p "$AGENT_BRAIN_GLOBAL/roles" "$AGENT_BRAIN_GLOBAL/commit_guard"
+cat > "$AGENT_BRAIN_GLOBAL/roles/agents.md" <<'AGENTS'
+| Meno | Rola |
+|---|---|
+| Oskar | operátor |
+| Adam | správca agentov |
+| Boris | správca servera |
+| Cyril | zástupca operátora |
+| Dan | vedúci vývoja |
+AGENTS
+printf 'tasker\tDan\tD0172\n' > "$AGENT_BRAIN_GLOBAL/commit_guard/repo_authors.txt"
+printf 'agent@example.org\n' > "$AGENT_BRAIN_GLOBAL/commit_guard/git_email.txt"
+GOOD="$(tr -d '[:space:]' < "$AGENT_BRAIN_GLOBAL/commit_guard/git_email.txt")"
 git init -q "$T/r"
 cd "$T/r" || exit 1
 failures=0
@@ -36,7 +50,7 @@ NAME="root" check "meno root odmietne" 1 "$GOOD" 'Oprava\n'
 NAME="Adam" check "meno bez stroja odmietne" 1 "$GOOD" 'Oprava\n'
 NAME="Adam (Mac, cez Cyril)" check "meno s čiarkou odmietne" 1 "$GOOD" 'Oprava\n'
 
-# zoznam autorov podľa repa (lib/repo_authors.txt, D0172): tasker len Dan
+# zoznam autorov podľa repa (commit_guard/repo_authors.txt v spoločnom mozgu, D0172): tasker len Dan
 git -C "$T/r" remote add origin git@github.com:example-org/tasker.git
 NAME="Adam (examplehost)" check "repo tasker, autor Adam odmietne" 1 "$GOOD" 'Oprava\n'
 NAME="Dan (examplehost)" check "repo tasker, autor Dan prejde" 0 "$GOOD" 'Oprava\n'

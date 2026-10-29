@@ -88,10 +88,17 @@ function tk(args, env, cwd) {
   }
 }
 
-test("tk s AGENT_NAME spustí tasker pod tasker-svc s TASKER_HOME a TASKER_USER", () => {
+test("tk s AGENT_NAME spustí tasker pod TK_USER s TASKER_HOME v jeho domove a TASKER_USER", () => {
   const r = tk(["task", "show", "462", "--json"], { AGENT_NAME: "adam" });
   assert.equal(r.code, 0);
-  assert.equal(r.called, "-u nikto-taký -- env TASKER_HOME=/home/tasker-svc/.tasker TASKER_USER=adam tasker task show 462 --json");
+  assert.equal(r.called, "-u nikto-taký -- env TASKER_HOME=/home/nikto-taký/.tasker TASKER_USER=adam tasker task show 462 --json");
+});
+
+test("tk bez TK_USER vezme používateľa z AGENT_TASKER_USER, inak tasker", () => {
+  const a = tk(["task", "list"], { AGENT_NAME: "adam", TK_USER: "", AGENT_TASKER_USER: "tasker-svc" });
+  assert.equal(a.called, "-u tasker-svc -- env TASKER_HOME=/home/tasker-svc/.tasker TASKER_USER=adam tasker task list");
+  const b = tk(["task", "list"], { AGENT_NAME: "adam", TK_USER: "" });
+  assert.match(b.called, /^-u tasker -- env TASKER_HOME=\/home\/tasker\/\.tasker /);
 });
 
 test("tk bez AGENT_NAME a bez persony skončí chybou a tasker nespustí", () => {
