@@ -28,6 +28,7 @@ import { brainGlobalDir, workflowDir } from "./lib/paths.mjs";
 import { agentDefProblems } from "./lib/agent_defs.mjs";
 import { requiresProblems } from "./lib/hook_requires.mjs";
 import { deadCodeProblems } from "./lib/dead_code.mjs";
+import { driftProblems, settingsFor, tableProblems } from "./env/hooks.mjs";
 
 const REPO = dirname(fileURLToPath(import.meta.url));
 // Prostredie: Mac má pracovisko ~/Work, server stromy agentov v /root.
@@ -126,19 +127,23 @@ for (const bucket of entries(join(CLAUDE, "skills", "synced"))) {
 }
 
 // 4. zapnuté pluginy
+// Pluginy, deny a skillOverrides berie kontrola zo živého ~/.claude/settings.json
+// (kľúče mimo hookov patria stroju a spoločnému mozgu, nie tomuto repu); hooky
+// vzniknú z env/hooks.mjs (druh mac) a živý súbor sa s nimi porovná nižšie.
+const generated = settingsFor("mac", join(REPO, "hooks"), REPO);
 let settings = {};
 try {
-  settings = JSON.parse(readFileSync(join(REPO, "env", "mac", "settings.json"), "utf8"));
+  if (existsSync(join(CLAUDE, "settings.json"))) settings = JSON.parse(readFileSync(join(CLAUDE, "settings.json"), "utf8"));
 } catch (e) {
-  problems.push(`env/mac/settings.json sa nedá načítať: ${e.message}`);
+  problems.push(`~/.claude/settings.json sa nedá načítať: ${e.message}`);
 }
 // Commit agenta nemá trailer Co-Authored-By ani Claude-Session. Zastaraný
 // includeCoAuthoredBy odkaz na reláciu Remote Control neskryje (2026-10-16).
 // Platí aj pre nastavenie agentov v ich repách.
-// Na serveri aj spoločné nastavenie rootu, z neho bežia vlákna bez vlastného
-// .claude/settings.json (2026-10-19).
-const attributionFiles = [join(REPO, "env", "mac", "settings.json"), ...agentRepos().map((a) => join(AGENTI, a, ".claude", "settings.json"))];
-if (!MAC && !process.env.AR_AGENTS) attributionFiles.push(join(CLAUDE, "settings.json"));
+// Spoločné nastavenie (root na serveri, používateľ na Macu), z neho bežia vlákna
+// bez vlastného .claude/settings.json (2026-10-19).
+const attributionFiles = agentRepos().map((a) => join(AGENTI, a, ".claude", "settings.json"));
+if (!process.env.AR_AGENTS) attributionFiles.push(join(CLAUDE, "settings.json"));
 for (const p of attributionFiles) {
   let a;
   try {
@@ -165,8 +170,8 @@ for (const { key, plugin, root } of pluginRoots(settings)) {
     const uo = userOnly(p);
     found.push({ name: basename(p), id, source: `plugin ${key}${uo ? ", len /príkaz" : ""}`, userOnly: uo });
     if (MODEL_PLUGINS.has(key)) {
-      if (uo) problems.push(`pluginový skill ${id} má volať aj model, ale je len na príkaz, spusti ./install.sh`);
-    } else if (!uo) problems.push(`pluginový skill ${id} sa načítava automaticky, spusti ./install.sh`);
+      if (uo) problems.push(`pluginový skill ${id} má volať aj model, ale je len na príkaz, spusti env/mac/install.sh`);
+    } else if (!uo) problems.push(`pluginový skill ${id} sa načítava automaticky, spusti env/mac/install.sh`);
   }
 }
 
@@ -256,27 +261,28 @@ function linked(link, target) {
   }
 }
 if (!deployed) notes.push(`${tilde(REPO)} nie je nasadený klon ${tilde(DEPLOY_CLONE)}, nasadenie (symlinky, settings.json, gitignore) sa tu nekontroluje`);
-if (deployed && !linked(join(CLAUDE, "CLAUDE.md"), join(REPO, "RULES.md"))) problems.push("~/.claude/CLAUDE.md nie je symlink na RULES.md repa — spusti install.sh prostredia");
+// ~/.claude/CLAUDE.md je súbor s dvoma importmi: RULES.md klonu kódu a RULES.md spoločného mozgu.
+if (deployed) {
+  let have = [];
+  try {
+    have = readFileSync(join(CLAUDE, "CLAUDE.md"), "utf8").split("\n").map((l) => l.trim());
+  } catch {}
+  for (const want of [join(REPO, "RULES.md"), join(brainGlobalDir(), "RULES.md")])
+    if (!have.includes(`@${want}`)) problems.push(`~/.claude/CLAUDE.md nemá riadok @${tilde(want)} — spusti install.sh prostredia (env/${MAC ? "mac" : "server"}/install.sh)`);
+}
 if (deployed && MAC && !linked(join(WORK, "CLAUDE.md"), join(brainGlobalDir(), "env", "mac", "RULES.md"))) problems.push("~/Work/CLAUDE.md nie je symlink na env/mac/RULES.md spoločného mozgu — spusti env/mac/install.sh");
 if (deployed && !MAC && !linked(join(WORK, "CLAUDE.md"), join(brainGlobalDir(), "env", "server", "RULES.md"))) problems.push("/root/CLAUDE.md nie je symlink na env/server/RULES.md spoločného mozgu — spusti env/server/install.sh");
 
-function canon(v) {
-  if (Array.isArray(v)) return v.map(canon);
-  if (v && typeof v === "object") return Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])]));
-  return v;
-}
-if (deployed && MAC) try {
-  const live = JSON.parse(readFileSync(join(CLAUDE, "settings.json"), "utf8"));
-  if (JSON.stringify(canon(live)) !== JSON.stringify(canon(settings)))
-    problems.push("drift: ~/.claude/settings.json ≠ env/mac/settings.json — porovnaj (diff) a zosúlaď: zmenu z harness-u prenes do repa, potom spusti env/mac/install.sh (živý súbor zálohuje a prepíše)");
-} catch (e) {
-  problems.push(`~/.claude/settings.json sa nedá načítať: ${e.message}`);
+if (deployed && MAC) {
+  // Živý súbor sa nesmie líšiť od toho, čo z env/hooks.mjs urobí env/mac/install.sh.
+  const drift = driftProblems(settings, "mac", join(REPO, "hooks"), REPO);
+  if (drift.length) problems.push(`drift: ~/.claude/settings.json ≠ výstup env/hooks.mjs (mac) — spusti env/mac/install.sh (zlúči hooky do živého súboru, ostatné kľúče nechá)`);
 }
 if (deployed && MAC) try {
   const ex = execSync("git config --global core.excludesfile", { encoding: "utf8" }).trim();
-  if (resolve(ex.replace(/^~/, HOME)) !== join(REPO, "env", "mac", "gitignore")) problems.push("globálny gitignore nie je nastavený na env/mac/gitignore — spusti ./install.sh");
+  if (resolve(ex.replace(/^~/, HOME)) !== join(REPO, "env", "mac", "gitignore")) problems.push("globálny gitignore nie je nastavený na env/mac/gitignore — spusti env/mac/install.sh");
 } catch {
-  problems.push("globálny gitignore nie je nastavený — spusti ./install.sh");
+  problems.push("globálny gitignore nie je nastavený — spusti env/mac/install.sh");
 }
 
 // --- unslop v kontexte relácie ----------------------------------------------
@@ -288,14 +294,14 @@ try {
 } catch (e) {
   problems.push(`unslop: pravidlá sa nedajú načítať: ${e.message}`);
 }
-const startCmds = (settings.hooks?.SessionStart || []).flatMap((m) => m.hooks || []).map((h) => h.command || "");
+const startCmds = (generated.hooks?.SessionStart || []).flatMap((m) => m.hooks || []).map((h) => h.command || "");
 if (!startCmds.some((c) => /hooks\/unslop\.mjs"?\s*$/.test(c)))
-  problems.push("unslop: env/mac/settings.json nevolá SessionStart hook hooks/unslop.mjs bez argumentu");
+  problems.push("unslop: env/hooks.mjs nevolá pre mac SessionStart hook hooks/unslop.mjs bez argumentu");
 // Zmena pravidiel ide do ťahu hookom rules_delta.mjs, nie správou do
 // schránky (rozhodnutie z 19. 10. 2026, budič budí zadávateľa len keď čaká).
-const promptCmds = (settings.hooks?.UserPromptSubmit || []).flatMap((m) => m.hooks || []).map((h) => h.command || "");
+const promptCmds = (generated.hooks?.UserPromptSubmit || []).flatMap((m) => m.hooks || []).map((h) => h.command || "");
 if (!promptCmds.some((c) => /hooks\/rules_delta\.mjs"?\s*$/.test(c)))
-  problems.push("rules_delta: env/mac/settings.json nevolá UserPromptSubmit hook hooks/rules_delta.mjs");
+  problems.push("rules_delta: env/hooks.mjs nevolá pre mac UserPromptSubmit hook hooks/rules_delta.mjs");
 
 // --- spustiteľné súbory v gite -----------------------------------------------
 // env/mac/install.sh robí chmod +x na hooks/*.mjs. Súbor, ktorý má v gite
@@ -425,6 +431,10 @@ problems.push(...agentDefProblems(REPO));
 
 // Každý hook nesie v druhom riadku `// requires: ...` (lib/hook_requires.mjs).
 problems.push(...requiresProblems(REPO));
+
+// Tabuľka hookov env/hooks.mjs: hook existuje, requires sedí s hlavičkou, každý
+// hook v hooks/ je v tabuľke, pomocný modul alebo výnimka.
+problems.push(...tableProblems(REPO));
 
 // Súbor kódu, ktorý nikde mimo seba a mimo testov nie je importovaný, volaný ani
 // menovaný, je mŕtvy; výnimky nesie lib/dead_code_allow.txt (lib/dead_code.mjs).
