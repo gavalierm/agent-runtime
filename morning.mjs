@@ -12,6 +12,8 @@
 // a zásahy operátora za 24 h (operatorSection, úloha 605): udalosti operátora
 // a posuny poradia v Taskeri, komentáre agenta za operátora (telo začína
 // AGENT_OPERATOR_NAME) a správy operátora z webu v T3 (cfg.t3Db). Obe DB len na čítanie.
+// runningSection (úloha 662): zoznam úloh in_progress s časom vstupu a otvorenou prácou, lebo `tasker summary`
+// dáva len počet.
 // Hotové dáta pre report bez ručného dopytovania (úloha 607, D0179): stalledSection
 // (úlohy, ktoré v okne 24 h stáli viac ako 1 h v stave bez práce, s príčinou, a otvorené
 // needs_human s vekom), interruptedSection (behy killed a cancelled s udalosťami úlohy
@@ -288,6 +290,33 @@ function stallCause(state, start, end, ev, comments, task) {
   return "";
 }
 
+// Beží (úloha 662): úlohy v stave in_progress s riešiteľom, projektom, časom vstupu do stavu (posledná
+// udalosť created alebo status do in_progress, inak updated_at) a otvorenou prácou z tabuľky work (ended_at
+// null, until v budúcnosti). `tasker summary` dáva len počet. DB len na čítanie, chyba vráti riadok.
+export function runningSection(cfg, now = Date.now()) {
+  try {
+    const db = new DatabaseSync(cfg.taskerDb, { readOnly: true });
+    let tasks, events, work;
+    try {
+      tasks = db.prepare("SELECT id, title, assignee, project, updated_at FROM tasks WHERE status = 'in_progress'").all();
+      events = db.prepare("SELECT task_id, at, kind, to_status FROM events WHERE task_id IS NOT NULL AND (kind = 'created' OR kind = 'status') AND to_status = 'in_progress' ORDER BY id").all();
+      work = db.prepare("SELECT task_id, agent, since FROM work WHERE ended_at IS NULL AND until > ?").all(now);
+    } finally { db.close(); }
+    const lastIn = new Map();
+    for (const e of events) lastIn.set(e.task_id, e.at);
+    const rows = tasks.map((t) => ({ t, start: lastIn.get(t.id) ?? t.updated_at })).sort((a, b) => a.start - b.start || a.t.id - b.t.id);
+    const lines = ["", `Beží (úlohy in_progress: ${rows.length}), od vstupu do stavu:`, ""];
+    if (!rows.length) lines.push("- žiadne");
+    for (const { t, start } of rows) {
+      const open = work.filter((w) => w.task_id === t.id).map((w) => `pracuje ${w.agent} od ${hhmm(w.since)}`);
+      lines.push(`- úloha ${t.id} ${t.assignee || "bez riešiteľa"}, ${t.project || "bez projektu"}, "${cut(t.title, 70)}": od ${fmtAt(start)} (${fmtDur(now - start)}), ${open.length ? open.join("; ") : "bez otvorenej práce"}`);
+    }
+    return lines;
+  } catch (e) {
+    return ["", "", `Beží: čítanie databázy Taskera zlyhalo: ${(e.message || "").toString().trim().slice(0, 300)}`];
+  }
+}
+
 // Stojace úlohy za 24 h (úloha 607): prechody stavu (udalosti `created` a `status`) zložené do intervalov. Interval
 // v stave bez práce (IDLE_STATES) dlhší než hodina v okne ide do zoznamu s trvaním v okne a celým trvaním od vstupu.
 // Otvorené needs_human idú zvlášť s vekom od vstupu, hoci vstúpili pred oknom. Úlohy unassigned bez prechodu
@@ -545,6 +574,7 @@ export function build(cfg, run = execFileSync, now = Date.now(), deps = {}) {
     "",
     done.text,
     ...done.lines,
+    ...runningSection(cfg, now),
     ...stalledSection(cfg, now),
     ...interruptedSection(cfg, now),
     ...repliesSection(cfg, now),
