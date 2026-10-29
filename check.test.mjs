@@ -55,5 +55,19 @@ const bad = runCheck((dir) => {
 const failsAsExpected = bad.code === 1 && /agents\/implementator\.md nemá vo frontmatteri riadok `model: sonnet`/.test(bad.out);
 if (!failsAsExpected) console.log(bad.out);
 console.log(failsAsExpected ? "check.mjs na kópii bez model: sonnet zlyhá: v poriadku" : `✗ check.mjs na kópii bez model: sonnet skončil kódom ${bad.code}, čakal som 1 s hlásením`);
+
+// Hook bez riadku requires a nový súbor kódu, ktorý nikto nemenuje, musia zhodiť check.
+const noRequires = runCheck((dir) => {
+  const f = join(dir, "hooks", "guard.mjs");
+  writeFileSync(f, readFileSync(f, "utf8").replace(/^\/\/ requires: .*\n/m, ""));
+});
+const requiresFails = noRequires.code === 1 && /hooks\/guard\.mjs: druhý riadok nie je `\/\/ requires:/.test(noRequires.out);
+if (!requiresFails) console.log(noRequires.out);
+console.log(requiresFails ? "check.mjs na hooku bez requires zlyhá: v poriadku" : "✗ check.mjs na hooku bez requires nezlyhal");
+
+const dead = runCheck((dir) => writeFileSync(join(dir, "hooks", "nikto_nevola.mjs"), "#!/usr/bin/env node\n// requires: none\nconsole.log(1);\n"));
+const deadFails = dead.code === 1 && /mŕtvy kód hooks\/nikto_nevola\.mjs/.test(dead.out);
+if (!deadFails) console.log(dead.out);
+console.log(deadFails ? "check.mjs na nemenovanom súbore zlyhá: v poriadku" : "✗ check.mjs na mŕtvom súbore nezlyhal");
 rmSync(empty, { recursive: true, force: true });
-process.exit(okPass && failsAsExpected ? 0 : 1);
+process.exit(okPass && failsAsExpected && requiresFails && deadFails ? 0 : 1);
