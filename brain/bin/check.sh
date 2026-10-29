@@ -3,8 +3,13 @@
 # It runs from the repo root and from any subfolder. An error is one line on stderr
 # with a path, a warning is one line on stdout.
 #
-#   check.sh                 runs all checks
-#   check.sh --install-hook  copies bin/pre-commit to .git/hooks/pre-commit
+#   check.sh [<target>]                  runs all checks
+#   check.sh --install-hook [<target>]   installs the pre-commit hook of the target repo
+#
+# The target is the root of a repo (the brain is its folder agentic-brain/, mode project)
+# or a brain folder at the root of a repo (the repo is the brain, mode global). Without a
+# target the script checks the brain it lies in (brain/bin/check.sh of a copy made by
+# adopt.sh --standalone, or the repo root of this script).
 #
 # The variable AGENTIC_BRAIN_GLOBAL may point to the folder of the global brain
 # (with RULES.md and skills/). Without it, the script looks for ~/agentic-brain.
@@ -19,15 +24,39 @@
 #
 # A skill with the same name in two layers is an error when its SKILL.md differs. The same
 # SKILL.md (the same skill of the template) may exist in every layer.
+#
+# A skill needs scripts/ with a script. A skill with the frontmatter line "scripts: none" needs
+# a non-empty "scripts-reason:" line instead and may have no scripts/.
 set -u
 
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-BRAIN=$(cd "$SELF_DIR/.." && pwd -P)
 
-case "${1:-}" in
-  ""|--install-hook) ;;
-  *) echo "Usage: check.sh [--install-hook]" >&2; exit 2 ;;
-esac
+usage() { echo "Usage: check.sh [--install-hook] [<repo or brain folder>]" >&2; exit 2; }
+
+INSTALL_HOOK=0; TARGET=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --install-hook) INSTALL_HOOK=1; shift ;;
+    -*) usage ;;
+    *) [ -z "$TARGET" ] || usage; TARGET=$1; shift ;;
+  esac
+done
+
+# a folder is a brain when it has RULES.md and the error register
+is_brain() { [ -f "$1/RULES.md" ] && [ -f "$1/errors/REGISTER.md" ]; }
+
+if [ -n "$TARGET" ]; then
+  if [ ! -d "$TARGET" ]; then echo "check.sh: target $TARGET is not a folder" >&2; exit 2; fi
+  TARGET=$(cd "$TARGET" && pwd -P)
+  if is_brain "$TARGET/agentic-brain"; then BRAIN=$TARGET/agentic-brain
+  elif is_brain "$TARGET"; then BRAIN=$TARGET
+  else
+    echo "check.sh: $TARGET has no brain (agentic-brain/RULES.md with errors/REGISTER.md, or RULES.md with errors/REGISTER.md in the folder itself)" >&2
+    exit 1
+  fi
+else
+  BRAIN=$(cd "$SELF_DIR/.." && pwd -P)
+fi
 
 ROOT=$(git -C "$BRAIN" rev-parse --show-toplevel 2>/dev/null) || ROOT=""
 if [ -z "$ROOT" ]; then
@@ -97,19 +126,25 @@ project_brain() {
   printf '%s' "$abs"
 }
 
+# the hook of the target repo: its own agentic-brain/bin/check.sh when the repo has a copy
+# (adopt.sh --standalone), otherwise this script by the absolute path written at install time
 install_hook() {
-  local src="$BRAIN/bin/pre-commit" gitdir hooks dst
-  [ -f "$src" ] || { err "$(rel "$src")" "pre-commit hook is missing"; return 1; }
+  local src="$SELF_DIR/pre-commit" gitdir hooks dst tmp
+  [ -f "$src" ] || { err "$src" "pre-commit hook is missing"; return 1; }
   gitdir=$(git -C "$ROOT" rev-parse --git-common-dir 2>/dev/null) || { err "$ROOT" "not a git repo, the hook is not installed"; return 1; }
   gitdir=$(cd "$ROOT" && cd "$gitdir" && pwd -P)
   hooks="$gitdir/hooks"
   dst="$hooks/pre-commit"
-  if [ -e "$dst" ] && ! cmp -s "$src" "$dst" && ! grep -q 'agentic-brain/bin/check.sh' "$dst"; then
-    err "$dst" "another pre-commit hook exists and was left alone, add a call to agentic-brain/bin/check.sh to it"
+  tmp=$(mktemp)
+  sed "s|__CHECK__|$SELF_DIR/check.sh|" "$src" > "$tmp"
+  if [ -e "$dst" ] && ! cmp -s "$tmp" "$dst" && ! grep -q 'agentic-brain/bin/check.sh\|agentic-brain check hook' "$dst"; then
+    rm -f "$tmp"
+    err "$dst" "another pre-commit hook exists and was left alone, add a call to check.sh to it"
     return 1
   fi
   mkdir -p "$hooks"
-  cp "$src" "$dst" && chmod +x "$dst"
+  cp "$tmp" "$dst" && chmod +x "$dst"
+  rm -f "$tmp"
   info "Hook installed: $dst"
   if [ -n "$(git -C "$ROOT" config core.hooksPath 2>/dev/null)" ]; then
     warn "$dst" "core.hooksPath is set, git will not run the hook from .git/hooks"
@@ -117,7 +152,7 @@ install_hook() {
   return 0
 }
 
-if [ "${1:-}" = "--install-hook" ]; then
+if [ "$INSTALL_HOOK" = 1 ]; then
   install_hook && exit 0
   exit 1
 fi
@@ -146,7 +181,11 @@ check_skills() {
     elif [ -z "$(fm_get "$f" description)" ]; then
       err "$(rel "$f")" "frontmatter has no description"
     fi
-    nonempty_dir "$d/scripts" || err "$(rel "$d")/scripts" "scripts/ is missing or empty"
+    if [ -f "$f" ] && [ "$(fm_get "$f" scripts)" = none ]; then
+      [ -n "$(fm_get "$f" scripts-reason)" ] || err "$(rel "$f")" "scripts: none needs a scripts-reason line"
+    else
+      nonempty_dir "$d/scripts" || err "$(rel "$d")/scripts" "scripts/ is missing or empty"
+    fi
   done
 }
 

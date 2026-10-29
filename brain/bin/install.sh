@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Installation of the brain.
 #
-#   install.sh           project layer in this repo: skill symlinks
-#                        in .claude/skills and the pre-commit hook
-#   install.sh --global  this repo is a clone of the global brain (~/agentic-brain):
-#                        adds an import of RULES.md to ~/.claude/CLAUDE.md and
-#                        puts symlinks to the skills in ~/.claude/skills
+#   install.sh [<target>]  the target repo (the repo of the current folder when omitted):
+#                          check.sh <target> creates the skill symlinks in .claude/skills,
+#                          check.sh --install-hook <target> installs the pre-commit hook
+#   install.sh --global    this repo is a clone of the global brain (~/agentic-brain), for an
+#                          operator who has no clone of the agent-runtime repo: adds an import
+#                          of RULES.md to ~/.claude/CLAUDE.md and puts symlinks to the
+#                          skills in ~/.claude/skills
 #
 # The script is idempotent. The target of the global installation is $HOME/.claude.
 set -u
@@ -14,9 +16,10 @@ SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 BRAIN=$(cd "$SELF_DIR/.." && pwd -P)
 
 install_project() {
-  local rc=0
-  bash "$BRAIN/bin/check.sh" || rc=1
-  bash "$BRAIN/bin/check.sh" --install-hook || rc=1
+  local target=${1:-} rc=0
+  [ -n "$target" ] || target=$(git rev-parse --show-toplevel 2>/dev/null) || target=$BRAIN
+  bash "$SELF_DIR/check.sh" "$target" || rc=1
+  bash "$SELF_DIR/check.sh" --install-hook "$target" || rc=1
   return "$rc"
 }
 
@@ -70,7 +73,7 @@ install_global() {
 }
 
 case "${1:-}" in
-  "") install_project ;;
-  --global) install_global ;;
-  *) echo "Usage: install.sh [--global]" >&2; exit 2 ;;
+  --global) [ "$#" -eq 1 ] || { echo "Usage: install.sh [--global | <target>]" >&2; exit 2; }; install_global ;;
+  -*) echo "Usage: install.sh [--global | <target>]" >&2; exit 2 ;;
+  *) [ "$#" -le 1 ] || { echo "Usage: install.sh [--global | <target>]" >&2; exit 2; }; install_project "${1:-}" ;;
 esac

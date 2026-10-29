@@ -26,15 +26,18 @@ One row is one occurrence.
 
 ## What the script does
 
-`scripts/error.sh` adds one row to the register with the date, the class, the description, the fix (file and commit) and the mechanism. Without a mechanism it exits with code 1 and writes nothing.
+`scripts/error.sh` adds one row `| date | class | description | fix | test |` to the register: the fix column holds the file, its commit and the mechanism, the test column holds `--check` or, without it, the mechanism. Without a mechanism it exits with code 1 and writes nothing.
 
 ```
-scripts/error.sh --class <class> --file <fixed file> --mechanism <hook|test|deny|decision>:<ref> [--description "<what I claimed or did>"]
+scripts/error.sh --class <class> --file <fixed file> --mechanism <hook|test|deny|decision>:<ref> [--description "<what I claimed or did>"] [--truth "<what was true>"] [--check "<hook or test that stops it>"] [--brain <folder>]
+scripts/error.sh --open
 ```
 
-On the second occurrence of the same class in the same register the script creates a review task in the task manager when `AGENT_TK` is set. Without `AGENT_TK` it prints that the task has to be created by hand.
+The script finds the register from the current folder: `agentic-brain/errors/REGISTER.md` of the repo, else `errors/REGISTER.md` at the repo root, else the register of the global brain. `--brain <folder>` names a brain (or a repo root that has `agentic-brain/`) explicitly. `--open` lists the rows without a fix and writes nothing.
 
-The output is the report for the operator in four sentences: what I claimed or did, which mechanism let it through, which file and commit changed, which check stops it now. Put it into the next reply to the operator, also when the operator does not ask.
+On the second occurrence of the same class in the same register the script creates a review task through the command in `AGENT_TK` (project `agenti`, assignee `ERROR_REVIEWER` or the role `spravca-agentov`) and writes the task number into the fix column. Without `AGENT_TK` it prints that the task is not created and has to be created by hand.
+
+The output is the report for the operator in four sentences: what I claimed or did, what was true (`--truth`, name the mechanism that let it through), which file and commit changed, which check stops it now. Put it into the next reply to the operator, also when the operator does not ask.
 
 ## Steps
 

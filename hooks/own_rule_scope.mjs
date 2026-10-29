@@ -20,7 +20,7 @@
 // vlastného repa, správne miesto bolo env/server/RULES.md.
 //
 // Odsek s dátumom chyby (úloha 613): chyba agenta sa zapisuje len do registra
-// skriptom chyba.sh (stĺpec mechanizmus), nikdy ako nový odsek "Chyba <deň>. <mesiac>. <rok>"
+// skriptom error.sh (stĺpec opravy s mechanizmom), nikdy ako nový odsek "Chyba <deň>. <mesiac>. <rok>"
 // do CLAUDE.md alebo PERSONA.md (ľubovoľný taký súbor, aj v repe kódu). Hook
 // zamietne trvalo, druhý pokus neprejde: Edit a MultiEdit s väčším počtom takých
 // odsekov v new_string než v old_string, Write s väčším počtom než má súbor,
@@ -52,7 +52,7 @@ export const POSTUP =
   "v repe kódu alebo spoločného mozgu (commit s riadkom o dosahu); ak je len tvoja, zopakuj ten istý zápis a prejde.";
 
 export const POSTUP_CHYBA =
-  `spusti ${join(workflowDir(), "bin", "chyba.sh")} --trieda <trieda> --subor <súbor s opravou> --mechanizmus <hook|test|deny|rozhodnutie>:<cesta alebo id>; ` +
+  `spusti ${join(workflowDir(), "skills", "error", "scripts", "error.sh")} --class <trieda> --file <súbor s opravou> --mechanism <hook|test|deny|decision>:<cesta alebo id>; ` +
   "pravidlo bez dátumu a čísla úlohy prepíš v existujúcom odseku.";
 
 const CHYBA_RE = /\bChyba \d{1,2}\. ?\d{1,2}\. ?\d{4}\b/g;
@@ -162,7 +162,7 @@ export function seenBefore({ stateDir, session, file, text }) {
 
 export function check(input, opts = {}) {
   const chyba = chybaOdsek(input, opts.read);
-  if (chyba) return `Odsek Chyba ${chyba.datum} do ${chyba.file} nejde, chyba patrí do registra (skill chyba).`;
+  if (chyba) return `Odsek Chyba ${chyba.datum} do ${chyba.file} nejde, chyba patrí do registra (skill error).`;
   if (!["Write", "Edit", "MultiEdit"].includes(input.tool_name)) return null;
   const file = (input.tool_input || {}).file_path;
   if (!file) return null;

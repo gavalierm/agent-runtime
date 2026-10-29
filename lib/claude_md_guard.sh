@@ -6,7 +6,7 @@
 # Pre každý pridaný alebo zmenený súbor v indexe:
 #  - súbor s menom CLAUDE.md má najviac 200 riadkov,
 #  - CLAUDE.md a PERSONA.md nenesú odsek "Chyba <dátum>": chyba agenta žije
-#    v registri (skill chyba, bin/chyba.sh), do súboru ide len pravidlo,
+#    v registri (skill error, skills/error/scripts/error.sh), do súboru ide len pravidlo,
 #  - textový súbor nemá riadok začínajúci značkou konfliktu.
 #
 # Výnimka len s dôvodom: CLAUDE_MD_GUARD_SKIP="<dôvod>" git commit ...
@@ -47,7 +47,7 @@ while IFS= read -r -d '' f; do
         hit="$(printf '%s' "$content" | grep -nE 'Chyba [0-9]|chyba [0-9]+\. [0-9]+\. 20[0-9][0-9]' | head -n 1)"
         if [ -n "$hit" ]; then
             deny_postup "Commit odmietnutý: $f nesie chybu s dátumom (riadok ${hit%%:*})." \
-                "chybu zapíš skriptom bin/chyba.sh (skill chyba) a do $f daj len pravidlo bez dátumu, čísla úlohy a príbehu."
+                "chybu zapíš skriptom skills/error/scripts/error.sh (skill error) a do $f daj len pravidlo bez dátumu, čísla úlohy a príbehu."
             status=1
         fi
     fi

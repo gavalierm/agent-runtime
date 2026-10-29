@@ -132,7 +132,7 @@ test("používateľ behov úloh z runtime.env agenta (AGENT_TASKER_USER), bez ne
   assert.equal(run({ ...bez, AGENT_NAME: "iny" }, { ...input, session_id: "t2" }), null);
 });
 
-// Úloha 613: chyba agenta patrí do registra (chyba.sh), nie ako odsek "Chyba <dátum>"
+// Úloha 613: chyba agenta patrí do registra (error.sh), nie ako odsek "Chyba <dátum>"
 // do CLAUDE.md alebo PERSONA.md. Volanie check() priamo, stav a čítanie súborov v tmp.
 function direct() {
   const stateDir = join(mkdtempSync(join(tmpdir(), "ors-direct-")), "state");
@@ -140,7 +140,7 @@ function direct() {
   return { stateDir, exists: () => true };
 }
 const bash = (command, session_id = "b") => ({ session_id, cwd: "/tmp", tool_name: "Bash", tool_input: { command } });
-const CHYBA_DOVOD = /^Odsek Chyba .* nejde, chyba patrí do registra \(skill chyba\)\./;
+const CHYBA_DOVOD = /^Odsek Chyba .* nejde, chyba patrí do registra \(skill error\)\./;
 
 test("613 a: Edit s novým odsekom Chyba <dátum> je zamietnutý trvalo, druhý pokus tiež", () => {
   const o = direct();
@@ -196,12 +196,12 @@ test("613 d: Bash zápis odseku Chyba do CLAUDE.md alebo PERSONA.md je zamietnut
   for (const c of pass) assert.equal(check(bash(c, "p"), o), null, c);
 });
 
-test("613 d: hook ako proces zamietne Bash zápis s postupom chyba.sh --mechanizmus", () => {
+test("613 d: hook ako proces zamietne Bash zápis s postupom error.sh --mechanism", () => {
   const { e } = env();
   const r = run(e, bash("cat >> /root/adam/CLAUDE.md <<'EOF'\nChyba 27. 10. 2026: x\nEOF"));
   assert.equal(r.permissionDecision, "deny");
   assert.match(r.permissionDecisionReason, CHYBA_DOVOD);
-  assert.match(r.permissionDecisionReason, /\nSprávny postup: spusti \/opt\/agentic-workflow\/bin\/chyba\.sh --trieda <trieda> --subor <súbor s opravou> --mechanizmus <hook\|test\|deny\|rozhodnutie>:<cesta alebo id>/);
+  assert.match(r.permissionDecisionReason, /\nSprávny postup: spusti \/opt\/agentic-workflow\/skills\/error\/scripts\/error\.sh --class <trieda> --file <súbor s opravou> --mechanism <hook\|test\|deny\|decision>:<cesta alebo id>/);
   assert.equal(run(e, bash("grep -n 'Chyba 27. 10. 2026' /root/adam/CLAUDE.md")), null);
   assert.equal(run(e, bash("echo 'Chyba 27. 10. 2026: x'")), null);
 });

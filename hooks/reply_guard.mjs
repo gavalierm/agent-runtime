@@ -15,7 +15,7 @@
 // žiada postup, podrobnosti, vysvetlenie alebo dokument, detailRequested), vetu
 // nad 35 slov, položku zoznamu s viac vetami alebo adresu http(s), ktorá dnes
 // neodpovedá. Zastaví na prvom probléme. Bloky kódu, inline kód, nadpisy,
-// tabuľky, zoznamy, štyri vety hlásenia chyby z bin/chyba.sh a riadky
+// tabuľky, zoznamy, štyri vety hlásenia chyby zo skills/error/scripts/error.sh a riadky
 // unslop:, identita:, Čaká na teba:, Príkaz pre teba a HOTOVO-KONTEXT (aj s režimom a kľúčom z kontext.sh) sa do
 // prózy nepočítajú.
 //
@@ -88,7 +88,7 @@ export const MAX_SENTENCES = 3;
 export const MAX_SENTENCES_DETAIL = 6;
 export const MAX_WORDS = 35;
 
-// Riadky hlásenia uznanej chyby (bin/chyba.sh, global §4) sa do prózy nerátajú.
+// Riadky hlásenia uznanej chyby (skills/error/scripts/error.sh, global §4) sa do prózy nerátajú.
 const SKIP_LINE = /^(unslop:|overené:|identita:|čaká na teba:|príkaz pre teba|hotovo-kontext|tvrdil alebo urobil som:|pravda bola:|zmenil sa súbor |nabudúce to zastaví:)/i;
 
 // Operátor žiada dlhšiu odpoveď: postup, kroky, podrobnosti, vysvetlenie,

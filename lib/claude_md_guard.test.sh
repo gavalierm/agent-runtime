@@ -82,7 +82,7 @@ printf 'Pravidlo.\n\n%s 27. 10. 2026: x\n' "$CH" > PERSONA.md
 git add PERSONA.md
 check "odsek s chybou a dátumom v PERSONA.md zlyhá" 1 git commit -q -m "chyba" -- PERSONA.md
 contains "hláška menuje riadok" "PERSONA.md nesie chybu s dátumom (riadok 3)"
-contains "hláška posiela na chyba.sh" "Správny postup: chybu zapíš skriptom bin/chyba.sh"
+contains "hláška posiela na error.sh" "Správny postup: chybu zapíš skriptom skills/error/scripts/error.sh"
 
 printf 'Pravidlo, ktoré vzniklo ako %s 23. 10. 2026, úloha 404.\n' "${CH,,}" > PERSONA.md
 git add PERSONA.md
