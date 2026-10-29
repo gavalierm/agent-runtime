@@ -281,7 +281,7 @@ for (const [text, name, want] of named) {
 
 // Priebežná správa so zámerom (námietka 27. 10. 2026), prvý prípad je skutočná veta Huga.
 const intent = [
-  ["Prečítam hook štartu relácie v /root/agent-runtime, aby som overil, čo pri štarte vkladá a odkiaľ berie stav odovzdávky.", "hlási zámer"],
+  ["Prečítam hook štartu relácie v /opt/agentic-workflow, aby som overil, čo pri štarte vkladá a odkiaľ berie stav odovzdávky.", "hlási zámer"],
   ["Pozriem, čo máme.", "hlási zámer"],
   ["Teraz skontrolujem test.", "hlási zámer"],
   ["I'll check the hook first.", "hlási zámer"],

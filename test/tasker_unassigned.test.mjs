@@ -56,8 +56,8 @@ test("most: odblokovaná úloha bez riešiteľa dá zakladateľovi adam jednu sp
   assert.match(m, /^odpoveď: nečakám\nTasker: úloha #1, ktorú si založil, je odblokovaná a nemá riešiteľa/);
   assert.match(m, /Odkaz: https:\/\/\S+\/tasks\/1\n/);
   assert.match(m, /Názov: Bez riešiteľa, od Adama/);
-  assert.match(m, /Detail: AGENT_NAME=adam \/opt\/agent-rules\/bin\/tk task show 1 --json/);
-  assert.match(m, /Hotovo: AGENT_NAME=adam \/opt\/agent-rules\/bin\/tk done 1 --summary/);
+  assert.match(m, /Detail: AGENT_NAME=adam \/opt\/agentic-workflow\/bin\/tk task show 1 --json/);
+  assert.match(m, /Hotovo: AGENT_NAME=adam \/opt\/agentic-workflow\/bin\/tk done 1 --summary/);
   assert.deepEqual(msgs(borisBox), []);
   assert.equal((await bridgeTick(cfg, agents)).written, 0, "druhý beh tú istú udalosť nepošle");
   assert.equal(msgs(box).length, 1);

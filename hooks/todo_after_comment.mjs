@@ -17,7 +17,8 @@ import { fileURLToPath } from "node:url";
 import { blockStop } from "../lib/deny.mjs";
 import { defaultDb } from "../lib/tasker_read.mjs";
 import { agentName } from "../lib/agent_name.mjs";
-import { hookEnv, rulesRepo } from "../lib/agent_env.mjs";
+import { hookEnv } from "../lib/agent_env.mjs";
+import { workflowDir } from "../lib/paths.mjs";
 
 // Čas poslednej skutočnej správy operátora (ms), alebo null.
 export function turnStart(transcript) {
@@ -50,10 +51,10 @@ export async function todoWithComment({ db, user, sinceMs }) {
   } finally { d.close(); }
 }
 
-export const POSTUP = (ids, rules = rulesRepo()) =>
+export const POSTUP = (ids, workflow = workflowDir()) =>
   `pre každú úlohu (${ids.join(", ")}) jedno z: hotová je \`tasker done <id> --summary "..."\`, čaká na udalosť mimo Taskera `
   + "`tasker wait <id> --reason \"na čo\" --until <čas>`, čaká na inú úlohu `tasker block <id> --by <id> --reason \"na čom stojí\"`, "
-  + `čaká na človeka otázka v komentári a \`tasker result needs_human\`. Tasker spúšťaj cez \`${rules}/bin/tk ...\` `
+  + `čaká na človeka otázka v komentári a \`tasker result needs_human\`. Tasker spúšťaj cez \`${workflow}/bin/tk ...\` `
   + "(namiesto `tasker ...`).";
 
 export function reason(rows) {
@@ -76,5 +77,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (sinceMs == null) process.exit(0);
     rows = await todoWithComment({ db, user, sinceMs });
   } catch { process.exit(0); }
-  if (rows.length) blockStop(reason(rows), POSTUP(rows.map((r) => r.id), rulesRepo(henv)));
+  if (rows.length) blockStop(reason(rows), POSTUP(rows.map((r) => r.id), workflowDir(henv)));
 }

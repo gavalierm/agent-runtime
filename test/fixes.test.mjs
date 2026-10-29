@@ -150,7 +150,7 @@ test("most: úloha agenta s enabled=0 bez mosta ide vlastníkovi do jeho schrán
   const [m] = s.read(s.adam);
   assert.match(m.n, /^tasker-proj-\d{8}-\d{6}-/);
   assert.match(m.t, /^odpoveď: nečakám\nTasker: úloha #1 pre agenta dev, ktorý je vypnutý a nemá most, nikto ju nespustí\.\nOdkaz: http:\/\/127\.0\.0\.1:8801\/tasks\/1\nNázov: Pre dev\nStav: handoff\nProjekt: proj\n/);
-  assert.match(m.t, /Detail: AGENT_NAME=dev \/opt\/agent-rules\/bin\/tk task show 1 --json/);
+  assert.match(m.t, /Detail: AGENT_NAME=dev \/opt\/agentic-workflow\/bin\/tk task show 1 --json/);
   assert.doesNotMatch(m.t, /runuser/);
   assert.deepEqual(s.read(s.boris), []);
   // Komentár iného autora na úlohe vypnutého agenta nesie text komentára.

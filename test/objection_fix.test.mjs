@@ -17,7 +17,7 @@ const cases = [
   [{ text: "Uznávam, Borisovi som opravil povolenia v 82b2f4d.", cmds: ["cd ~/Work/agenti/boris && chyba.sh --trieda x --subor y; git add runtime/permissions.json install.sh && git commit -qm x"] }, false],
   // D0142: commit bez chyba.sh zastaví, 390 a 420 (23. 10. 2026).
   [{ text: "Máš pravdu, úloha 390 ostala todo. Opravil som hook v 1a2b3c4.", cmds: ["git add hooks/todo_after_comment.mjs && git commit -qm x"] }, true],
-  [{ text: "Moja chyba, úloha 420 ostala todo. Hook 1a2b3c4.", cmds: ["git add hooks/todo_after_comment.mjs && git commit -qm x && /opt/agent-rules/bin/chyba.sh --trieda todo --subor hooks/todo_after_comment.mjs"] }, false],
+  [{ text: "Moja chyba, úloha 420 ostala todo. Hook 1a2b3c4.", cmds: ["git add hooks/todo_after_comment.mjs && git commit -qm x && /opt/agentic-workflow/bin/chyba.sh --trieda todo --subor hooks/todo_after_comment.mjs"] }, false],
   // Commit so zoznamom za `--` bez git add, štýl servera (23. 10. 2026).
   [{ text: "Moja chyba, opravené v 1a2b3c4.", cmds: ["chyba.sh --trieda x --subor PERSONA.md; git commit -m x -- PERSONA.md && git push -q"] }, false],
   [{ text: "Moja chyba, opravené v 1a2b3c4.", cmds: ["chyba.sh --trieda x --subor y; git commit -m x -- memory/MEMORY.md"] }, true],

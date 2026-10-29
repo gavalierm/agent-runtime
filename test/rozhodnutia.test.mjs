@@ -1,6 +1,6 @@
 // Test lib/rozhodnutia.mjs a bin/rozhodni.sh. Všetko beží v dočasných
 // priečinkoch a dočasnom repe s bare origin, skript dostane vždy
-// ROZHODNUTIA_REPO a nikdy ROZHODNI_SYNC_UNIT, takže nemá cestu na živý klon
+// AGENT_BRAIN_GLOBAL a nikdy ROZHODNI_SYNC_UNIT, takže nemá cestu na živý klon
 // ani sync. Spustenie: node --test test/rozhodnutia.test.mjs
 import "../lib/git_isolate.mjs";
 import { test } from "node:test";
@@ -26,10 +26,10 @@ const zaklad = {
 };
 const rec = (o) => ({ ...zaklad, ...o, file: `${o.id || zaklad.id}.md` });
 
-// Priečinok rozhodnutia/ s kópiou ROZSAHY.md a danými záznamami.
+// Priečinok decisions/ s kópiou ROZSAHY.md a danými záznamami.
 function fixtura(records = [], { index = true } = {}) {
   const root = tmp();
-  const dir = join(root, "rozhodnutia");
+  const dir = join(root, "decisions");
   mkdirSync(dir);
   copyFileSync(ROZSAHY, join(dir, "ROZSAHY.md"));
   // Ukážková tabuľka agentov: roles/agents.md patrí repu s rozhodnutiami, nie tomuto repu.
@@ -173,12 +173,12 @@ function repoSOrigin() {
   git(root, "clone", "-q", origin, repo);
   git(repo, "config", "user.email", "t@t");
   git(repo, "config", "user.name", "Test");
-  mkdirSync(join(repo, "rozhodnutia"));
-  copyFileSync(ROZSAHY, join(repo, "rozhodnutia", "ROZSAHY.md"));
+  mkdirSync(join(repo, "decisions"));
+  copyFileSync(ROZSAHY, join(repo, "decisions", "ROZSAHY.md"));
   git(repo, "add", "."); git(repo, "commit", "-qm", "init"); git(repo, "push", "-q", "origin", "HEAD:main");
   const sh = (cwd, args, input = "", extra = {}) => spawnSync("bash", [SH, ...args], {
     cwd, input, encoding: "utf8",
-    env: { ...env, ROZHODNUTIA_REPO: cwd, AGENT_NAME: "beta", ROZHODNI_STROJ: "test", ...extra },
+    env: { ...env, AGENT_BRAIN_GLOBAL: cwd, AGENT_NAME: "beta", ROZHODNI_STROJ: "test", ...extra },
   });
   return { root, repo, origin, git, sh };
 }
@@ -200,7 +200,7 @@ test("rozhodni.sh: dry-run nezapíše nič, zápis commitne pod menom agenta a p
     assert.equal(t.git(t.repo, "log", "-1", "--format=%an|%s").trim(), "Beta (test)|Rozhodnutie D0001: HDD sa nezapája");
     assert.equal(t.git(t.repo, "status", "--short"), "");
     assert.equal(t.git(t.origin, "rev-parse", "main"), t.git(t.repo, "rev-parse", "HEAD"));
-    assert.match(t.git(t.origin, "show", "main:rozhodnutia/INDEX.md"), /D0001 /);
+    assert.match(t.git(t.origin, "show", "main:decisions/INDEX.md"), /D0001 /);
   } finally { rmSync(t.root, { recursive: true, force: true }); }
 });
 
@@ -243,7 +243,7 @@ test("rozhodni.sh: --z-ulohy vyplní zdroj a úlohu z Taskera, explicitné --zdr
 
     r = t.sh(t.repo, [...bezZdroja, "--z-ulohy", "375"], "Plagáty ostávajú tmavé.", ok);
     assert.equal(r.status, 0, r.stderr);
-    assert.match(t.git(t.origin, "show", "main:rozhodnutia/D0001.md"), /^uloha: 375$/m);
+    assert.match(t.git(t.origin, "show", "main:decisions/D0001.md"), /^uloha: 375$/m);
 
     r = t.sh(t.repo, [...bezZdroja.map((x) => (x === "dizajn.plagat.farba" ? "dizajn.plagat.iny" : x)), "--z-ulohy", "375", "--zdroj", "vlákno Gama", "--dry-run"], "Iné.", ok);
     assert.match(r.stdout, /^zdroj: vlákno Gama$/m);
@@ -280,9 +280,9 @@ test("rozhodni.sh: offline zápis ostane lokálne, po cudzom zápise s rovnakým
     assert.equal(t.git(t.origin, "rev-parse", "main"), t.git(t.repo, "rev-parse", "HEAD"));
     const log = t.git(t.repo, "log", "--format=%an|%s", "-3").trim().split("\n");
     assert.deepEqual(log, ["Beta (test)|Rozhodnutie D0003: Iný", "Beta (test)|Rozhodnutie D0002: HDD sa nezapája", "Beta (test)|Rozhodnutie D0001: Cudzí"]);
-    const idx = t.git(t.origin, "show", "main:rozhodnutia/INDEX.md");
+    const idx = t.git(t.origin, "show", "main:decisions/INDEX.md");
     for (const id of ["D0001", "D0002", "D0003"]) assert.match(idx, new RegExp(`^${id} `, "m"));
-    assert.deepEqual(cli(join(t.repo, "rozhodnutia"), "check").stdout, "");
+    assert.deepEqual(cli(join(t.repo, "decisions"), "check").stdout, "");
   } finally { rmSync(t.root, { recursive: true, force: true }); }
 });
 
@@ -356,7 +356,7 @@ test("check: rovnaký názov pri rôznych kľúčoch je upozornenie, kód ostáv
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("subory: súbor z klonu agent-runtime sa uzná, chýbajúci nie", () => {
+test("subory: súbor z klonu tohto repa sa uzná, chýbajúci nie", () => {
   const { root, dir } = fixtura([
     rec({ id: "D0001", subory: "hooks/reply_guard.mjs", kluc: "a.a", alias: "" }),
     rec({ id: "D0002", subory: "hooks/nie_je.mjs", kluc: "a.b", alias: "" }),
@@ -366,34 +366,37 @@ test("subory: súbor z klonu agent-runtime sa uzná, chýbajúci nie", () => {
   try {
     mkdirSync(join(runtime, "hooks"));
     writeFileSync(join(runtime, "hooks", "reply_guard.mjs"), "// hook\n");
-    const t = problems(loadAll(dir), { ...context(dir), runtime }).join("\n");
+    const t = problems(loadAll(dir), { ...context(dir), workflow: runtime }).join("\n");
     assert.doesNotMatch(t, /reply_guard\.mjs' neexistuje/);
     assert.match(t, /hooks\/nie_je\.mjs' neexistuje/);
     assert.doesNotMatch(t, /zmazany\.sh/);
-    assert.match(problems(loadAll(dir), { ...context(dir), runtime: join(runtime, "prazdny") }).join("\n"), /reply_guard\.mjs' neexistuje/);
+    assert.match(problems(loadAll(dir), { ...context(dir), workflow: join(runtime, "prazdny") }).join("\n"), /reply_guard\.mjs' neexistuje/);
   } finally { rmSync(root, { recursive: true, force: true }); rmSync(runtime, { recursive: true, force: true }); }
 });
 
-test("configure: operátor pod iným menom a kontrola repa pravidiel", async () => {
-  const m = await import("../lib/rozhodnutia.mjs?configure");
+test("operátor pod iným menom z AGENT_OPERATOR_NAME", () => {
   const { root, dir } = fixtura([rec({ id: "D0001", rozhodol: "Meno", moc: "operator", zdroj: "povedal", kluc: "a.a", alias: "" })]);
+  const old = process.env.AGENT_OPERATOR_NAME;
   try {
-    assert.doesNotMatch(m.problems(loadAll(dir), m.context(dir)).join("\n"), /zdroj musí niesť/);
-    m.configure({ operatori: ["Meno"], kontroly: [(r, bad) => r.id === "D0001" && bad("kontrola repa")] });
-    const t = m.problems(loadAll(dir), m.context(dir)).join("\n");
-    assert.match(t, /D0001\.md: rozhodol Meno, zdroj musí niesť vlákno/);
-    assert.match(t, /D0001\.md: kontrola repa/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+    delete process.env.AGENT_OPERATOR_NAME;
+    assert.doesNotMatch(problems(loadAll(dir), context(dir)).join("\n"), /zdroj musí niesť/);
+    process.env.AGENT_OPERATOR_NAME = "Meno";
+    assert.match(problems(loadAll(dir), context(dir)).join("\n"), /D0001\.md: rozhodol Meno, zdroj musí niesť vlákno/);
+  } finally {
+    if (old === undefined) delete process.env.AGENT_OPERATOR_NAME; else process.env.AGENT_OPERATOR_NAME = old;
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
-test("rozhodnutia.mjs bez priečinka skončí kódom 2 a rozhodni.sh bez ROZHODNUTIA_REPO tiež", () => {
+test("rozhodnutia.mjs a rozhodni.sh bez priečinka decisions/ skončia kódom 2", () => {
   const env = { PATH: process.env.PATH, HOME: tmp() };
+  env.AGENT_BRAIN_GLOBAL = join(env.HOME, "nie-je");
   try {
     const a = spawnSync("node", [CLI, "list"], { encoding: "utf8", env });
     assert.equal(a.status, 2);
-    assert.match(a.stderr, /ROZHODNUTIA_REPO/);
+    assert.match(a.stderr, /AGENT_BRAIN_GLOBAL/);
     const b = spawnSync("bash", [SH, "--dry-run"], { encoding: "utf8", env, input: "x" });
     assert.equal(b.status, 2);
-    assert.match(b.stderr, /ROZHODNUTIA_REPO/);
+    assert.match(b.stderr, /AGENT_BRAIN_GLOBAL/);
   } finally { rmSync(env.HOME, { recursive: true, force: true }); }
 });

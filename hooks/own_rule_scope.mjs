@@ -1,26 +1,26 @@
 #!/usr/bin/env node
 // own_rule_scope.mjs: pravidlo, ktoré potrebuje aj iný agent, nepatrí do
-// vlastného repa (global/CLAUDE.md §3: "If other agents need a rule or hold
+// vlastného repa (RULES.md §3: "If other agents need a rule or hold
 // a copy, it goes to global rules or a role, not your own repo. Check before
 // writing."). PreToolUse pre Write, Edit, MultiEdit a Bash (zapojuje ho
-// env/server/install.sh a env/mac/settings.json repa pravidiel).
+// adaptér prostredia).
 //
 // Cieľ je CLAUDE.md alebo PERSONA.md v koreni repa agenta: server
 // /root/<meno>/ (s PERSONA.md, inak je to projekt), /home/<AGENT_TASKER_USER>/agenti/<meno>/
 // (používateľ behov úloh, bez premennej sa nekontroluje), Mac ~/Work/agent-<meno>/ a ~/Work/agenti/<meno>/; aj worktree
-// .worktrees/<úloha>/. Repo pravidiel (agent-rules, /opt/agent-rules) a projekty hook nechá tak.
+// .worktrees/<úloha>/. Repo kódu a spoločného mozgu (workflowDir, brainGlobalDir) a projekty hook nechá tak.
 //
 // Zápis, ktorý pridáva text (aspoň 40 znakov navyše alebo nová odrážka "- "),
 // sa prvýkrát zamietne s otázkou, či tú vec robí aj iný agent alebo rola.
 // Rovnaký zápis (relácia + cesta + hash nového textu) zopakovaný druhýkrát
 // prejde. Zmazanie a preformulovanie bez prírastku prejde hneď.
-// Stav: $AR_STATE alebo ~/.local/state/agent-rules/own_rule_scope/<relácia>.
+// Stav: $AR_STATE alebo ~/.local/state/agentic-workflow/own_rule_scope/<relácia>.
 // Príčina zavedenia: pravidlo pre všetkých agentov zapísal agent do CLAUDE.md
-// vlastného repa, správne miesto bolo env/server/CLAUDE.md.
+// vlastného repa, správne miesto bolo env/server/RULES.md.
 //
 // Odsek s dátumom chyby (úloha 613): chyba agenta sa zapisuje len do registra
 // skriptom chyba.sh (stĺpec mechanizmus), nikdy ako nový odsek "Chyba <deň>. <mesiac>. <rok>"
-// do CLAUDE.md alebo PERSONA.md (ľubovoľný taký súbor, aj v repe pravidiel). Hook
+// do CLAUDE.md alebo PERSONA.md (ľubovoľný taký súbor, aj v repe kódu). Hook
 // zamietne trvalo, druhý pokus neprejde: Edit a MultiEdit s väčším počtom takých
 // odsekov v new_string než v old_string, Write s väčším počtom než má súbor,
 // Bash s textom odseku a zápisom (presmerovanie >, >>, tee, sed -i, perl -i,
@@ -39,18 +39,19 @@ import { join, dirname, basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { denyTool } from "../lib/deny.mjs";
 import { hookEnv } from "../lib/agent_env.mjs";
+import { brainGlobalDir, workflowDir } from "../lib/paths.mjs";
 
 export const GROWTH = 40;
 const FILES = new Set(["CLAUDE.md", "PERSONA.md"]);
-const NOT_AGENT = new Set(["agent-rules", "rules"]);
+const NOT_AGENT = new Set([basename(workflowDir()), basename(brainGlobalDir()), "rules"]);
 const WT = /\/\.worktrees\/[^/]+$/;
 
 export const POSTUP =
-  "ak tú vec robí aj iný agent alebo rola, zapíš ju do env/<prostredie>/CLAUDE.md, global/CLAUDE.md alebo roles/ " +
-  "v repe agent-rules (/root/agent-rules, commit s riadkom o dosahu); ak je len tvoja, zopakuj ten istý zápis a prejde.";
+  "ak tú vec robí aj iný agent alebo rola, zapíš ju do RULES.md, env/<prostredie>/RULES.md alebo roles/ " +
+  "v repe kódu alebo spoločného mozgu (commit s riadkom o dosahu); ak je len tvoja, zopakuj ten istý zápis a prejde.";
 
 export const POSTUP_CHYBA =
-  "spusti /opt/agent-rules/bin/chyba.sh --trieda <trieda> --subor <súbor s opravou> --mechanizmus <hook|test|deny|rozhodnutie>:<cesta alebo id>; " +
+  `spusti ${join(workflowDir(), "bin", "chyba.sh")} --trieda <trieda> --subor <súbor s opravou> --mechanizmus <hook|test|deny|rozhodnutie>:<cesta alebo id>; ` +
   "pravidlo bez dátumu a čísla úlohy prepíš v existujúcom odseku.";
 
 const CHYBA_RE = /\bChyba \d{1,2}\. ?\d{1,2}\. ?\d{4}\b/g;
@@ -169,9 +170,9 @@ export function check(input, opts = {}) {
   if (!repo) return null;
   const text = addedText(input, opts.read);
   if (text === null) return null;
-  const stateDir = opts.stateDir || process.env.AR_STATE || join(process.env.HOME || homedir(), ".local/state/agent-rules/own_rule_scope");
+  const stateDir = opts.stateDir || process.env.AR_STATE || join(process.env.HOME || homedir(), ".local/state/agentic-workflow/own_rule_scope");
   if (seenBefore({ stateDir, session: input.session_id, file: abs, text })) return null;
-  return `Zapisuješ nový text do ${abs}, do vlastného repa agenta. Robí tú vec aj iný agent alebo rola? Podľa global/CLAUDE.md §3 taká vec patrí do repa pravidiel, nie do repa jedného agenta.`;
+  return `Zapisuješ nový text do ${abs}, do vlastného repa agenta. Robí tú vec aj iný agent alebo rola? Podľa RULES.md §3 taká vec patrí do spoločných pravidiel, nie do repa jedného agenta.`;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

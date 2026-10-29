@@ -1,0 +1,43 @@
+#!/bin/bash
+# tk — obal príkazu tasker pre agenta pod rootom (úloha Taskera 462).
+#   tk task show 462 --json
+# Spustí `tasker` pod používateľom správcu úloh (AGENT_TASKER_USER, inak `tasker`)
+# s TASKER_HOME a TASKER_USER.
+# Meno agenta: AGENT_NAME, inak TASKER_USER, inak "# Meno" z PERSONA.md
+# projektu (CLAUDE_PROJECT_DIR alebo aktuálny priečinok), malými písmenami.
+# Vlákno T3 agenta nemá AGENT_NAME ani TASKER_USER (lib/agent_name.mjs), meno
+# preto nesie persona. Bez mena skončí kódom 64, Tasker sa nespustí.
+# Premenné TK_HOME a TK_USER menia databázu a používateľa (aj pre test).
+set -u
+. "$(dirname "$(readlink -f "$0")")/../lib/deny.sh"
+name="${AGENT_NAME:-${TASKER_USER:-}}"
+if [ -z "$name" ]; then
+    persona="${CLAUDE_PROJECT_DIR:-$PWD}/PERSONA.md"
+    [ -f "$persona" ] && name="$(sed -n 's/^# \(.*\)$/\1/p' "$persona" | head -n1 | tr '[:upper:]' '[:lower:]')"
+fi
+if [[ ! "$name" =~ ^[a-z0-9_-]+$ ]]; then
+    deny_postup "tk nevie, ktorý agent volá Tasker (AGENT_NAME, TASKER_USER ani PERSONA.md v $PWD)" "AGENT_NAME=<meno> tk ..."
+    exit 64
+fi
+# --verify je príkaz shellu, ktorý dispečer spustí po done behu. Text
+# s diakritikou mimo úvodzoviek je opis, nie príkaz, a overenie by padlo
+# (chyba 25. 10. 2026: úlohy 557 a 558 mali v --verify vetu).
+prev=""
+for a in "$@"; do
+    v=""
+    [ "$prev" = "--verify" ] && v="$a"
+    [[ "$a" == --verify=* ]] && v="${a#--verify=}"
+    prev="$a"
+    [ -z "$v" ] && continue
+    bare="$(printf '%s' "$v" | sed -e "s/'[^']*'//g" -e 's/"[^"]*"//g')"
+    if printf '%s' "$bare" | grep -q '[áäčďéíĺľňóôŕšťúýžÁÄČĎÉÍĹĽŇÓÔŔŠŤÚÝŽ]'; then
+        deny_postup "--verify nesie vetu, nie príkaz shellu: $v" "--verify '<príkaz, ktorý skončí kódom 0, keď je hotovo>', opis patrí do --body"
+        exit 2
+    fi
+done
+user="${TK_USER:-${AGENT_TASKER_USER:-tasker}}"
+home="${TK_HOME:-/home/$user/.tasker}"
+if [ "$(id -un)" = "$user" ]; then
+    exec env TASKER_HOME="$home" TASKER_USER="$name" tasker "$@"
+fi
+exec runuser -u "$user" -- env TASKER_HOME="$home" TASKER_USER="$name" tasker "$@"

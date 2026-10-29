@@ -1,0 +1,9 @@
+# Zrušené mená. Riadok je rozšírený regulárny výraz (git grep -E -i)
+# v base64, aby zoznam meno nešíril. Meno nesmie ostať v žiadnom súbore
+# gitu repa agenta, pravidiel ani servera. Kontrola je lib/retired_names.sh.
+# Správy starších commitov sa neprepisujú (DECISIONS.md 2026-10-19).
+# Vzor pridaj až po overení, na čo odkazuje každý jeho nález.
+cGFwZXJjbGlw
+KF58W15hLXpdKWtsaXA=
+KF58W15BLVphLXpdKUdBVi1bMC05XQ==
+KF58W15hLXpfXSlwY18oYXBpfHJlbGVhc2Up

@@ -8,7 +8,9 @@
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { blockStop } from "../lib/deny.mjs";
+import { workflowDir } from "../lib/paths.mjs";
 
 const AGREE = /(?<!\p{L})(máš pravdu|pravdu máš|námietku prijímam|uznávam|mal si pravdu|you'?re right|moja chyba|chyba je moja|chybu som urobil|pomýlil som sa)(?!\p{L})/iu;
 // Súbory, ktoré agenta riadia. Samotná pamäť nestačí (operátor 18. 10. 2026:
@@ -35,8 +37,10 @@ export function lastTurn(transcript) {
   return { text: text.join("\n"), cmds, userText };
 }
 
+const CHYBA = join(workflowDir(), "bin", "chyba.sh");
+
 export const POSTUP = {
-  chyba: "zmeň súbor, ktorý ťa riadi, `git commit -m \"...\" -- <súbor>`, `git push`, potom spusti `/opt/agent-rules/bin/chyba.sh --trieda <trieda chyby> --subor <ten súbor>` "
+  chyba: "zmeň súbor, ktorý ťa riadi, `git commit -m \"...\" -- <súbor>`, `git push`, potom spusti `" + CHYBA + " --trieda <trieda chyby> --subor <ten súbor>` "
     + "(skill `chyba`) a výpis, štyri vety, vlož do odpovede.",
   commit: "zmeň súbor, ktorý ťa riadi (PERSONA.md, CLAUDE.md, hook alebo check.mjs), `git add <súbor>`, "
     + "`git commit -m \"...\" -- <súbor>`, `git push`, a v odpovedi uveď číslo commitu.",

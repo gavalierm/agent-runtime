@@ -17,13 +17,14 @@
 //
 // Prostredie: AGENT_NAME (inak "# Meno" z PERSONA.md v cwd), IDLE_WAKE_STATE
 // (predvolene ~/.local/state/idle_wake), IDLE_WAKE_TK (test, nahradí
-// /opt/agent-rules/bin/tk).
+// bin/tk tohto repa).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { workflowDir } from "../lib/paths.mjs";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 
-const TK = process.env.IDLE_WAKE_TK || "/opt/agent-rules/bin/tk";
+const TK = process.env.IDLE_WAKE_TK || join(workflowDir(), "bin", "tk");
 const WRITE_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit", "Agent", "Task"]);
 const READ_CMDS = new Set(["ls", "cat", "head", "tail", "grep", "rg", "find", "wc", "stat", "echo", "pwd", "date", "sleep", "node", "test", "diff", "ps", "id", "tmux", "sort", "cut", "jq", "python3"]);
 

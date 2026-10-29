@@ -12,7 +12,8 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const SCRIPT = join(here, "..", "agent_vlakno.sh");
+const REPO = join(here, "..");
+const SCRIPT = join(REPO, "agent_vlakno.sh");
 const NAME = "tst";
 const GH_TOKEN = "ghp_tajny_token_strojoveho_uctu";
 const T3_TOKEN = "t3tajnytokenagenta";
@@ -128,13 +129,13 @@ test("prvý beh zriadi všetko, druhý nič nezmení", () => {
 
   assert.equal(mode(join(R, `root/.config/${NAME}/runtime.env`)), "600");
   assert.equal(readFileSync(join(R, `root/.config/${NAME}/runtime.env`), "utf8"), [
-    "AGENT_RUNTIME=/root/agent-runtime",
+    `AGENT_WORKFLOW=${REPO}`,
     "AGENT_WORKDIR=/root/tst",
     "AGENT_BOX=/var/lib/tst",
     "AGENT_MODEL=claude-opus-5-5",
     "T3_URL=http://127.0.0.1:3773",
     "T3_TOKEN_FILE=/root/.config/tst/t3_token",
-    'AGENT_REPLY_CMD="AGENT_NAME=tst /root/agent-runtime/reply.sh"',
+    `AGENT_REPLY_CMD="AGENT_NAME=tst ${REPO}/reply.sh"`,
     "AGENT_REPLY_ROUTE_adam=/var/lib/adam/inbox",
     "AGENT_RUNTIME_MODE=full-access",
     `TASKER_HOME=${join("/home", "tasker-svc", ".tasker")}`,

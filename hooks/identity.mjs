@@ -8,15 +8,15 @@
 // v klone projektu, po kompakcii zabudlo, kto je, a správu Taskera
 // "úloha pre teba" odmietlo ako cudziu. Bez persony hook mlčí.
 // Riadok "Role: <slug>, <slug>" v PERSONA.md pridá do kontextu pravidlá
-// roly zo súborov roles/<slug>.md klonu repa pravidiel (rulesRepo: AGENT_RULES_REPO,
-// predvolene /opt/agent-rules, na Macu ~/Work/agent-rules).
+// roly zo súborov roles/<slug>.md tohto repa (workflowDir v lib/paths.mjs).
 // Neznámy slug dá upozornenie v kontexte, hook nepadne.
 //
-// Operátor overí ID príkazom `node hooks/topic.mjs list` repa pravidiel.
+// Operátor overí ID príkazom `node hooks/topic.mjs list`.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { hookEnv, rulesRepo } from "../lib/agent_env.mjs";
+import { hookEnv } from "../lib/agent_env.mjs";
+import { workflowDir } from "../lib/paths.mjs";
 import { personaFor } from "../lib/agent_name.mjs";
 
 let input = {};
@@ -34,7 +34,7 @@ const topicNote = topic
   ? ` Toto je tvoje vlákno témy ${topic}: správy Taskera a schránky s touto témou idú sem a úlohy s riešiteľom ${name.toLowerCase()} v nich sú tvoje, rieš ich ako ${name}.`
   : "";
 
-const rolesDir = join(rulesRepo(hookEnv(input)), "roles");
+const rolesDir = join(workflowDir(hookEnv(input)), "roles");
 const slugs = (persona.match(/^Role:[ \t]*(.+)$/m)?.[1] ?? "")
   .split(",")
   .map((x) => x.trim())

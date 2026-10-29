@@ -166,7 +166,7 @@ test("bez príkazu a runuser (Mac): ticho, kód 0", () => {
   assert.deepEqual(sb.calls(), []);
 });
 
-// Obal `tk`: AGENT_TK, inak bin/tk v klone repa pravidiel (AGENT_RULES_REPO). Falošný
+// Obal `tk`: AGENT_TK, inak bin/tk v klone repa pravidiel (AGENT_WORKFLOW). Falošný
 // obal zapíše meno agenta a argumenty, živý Tasker ani skutočný tk sa nevolá.
 function fakeTk(path, log) {
   mkdirSync(dirname(path), { recursive: true });
@@ -182,16 +182,16 @@ test("obal tk: cesta z AGENT_TK", () => {
   assert.deepEqual(readFileSync(log, "utf8").trim().split("\n").filter((l) => !l.includes(" task show ")), ["tk[adam] work 414 --thread S1"]);
 });
 
-test("obal tk: bin/tk v klone repa pravidiel z AGENT_RULES_REPO, AGENT_TK z runtime.env", () => {
+test("obal tk: bin/tk v klone repa pravidiel z AGENT_WORKFLOW, AGENT_TK z runtime.env", () => {
   const sb = sandbox();
   const log = join(sb.dir, "tk.log");
   fakeTk(join(sb.dir, "pravidla", "bin", "tk"), log);
-  run(sb, pre("úloha 414", "tu1"), { TASKER_WORK_CMD: "", AGENT_RULES_REPO: join(sb.dir, "pravidla") });
+  run(sb, pre("úloha 414", "tu1"), { TASKER_WORK_CMD: "", AGENT_WORKFLOW: join(sb.dir, "pravidla") });
   assert.deepEqual(readFileSync(log, "utf8").trim().split("\n").filter((l) => !l.includes(" task show ")), ["tk[adam] work 414 --thread S1"]);
   fakeTk(join(sb.dir, "iny", "tk"), log);
   mkdirSync(join(sb.dir, ".config/adam"), { recursive: true });
   writeFileSync(join(sb.dir, ".config/adam/runtime.env"), `AGENT_TK=${join(sb.dir, "iny", "tk")}\n`);
-  run(sb, pre("úloha 415", "tu2"), { TASKER_WORK_CMD: "", AGENT_RULES_REPO: join(sb.dir, "neexistuje") });
+  run(sb, pre("úloha 415", "tu2"), { TASKER_WORK_CMD: "", AGENT_WORKFLOW: join(sb.dir, "neexistuje") });
   assert.deepEqual(readFileSync(log, "utf8").trim().split("\n").filter((l) => !l.includes(" task show ")), ["tk[adam] work 414 --thread S1", "tk[adam] work 415 --thread S1"]);
 });
 
@@ -231,7 +231,7 @@ test("ohlásenie staršie ako 60 minút sa zopakuje", () => {
   const sb = sandbox();
   run(sb, prompt("Úloha 466"));
   run(sb, bash());
-  const f = join(sb.dir, "cache", "agent-rules", "tasker_work_current", "S2");
+  const f = join(sb.dir, "cache", "agentic-workflow", "tasker_work_current", "S2");
   writeFileSync(f, JSON.stringify({ n: 466, reportedAt: Date.now() - 61 * 60_000 }));
   run(sb, bash());
   assert.equal(sb.calls().length, 2);

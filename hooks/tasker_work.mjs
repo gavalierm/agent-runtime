@@ -37,7 +37,7 @@
 // nepíše komentár ani `work`, otázka na operátora ostáva. Príznak zruší
 // ďalšia výzva bez schránky (s číslom aj bez). Úlohu v poradí (queued, scheduled, handoff, unassigned) s riešiteľom agentom
 // hook pri prvom zápise prevezme príkazom `tasker start N` (úloha Taskera 491). Stav:
-// ${XDG_CACHE_HOME:-$HOME/.cache}/agent-rules/tasker_work_current/<relácia>.
+// ${XDG_CACHE_HOME:-$HOME/.cache}/agentic-workflow/tasker_work_current/<relácia>.
 //
 // Zámok úlohy (úloha Taskera 510): PreToolUse pre Agent so zadaním "úloha N"
 // zamietne spustenie, keď úloha N má v udalostiach `work` (`tasker task show N
@@ -58,10 +58,9 @@
 // (chainedSessions z lib/session_id.mjs).
 //
 // Meno agenta: AGENT_NAME, inak "# Meno" z PERSONA.md v projekte (malými).
-// Obal `tk` je AGENT_TK, inak `bin/tk` v klone repa pravidiel (rulesRepo
-// v lib/agent_env.mjs). TASKER_WORK_CMD (test) ho nahradí priamym spustením
+// Obal `tk` je AGENT_TK, inak `bin/tk` v klone kódu (workflowDir v lib/paths.mjs). TASKER_WORK_CMD (test) ho nahradí priamym spustením
 // zadaného príkazu s TASKER_USER v prostredí.
-// Stav: ${XDG_CACHE_HOME:-$HOME/.cache}/agent-rules/tasker_work/<relácia>/<tool_use_id>.
+// Stav: ${XDG_CACHE_HOME:-$HOME/.cache}/agentic-workflow/tasker_work/<relácia>/<tool_use_id>.
 
 import { readFileSync, writeFileSync, renameSync, mkdirSync, readdirSync, rmSync, realpathSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -69,7 +68,8 @@ import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { denyTool } from "../lib/deny.mjs";
-import { hookEnv, rulesRepo } from "../lib/agent_env.mjs";
+import { hookEnv } from "../lib/agent_env.mjs";
+import { workflowDir } from "../lib/paths.mjs";
 import { chainedSessions } from "../lib/session_id.mjs";
 
 const TIMEOUT_MS = 2500;
@@ -114,7 +114,7 @@ function agentName(input, env = process.env) {
 function tk(agent, argv, env = process.env) {
   const cmd = env.TASKER_WORK_CMD;
   const henv = hookEnv({}, { AGENT_NAME: agent, ...env });
-  const run = cmd ? [cmd, argv] : [henv.AGENT_TK || join(rulesRepo(henv), "bin", "tk"), argv];
+  const run = cmd ? [cmd, argv] : [henv.AGENT_TK || join(workflowDir(henv), "bin", "tk"), argv];
   const r = spawnSync(run[0], run[1], { env: { ...env, AGENT_NAME: agent, TASKER_USER: agent }, timeout: TIMEOUT_MS, stdio: ["ignore", "pipe", "ignore"], encoding: "utf8" });
   return r.stdout || "";
 }
@@ -123,7 +123,7 @@ const tasker = (agent, args, env = process.env) => void tk(agent, ["work", ...ar
 
 function stateDir(session, env = process.env) {
   const base = env.XDG_CACHE_HOME || join(env.HOME || homedir(), ".cache");
-  return join(base, "agent-rules", "tasker_work", String(session).replace(/[^\w-]/g, "_"));
+  return join(base, "agentic-workflow", "tasker_work", String(session).replace(/[^\w-]/g, "_"));
 }
 
 const safeId = (s) => String(s || "").replace(/[^\w-]/g, "_");
@@ -133,7 +133,7 @@ const REPORT_EVERY_MS = 60 * 60_000;
 
 function currentFile(session, env = process.env) {
   const base = env.XDG_CACHE_HOME || join(env.HOME || homedir(), ".cache");
-  return join(base, "agent-rules", "tasker_work_current", String(session).replace(/[^\w-]/g, "_"));
+  return join(base, "agentic-workflow", "tasker_work_current", String(session).replace(/[^\w-]/g, "_"));
 }
 
 function saveCurrent(file, value) {

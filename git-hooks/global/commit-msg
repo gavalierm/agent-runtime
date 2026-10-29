@@ -1,0 +1,13 @@
+#!/bin/bash
+# Globálny hook commit-msg (úloha Taskera 565): trailer a autor commitu
+# (lib/commit_guard.sh) v každom repe, ktoré nemá vlastný core.hooksPath,
+# napríklad /root/tasker. Potom lokálny hook repa (_chain.sh). Skript
+# commit_guard.sh je v tom istom klone pravidiel, v ktorom hook leží.
+here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+guard="$here/../../lib/commit_guard.sh"
+if [ -f "$guard" ]; then
+    bash "$guard" "$1" || exit 1
+else
+    echo "Varovanie: chýba $guard, kontrola autora a trailerov preskočená." >&2
+fi
+CHAIN_NAME=commit-msg exec bash "$here/_chain.sh" "$@"

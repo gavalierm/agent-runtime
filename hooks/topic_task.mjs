@@ -19,6 +19,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTopic, TOPIC_RE } from "../route.mjs";
+import { originalId } from "../lib/session_id.mjs";
+import { workflowDir } from "../lib/paths.mjs";
 import { agentName, T3_DB, threadsForNative, topicOfThreads } from "../lib/agent_name.mjs";
 export { T3_DB, threadsForNative, topicOfThreads };
 
@@ -63,7 +65,7 @@ export function newTaskIds(command, response) {
 export const RECENT_MS = 60000;
 
 function defaultTk(agent) {
-  return (args) => execFileSync(process.env.TK_BIN || "/opt/agent-rules/bin/tk", args, { env: { ...process.env, AGENT_NAME: agent }, encoding: "utf8", timeout: 15000, maxBuffer: 64 * 1024 * 1024 });
+  return (args) => execFileSync(process.env.TK_BIN || join(workflowDir(), "bin", "tk"), args, { env: { ...process.env, AGENT_NAME: agent }, encoding: "utf8", timeout: 15000, maxBuffer: 64 * 1024 * 1024 });
 }
 
 // Záloha pre výstup, z ktorého sa id nedá prečítať (príkaz ho prefiltroval
@@ -111,7 +113,7 @@ export function topicNameFor(project, thread, topics = {}) {
 }
 
 function defaultNativeId() {
-  return import("file:///opt/agent-rules/hooks/clear_bridge.mjs").then((m) => m.originalId(process.ppid));
+  return originalId(process.ppid);
 }
 
 function defaultTopicsFile() {

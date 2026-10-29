@@ -24,19 +24,14 @@
 #                   v CLAUDE_PROJECT_DIR alebo v pracovnom priečinku
 #   CHYBA_REVIEWER  agent, ktorému sa založí úloha na kontrolu, inak spravca-agentov
 #   CHYBA_TASKER_USER  používateľ správcu úloh na serveri, inak tasker
-#   CHYBA_REGISTER  súbor registra, inak ~/.local/state/agent-rules/chyby.tsv
-#   CHYBA_TASKER    príkaz Taskera (rozdelí sa na slová), inak obal bin/tk z klonu
-#                   repa pravidiel (AGENT_RULES, lib/agent_rules.sh). Test ho
-#                   nahradí falošným. Bez dosiahnuteľného Taskera (Mac) skript
-#                   úlohu nezaloží a povie to na stderr.
-# Skript žije v repe agent-runtime. Repo pravidiel má obal bin/chyba.sh, ktorý
-# nastaví CHYBA_REVIEWER, CHYBA_TASKER_USER a AGENT_RULES.
+#   CHYBA_REGISTER  súbor registra, inak ~/.local/state/agentic-workflow/chyby.tsv
+#   CHYBA_TASKER    príkaz Taskera (rozdelí sa na slová), inak obal bin/tk tohto
+#                   repa. Test ho nahradí falošným. Bez dosiahnuteľného Taskera
+#                   (Mac) skript úlohu nezaloží a povie to na stderr.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/deny.sh
 . "$HERE/../lib/deny.sh"
-# shellcheck source=../lib/agent_rules.sh
-. "$HERE/../lib/agent_rules.sh"
 
 trieda="" subor="" popis="" pravda="" kontrola="" mechanizmus="" otvorene=""
 while [ $# -gt 0 ]; do
@@ -51,7 +46,7 @@ while [ $# -gt 0 ]; do
         *) echo "chyba.sh: neznáma voľba $1" >&2; exit 64 ;;
     esac
 done
-reg="${CHYBA_REGISTER:-$HOME/.local/state/agent-rules/chyby.tsv}"
+reg="${CHYBA_REGISTER:-$HOME/.local/state/agentic-workflow/chyby.tsv}"
 if [ -n "$otvorene" ]; then
     # Riadky bez 8. stĺpca: chyba bez mechanizmu. Register sa nemení.
     [ -f "$reg" ] && awk -F'\t' '$8 == "" { print $1 "\t" $2 "\t" $3 "\t" $4 }' "$reg"
@@ -100,7 +95,7 @@ if [ "$pocet" -ge 2 ] && [ -z "$uloha" ]; then
     if [ -n "${CHYBA_TASKER:-}" ]; then
         read -r -a tcmd <<< "$CHYBA_TASKER"
     elif command -v runuser >/dev/null && id "${CHYBA_TASKER_USER:-tasker}" >/dev/null 2>&1; then
-        tcmd=(env "AGENT_NAME=$agent" "$(agent_rules_dir)/bin/tk")
+        tcmd=(env "AGENT_NAME=$agent" "$HERE/tk")
     else
         tcmd=()
     fi

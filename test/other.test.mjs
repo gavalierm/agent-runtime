@@ -11,6 +11,7 @@ import { T3Client, writeInbox, parseHeader } from "../lib.mjs";
 import { tick as taskerTick, bridgeTick } from "../tasker_events.mjs";
 import { build as morningBuild } from "../morning.mjs";
 import { start, startPrompt } from "../start_agent.mjs";
+import { workflowDir } from "../lib/paths.mjs";
 
 // Telo odpovede nesie povinné riadky Výsledok, Dôkaz a Otvorené (reply.sh).
 const TRI = "Výsledok: v\nDôkaz: d\nOtvorené: nič\n";
@@ -113,7 +114,7 @@ test("tasker_events most: úloha agenta vo vlákne ide do jeho schránky raz, cu
   assert.match(text, /^odpoveď: nečakám\n/, "most budí, odpoveď nečaká");
   assert.match(text, /úloha #1 pre teba, úloha je v poradí/);
   assert.match(text, /Pridaj deploy kľúč\./);
-  assert.match(text, /AGENT_NAME=boris \/opt\/agent-rules\/bin\/tk done 1 --summary/);
+  assert.match(text, /AGENT_NAME=boris \/opt\/agentic-workflow\/bin\/tk done 1 --summary/);
   assert.doesNotMatch(text, /runuser/);
   assert.deepEqual(readdirSync(join(box, "inbox")), []);
   assert.equal((await bridgeTick(cfg, agents)).written, 0);
@@ -177,7 +178,7 @@ test("start_agent: založí projekt a vlákno, druhý beh nerobí nič, --new za
   assert.deepEqual(l.modelSelection, { instanceId: "claudeAgent", model: "claude-test" });
   assert.equal(l.runtimeMode, "auto");
   assert.deepEqual(l.workspaceStrategy, { type: "root" });
-  assert.equal(l.initialMessage.text, startPrompt("Agent", "AGENT_NAME=agent reply.sh"));
+  assert.equal(l.initialMessage.text, startPrompt("Agent", `AGENT_NAME=agent ${join(workflowDir(), "reply.sh")}`));
   assert.equal((await start(cfg, client, env)).created, false);
   assert.equal(t3.state.launches.length, 1);
   const r2 = await start(cfg, client, env, { forceNew: true });

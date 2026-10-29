@@ -34,7 +34,7 @@ test("replay 390 a 420: hook zastaví ťah, ktorý uzná chybu bez chyba.sh", ()
 });
 
 test("hook pustí ťah, ktorý uznal chybu, spustil chyba.sh a commitol opravu", () => {
-  const o = hook("Máš pravdu. Opravil som hook v 1a2b3c4.", ["git add hooks/x.mjs && git commit -qm x -- hooks/x.mjs", "/opt/agent-rules/bin/chyba.sh --trieda t --subor hooks/x.mjs"]);
+  const o = hook("Máš pravdu. Opravil som hook v 1a2b3c4.", ["git add hooks/x.mjs && git commit -qm x -- hooks/x.mjs", "/opt/agentic-workflow/bin/chyba.sh --trieda t --subor hooks/x.mjs"]);
   assert.equal(o, null);
 });
 

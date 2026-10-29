@@ -9,6 +9,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { brainGlobalDir, workflowDir } from "./lib/paths.mjs";
 
 const HOME = process.env.HOME || homedir();
 
@@ -16,7 +17,7 @@ const HOME = process.env.HOME || homedir();
 // predvolene agent) a z neho odvodí cesty. Ostatné premenné AGENT_* ich
 // prepíšu, zoznam je v README.md.
 function defaultWorkRepos(home) {
-  const repos = ["tasker", "agent-rules", "agent-runtime"].map((d) => join(home, d));
+  const repos = ["tasker", "agentic-workflow", "agentic-brain-global"].map((d) => join(home, d));
   try {
     for (const d of readdirSync(home)) if (!repos.includes(join(home, d)) && existsSync(join(home, d, "PERSONA.md"))) repos.push(join(home, d));
   } catch { /* domovský priečinok sa nedá čítať */ }
@@ -39,7 +40,7 @@ export function config(env = process.env) {
     model: pick("MODEL", undefined),
     t3Instance: pick("T3_INSTANCE", "claudeAgent"),
     runtimeMode: pick("RUNTIME_MODE", "auto"),
-    replyCmd: env.AGENT_REPLY_CMD || `AGENT_NAME=${name} ${env.AGENT_RUNTIME ? env.AGENT_RUNTIME + "/" : ""}reply.sh`,
+    replyCmd: env.AGENT_REPLY_CMD || `AGENT_NAME=${name} ${join(workflowDir(env), "reply.sh")}`,
     // Adresa T3 servera. Vlákna založené cez MCP T3_URL nededia, preto ho treba
     // mať v runtime.env každého agenta, inak platí lokálny port.
     t3Url: (env.T3_URL || "http://127.0.0.1:3773").replace(/\/$/, ""),
@@ -51,9 +52,9 @@ export function config(env = process.env) {
     taskerHome,
     // Príkaz, ktorým budič zapíše do Taskera trasu doručenej správy (`route <id> --thread ...`,
     // úloha 486). Prázdna hodnota zápis vypne, cfg bez `routeCmd` (testy) ho nerobí.
-    routeCmd: env.AGENT_ROUTE_CMD ?? "/opt/agent-rules/bin/tk",
-    // Klon repa pravidiel, z ktorého ranný súhrn číta nové rozhodnutia (úloha 470).
-    rulesRepo: env.AGENT_RULES_REPO || "/opt/agent-rules",
+    routeCmd: env.AGENT_ROUTE_CMD ?? join(workflowDir(env), "bin", "tk"),
+    // Klon spoločného mozgu, z ktorého ranný súhrn číta nové rozhodnutia (úloha 470).
+    brainGlobal: brainGlobalDir(env),
     // Repá, z ktorých ranný súhrn počíta commity za 24 h po autorovi (workSection).
     // Predvolene tri repá a každý priečinok pod domovským, ktorý nesie PERSONA.md (klon agenta).
     workRepos: env.AGENT_WORK_REPOS
@@ -169,7 +170,7 @@ export function stuckConfig(env = {}) {
     // Prázdna hodnota vypne správu do schránky, ostane výstraha.
     stuckAgent: env.STUCK_ALERT_AGENT ?? "",
     stuckFallback: env.STUCK_ALERT_FALLBACK ?? "",
-    stuckAskCmd: env.STUCK_ASK_CMD ?? "/opt/agent-rules/bin/ask_agent.sh",
+    stuckAskCmd: env.STUCK_ASK_CMD ?? join(workflowDir(env), "bin", "ask_agent.sh"),
   };
 }
 

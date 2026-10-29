@@ -74,7 +74,9 @@ import { execFileSync } from "node:child_process";
 import { accountItemProblem, waitingItemProblem } from "../lib/human_question.mjs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { personaFor } from "../lib/agent_name.mjs";
+import { workflowDir } from "../lib/paths.mjs";
 import { lastReply } from "./no_operator_commands.mjs";
 import { blockStop } from "../lib/deny.mjs";
 import { lastTurn } from "./objection_fix.mjs";
@@ -490,7 +492,7 @@ export const POSTUPY = [
   [/^položka "Čaká na teba" \(rozhodnutie\)/, "prepíš položku ako jednu vetu končiacu `?` (vec, voľba, odporúčanie), písmeno voľby (A/B) definuj ako `A) ...`; podrobnosti a čo spôsobí každá odpoveď patria do úlohy `tasker ask <id> --body \"...\"`"],
   [/^položka "Čaká na teba" \(tvoj účet\)/, "pridaj riadok `Overené: <čo o stave operátorovho účtu si overil a ktorým príkazom alebo stránkou>; neoverené: <čo nevidíš>`; tvrdenie o jeho účte bez overenia napíš ako predpoklad, nie fakt (global/CLAUDE.md §1)"],
   [/^"Čaká na teba" bez odkazu|v "Čaká na teba" v Taskeri neexistuje|v "Čaká na teba" je v stave/, ASK + "; stav práce drží Tasker, nie veta v odpovedi"],
-  [/^Tasker neodpovedal/, "over Tasker `/opt/agent-rules/bin/tk task list` a odpoveď pošli znova"],
+  [/^Tasker neodpovedal/, `over Tasker \`${join(workflowDir(), "bin", "tk")} task list\` a odpoveď pošli znova`],
   [/^veta ".*" hlási nové rozhodnutie/, "zapíš rozhodnutie `bin/rozhodni.sh --nazov ... --kluc ...` (text na stdin) a v odpovedi uveď jeho číslo D, alebo polož otázku `tasker ask <id> --body \"...\"`; staré rozhodnutie označ číslom D alebo dátumom"],
   [/^adresa .* dnes neodpovedá/, "over adresu `curl -sI <url>`, odkaz dávaj len na adresu, ktorá odpovedá, inak ju napíš bez https:// a dodaj, že ešte nebeží"],
 ];

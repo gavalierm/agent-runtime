@@ -8,7 +8,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { hookEnv, operatorForms, parseEnvFile, rulesRepo, zapnute } from "../lib/agent_env.mjs";
+import { hookEnv, operatorForms, parseEnvFile, zapnute } from "../lib/agent_env.mjs";
 import { defaultDb, fetchTasks } from "../lib/tasker_read.mjs";
 import { decisionProblem } from "../hooks/reply_guard.mjs";
 
@@ -57,11 +57,7 @@ test("operatorForms: meno z AGENT_OPERATOR_NAME, inak slovo operátor", () => {
   assert.deepEqual([d.nom, d.dat, d.gen, d.cap(d.dat)], ["operátor", "operátorovi", "operátora", "Operátorovi"]);
 });
 
-test("rulesRepo a zapnute", () => {
-  assert.equal(rulesRepo({ AR_CLONE: "/a", AGENT_RULES_REPO: "/b" }, "linux"), "/a");
-  assert.equal(rulesRepo({ AGENT_RULES_REPO: "/b" }, "linux"), "/b");
-  assert.equal(rulesRepo({}, "linux"), "/opt/agent-rules");
-  assert.equal(rulesRepo({ HOME: "/Users/m" }, "darwin"), "/Users/m/Work/agent-rules");
+test("zapnute", () => {
   assert.equal(zapnute({ AR_ROZHODNUTIA: "1" }), true);
   assert.equal(zapnute({ AR_ROZHODNUTIA: "0" }), false);
   assert.equal(zapnute({}), false);

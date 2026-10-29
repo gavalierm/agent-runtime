@@ -130,8 +130,8 @@ test("DB Taskera z TASKER_HOME v runtime.env agenta, keď TASKER_DB nie je", () 
   assert.equal(r2.stdout, "");
 });
 
-test("odkaz na obal tk v postupe: klon repa pravidiel z AGENT_RULES_REPO", () => {
+test("odkaz na obal tk v postupe: klon repa pravidiel z AGENT_WORKFLOW", () => {
   const db = mkDb("rules.db", [[390, "Rozhodnutia", "queued", "adam"]], [[390, "adam", T0 + 60000]]);
-  const r = run(db, tr(), { vars: { AGENT_RULES_REPO: "/srv/pravidla" } });
+  const r = run(db, tr(), { vars: { AGENT_WORKFLOW: "/srv/pravidla" } });
   assert.match(r.out.reason, /`\/srv\/pravidla\/bin\/tk \.\.\.`/);
 });

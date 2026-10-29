@@ -13,7 +13,7 @@ import { watchStep } from "../clear_watch.mjs";
 import { stuckRecipient } from "../stuck.mjs";
 
 const MIN = 60_000;
-const LIVE_ASK = "/opt/agent-rules/bin/ask_agent.sh";
+const LIVE_ASK = "/opt/agentic-workflow/bin/ask_agent.sh";
 // Všetky živé schránky /var/lib/*/inbox: test do nich nesmie nič pridať.
 const liveSnapshot = () => {
   const out = [];

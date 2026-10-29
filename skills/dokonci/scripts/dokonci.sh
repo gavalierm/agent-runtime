@@ -7,11 +7,12 @@
 #   dokonci.sh koniec <úloha> [--stop] --vysledok "<veta>" [--otvorene "<text>"]
 #   dokonci.sh otazka <úloha> --summary "<otázka s ?, možnosti A) B) a odporúčanie>"
 # Premenné: DOKONCI_TASKER (príkaz Taskera, pod rootom predvolene
-# /opt/agent-rules/bin/tk, inak tasker), DOKONCI_LEDGER_DIR (priečinok
+# bin/tk tohto repa, inak tasker), DOKONCI_LEDGER_DIR (priečinok
 # ledgera, predvolene .scratch v koreni repa, keď ho git ignoruje, inak
 # /tmp/dokonci). Každé zlyhanie: kód 1 a riadok "Správny postup:".
 set -u
 PROG="dokonci.sh"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 fail() { # fail "<čo zlyhalo>" "<správny postup>"
     printf '%s: %s\n' "$PROG" "$1" >&2
@@ -53,7 +54,7 @@ setup() {
     if [ -n "${DOKONCI_TASKER:-}" ]; then
         TASKER="$DOKONCI_TASKER"
     elif [ "$(id -u)" = 0 ]; then
-        TASKER=/opt/agent-rules/bin/tk
+        TASKER="$ROOT/bin/tk"
     else
         TASKER=tasker
     fi
@@ -183,7 +184,7 @@ cmd_dokaz() {
     [ -n "$popis" ] || fail "chýba --popis" "--popis \"<čo dokazuje>\""
     if [ -n "$subor" ]; then
         if [ ! -s "$subor" ]; then
-            fail "súbor $subor neexistuje alebo je prázdny" "vytvor snímku (/root/agent-runtime/browser.sh --gaps ...), potom dokonci.sh dokaz $ULOHA --popis \"...\" --subor <cesta>"
+            fail "súbor $subor neexistuje alebo je prázdny" "vytvor snímku ($ROOT/browser.sh --gaps ...), potom dokonci.sh dokaz $ULOHA --popis \"...\" --subor <cesta>"
         fi
         led dokaz "popis=$popis" "subor=$subor" "kod=0" "head=$(head_hash)"
         printf 'dôkaz zapísaný: %s (súbor %s)\n' "$popis" "$subor"
