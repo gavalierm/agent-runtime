@@ -33,6 +33,7 @@ export AGENT_BRAIN_GLOBAL="$BR"
 export AR_CLAUDE_DIR="$T/claude" AR_UNIT_DIR="$T/units" AR_ENV_ROOT="$T/root" AR_RUNS_HOME="$T/runs"
 export AR_NO_SYSTEMCTL=1
 mkdir -p "$AR_CLAUDE_DIR/skills/unslop" "$AR_CLAUDE_DIR/agents" "$AR_UNIT_DIR" "$AR_ENV_ROOT" "$AR_RUNS_HOME/.claude/skills"
+chmod 711 "$AR_ENV_ROOT"
 # Stav po starej inštalácii: CLAUDE.md je odkaz do starého klonu, unslop je
 # obyčajný priečinok, odkazy na zmazané veci, staré jednotky, cudzie veci.
 ln -s "$OLD/pravidla.md" "$AR_CLAUDE_DIR/CLAUDE.md"
@@ -70,6 +71,7 @@ check "CLAUDE.md používateľa behov: import kódu" 0 grep -qxF "@$WF/RULES.md"
 check "CLAUDE.md používateľa behov: import mozgu" 0 grep -qxF "@$BR/RULES.md" "$AR_RUNS_HOME/.claude/CLAUDE.md"
 # Pravidlá prostredia
 check "koreň prostredia: odkaz na RULES.md servera v mozgu" 0 test "$(readlink "$AR_ENV_ROOT/CLAUDE.md")" = "$BR/env/server/RULES.md"
+check "koreň prostredia: existujúci koreň s 711 ostal 711" 0 test "$(stat -c %a "$AR_ENV_ROOT")" = 711
 check "domov používateľa behov: odkaz na RULES.md servera v mozgu" 0 test "$(readlink "$AR_RUNS_HOME/CLAUDE.md")" = "$BR/env/server/RULES.md"
 # Skilly z oboch klonov
 for sk in unslop error; do

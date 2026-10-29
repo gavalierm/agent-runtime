@@ -203,7 +203,10 @@ deploy_claude root "$CLAUDE_DIR"
 # Pravidlá prostredia: CLAUDE.md v koreni stromu, pod ktorým agenti bežia,
 # Claude Code ho načíta z každého rodiča cwd.
 KEEP="$CLAUDE_DIR/pred-odkazom"
-install -d -m 700 "$ENV_ROOT"
+# Existujúci koreň nemení: /root má 711, aby používateľ behov prešiel do
+# /root/<agent> (29. 10. 2026 install -d -m 700 dal /root 700, strážca agenta
+# padal 203/EXEC). Režim 700 dostane len nový koreň.
+[ -d "$ENV_ROOT" ] || install -d -m 700 "$ENV_ROOT"
 link root "$BRAIN/env/server/RULES.md" "$ENV_ROOT/CLAUDE.md"
 settings_main
 
