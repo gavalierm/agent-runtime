@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // foreign_git.mjs — agent neobchádza ochranu vlastníctva gitu.
 // Git root-a v klone iného používateľa odmietne ("dubious ownership").
 // Dňa 20. 10. 2026 agent túto ochranu obišiel príkazmi `git -c

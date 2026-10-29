@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // tool_failure_log.mjs — zlyhaný príkaz Bash zapíše do registra nástrojov
 // (úloha 615). Agenti opakovali nástroje, ktoré v prostredí nefungujú: `gh`,
 // `sudo` pod rootom, prepínač `curl`, ktorý verzia nepozná. Každý pokus stál

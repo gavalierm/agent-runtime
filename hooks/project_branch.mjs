@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // project_branch.mjs — commit na main v repe projektu je len merge dev (D0182).
 // Repo projektu (kód, web, dáta) dostáva prácu agenta commitom do vetvy `dev`,
 // po dôkaze ide `git merge --no-ff dev` do `main`. Hook zamietne `git commit`,

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // deploy_readonly.mjs — /opt/tasker a nasadené klony kódu a spoločného mozgu
 // (workflowDir, brainGlobalDir) nikto nemení ani necommituje.
 // /opt/tasker je nasadenie správcu servera (D0052), klony sú kópia na

@@ -1,0 +1,26 @@
+# Výnimky z kontroly mŕtveho kódu (lib/dead_code.mjs). Riadok je `<cesta> <dôvod>`.
+# Výnimka bez dôvodu, na súbor, ktorý je niekde menovaný, alebo na neexistujúci súbor je chyba.
+# Hooky, ktoré volá settings.json prostredia: nastavenie prostredia env/ príde v dávke 1c,
+# tým výnimky zaniknú a kontrola ich pri zmazaní riadku vyžiada zmazať.
+hooks/agreement_send.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/compact_block.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/deploy_readonly.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/idle_wake.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/implementator_model.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/memory_context.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/no_retest.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/project_branch.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/project_data.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/rozhodnutia_context.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/server_work.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/subagent_foreground.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/tasker_root.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+hooks/tool_failure_report.mjs volá ho settings.json prostredia, ktoré príde v dávke 1c
+# Git hook pre-commit, ktorý inštaluje nastavenie prostredia z dávky 1c.
+lib/claude_md_guard.sh volá ho pre-commit hook, ktorý inštaluje prostredie v dávke 1c
+# Nástroje spúšťané ručne alebo len v testoch.
+lib/path_check.mjs spúšťa ho človek ručne (`node lib/path_check.mjs`), opis v README
+lib/git_isolate.mjs pomocník testov, importujú ho len testy
+github_device_login.sh spúšťa ho človek ručne pri zriadení strojového účtu, opis v README
+brain/bin/adopt.sh spúšťa ho človek ručne pri založení mozgu v repe, opis v README a v brain/RULES.md
+brain/bin/decide.sh spúšťa ho agent podľa brain/RULES.md, opis v README

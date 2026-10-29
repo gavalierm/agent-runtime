@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // task_title.mjs — názov úlohy pomenuje riešenie namiesto problému (env/server/CLAUDE.md,
 // časť "Správca úloh", úloha 587). Operátor úlohu hľadá podľa toho, čo ho trápi:
 // "/opt/tasker beží bez 276db3a", nie "Nasadiť Tasker 276db3a"; "Agenti v Taskeri dávajú

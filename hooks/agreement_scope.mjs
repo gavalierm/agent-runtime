@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // agreement_scope.mjs — správa operátora, ktorá vyjadruje súhlas a zároveň
 // menuje body alebo ich počet ("suhlasim v troch bodoch"), dostane do kontextu
 // pripomienku: menované body platia v znení návrhu, aj bod, ktorý agent

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // tasker_root.mjs — agent pod rootom spúšťa `tasker` priamo.
 // Tasker beží pod používateľom správcu úloh (AGENT_TASKER_USER, predvolene
 // `tasker`), databáza je v jeho domovskom priečinku. Dňa 23. 10. 2026 vlákno

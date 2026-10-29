@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // objection_fix.mjs — námietku, ktorej agent dá za pravdu, sprevádza commit
 // zmeny persony, pravidla alebo kontroly (prijatá námietka mení agenta).
 //

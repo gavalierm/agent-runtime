@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // no_retest.mjs — hlavné vlákno nespúšťa testy, ktoré sub-agent práve spustil
 // a vrátil ich výstup (global §6). Úloha Taskera 507, 24. 10. 2026:
 // po sub-agentovi s "# pass 369, # fail 0" hlavné vlákno spustilo tie isté

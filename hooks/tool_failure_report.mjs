@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // tool_failure_report.mjs — zlyhaný spoločný nástroj agent nahlási vlastníkovi
 // úlohou ten istý ťah (global/CLAUDE.md §4, D0177). Chyba 25. 10. 2026: agent
 // v behu pod používateľom správcu úloh spustil browser.sh z klonu kódu, ten skončil

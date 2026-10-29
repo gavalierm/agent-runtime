@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // sonnet_delegation.mjs — pripomienka global/CLAUDE.md §6: relácia na Opuse
 // alebo Fable dáva implementáciu sub-agentovi implementator (Sonnet). Nikdy neblokuje.
 // Úloha Taskera 501 (Ronova žiadosť, 24. 10. 2026).

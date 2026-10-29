@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: t3
 // clear_bridge.mjs — /clear v T3 Code prežije nový proces claude.
 // SessionStart so source "clear". T3 0.1.0 si pri vlákne drží ID relácie
 // z prvého štartu a každý ďalší proces spustí s --resume na ňu, /clear to

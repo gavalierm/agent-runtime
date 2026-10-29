@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // own_rule_scope.mjs: pravidlo, ktoré potrebuje aj iný agent, nepatrí do
 // vlastného repa (RULES.md §3: "If other agents need a rule or hold
 // a copy, it goes to global rules or a role, not your own repo. Check before

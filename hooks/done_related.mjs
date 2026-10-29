@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // done_related.mjs — po zavretí úlohy nesmie v tom istom projekte ostať
 // otázka pre človeka (needs_human) toho istého riešiteľa bez jeho komentára
 // v tom ťahu. Dňa 27. 10. 2026: audit 612 (projekt agenti) prepracoval celý

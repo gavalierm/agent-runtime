@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: t3
 // identity.mjs — relácia agenta s identitou ohlási v prvej odpovedi, kto je
 // (ohlásenie identity). SessionStart zo settings.json prostredia alebo
 // .claude/settings.json repa agenta, beží pri štarte, obnovení, /clear

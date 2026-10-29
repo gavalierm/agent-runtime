@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // no_model_wait.mjs — agent nečaká na udalosť príkazom v popredí.
 // Čakanie cez `sleep` alebo slučku `until`/`while` drží ťah otvorený
 // a po ňom model znova prečíta celý kontext, často opakovane. Dňa

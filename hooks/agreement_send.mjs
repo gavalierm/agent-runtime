@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: inbox
 // agreement_send.mjs — správa inému agentovi so značkou "[<meno> za <operátor>]",
 // keď operátor súhlasil len s jedným menovaným úkonom (stav zapisuje
 // agreement_scope.mjs), sa zamietne na prvý pokus: správa smie niesť len ten úkon.

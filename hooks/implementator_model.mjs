@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // implementator_model.mjs — sub-agent `implementator` beží na Sonnete, preto
 // hook zamietne volanie nástroja Agent, ktoré mu parametrom `model` vnúti iný
 // model. Parameter `model` pri volaní má prednosť pred `model` vo frontmatteri

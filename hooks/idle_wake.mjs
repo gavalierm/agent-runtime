@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // idle_wake.mjs — Stop hook: zobudenie zo schránky, po ktorom agent nič
 // nezapísal, sa samo zapíše ako chyba mechanizmu (úloha 492). Detekcia nie je
 // na modeli: hook prejde záznam relácie od poslednej výzvy `<schranka ...>`

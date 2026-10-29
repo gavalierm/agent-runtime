@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // subagent_foreground.mjs — sub-agent nespúšťa príkaz na pozadí.
 // Sub-agent, ktorý spustí príkaz s run_in_background a ukončí ťah, sa
 // vráti hlavnému vláknu ako hotový s výsledkom "čakám na ...". Koniec

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // tasker_work.mjs — práca sub-agenta alebo hlavného vlákna na úlohe Taskera sa
 // zapíše do Taskera príkazom `tasker work` (úloha Taskera 414, 472). Je to
 // záznam kto kedy pracoval. Podľa D0164 (úloha 485) `tasker work` stav úlohy

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // task_concurrency.mjs — úloha pre agenta, ktorý má v tom istom projekte bežiaci beh, sa
 // spustí súbežne bez blokéra (úloha 594). Chyba 25. 10. 2026: úloha 590 pre Lea vznikla
 // bez --blocked-by, hoci projekt tasker mal behy 113 a 114 v tom istom klone, dispečer ju

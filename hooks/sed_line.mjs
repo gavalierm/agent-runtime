@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // sed_line.mjs — `sed -i` s číslom riadku mení iba vtedy, keď agent ten riadok
 // v tom istom príkaze videl. Chyba 22. 10. 2026: `sed -i '6s|.*|...|'` v návrhu
 // webu Taskera prepísal riadok `:root` namiesto riadku s farbami stavov, číslo

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // shared_git.mjs — git príkazy, ktoré v zdieľanom klone zahodia alebo
 // schovajú rozpracované súbory inej relácie. Jedno miesto pre topic.mjs
 // (Mac) a foreign_git.mjs (server). Audit 16. 10. 2026, nález 10.

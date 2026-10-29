@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // rm_target.mjs — `rm` s cieľom z `$(...)`, spätných apostrofov alebo z premennej
 // bez `:?` zamietne hook skôr, než sa spýta poistka Claude Code. Verzia 2.1.310
 // má poistku dangerousRemoval s bypassImmune: pýta sa človeka aj v režime

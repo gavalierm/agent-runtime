@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // secret_read.mjs — tajomstvo sa nevypisuje na obrazovku. Čo príkaz Bash vypíše,
 // ide do prepisu relácie a do databázy T3 a tam ostane. Chyba 23. 10. 2026
 // (úloha 449): dvaja agenti vypísali dlhodobý token Claude (`claude setup-token`

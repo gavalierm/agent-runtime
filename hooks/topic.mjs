@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: mac
 // topic.mjs — agent vedie viac tém naraz, každú v jednom vlákne (rozhodnutie
 // z 16. 10. 2026). Nahradil single_session.mjs, ktorý púšťal k zápisu len
 // poslednú spustenú reláciu.

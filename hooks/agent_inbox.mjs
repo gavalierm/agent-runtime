@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: mac
 // agent_inbox.mjs — agent na Macu nevynechá správu iného agenta. Pri každej správe
 // operátora pozrie svoju schránku na serveri a keď v nej niečo čaká, pridá
 // pokyn prečítať ju pred odpoveďou. 15. 10. 2026 čakala správa o zastavenej

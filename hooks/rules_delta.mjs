@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // rules_delta.mjs: zmena pravidiel do ťahu, ktorý beží aj tak. UserPromptSubmit
 // zo settings.json prostredia (env/server/install.sh, env/mac/settings.json).
 // Pri každom prompte porovná HEAD nasadených klonov (workflowDir a brainGlobalDir

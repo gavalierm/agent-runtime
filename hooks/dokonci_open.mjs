@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // dokonci_open.mjs — koniec ťahu s otvoreným ledgerom skillu dokonci sa zastaví.
 // Chyba 27. 10. 2026 (úloha 623, behy Taskera 126 a 127): agent spustil posudok
 // nástrojom Agent na pozadí a ťah ukončil vetou "Čakám na posudok". Beh Taskera

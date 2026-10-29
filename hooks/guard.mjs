@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: mac
 // guard.mjs — územie agenta. PreToolUse hook pre Write, Edit, MultiEdit,
 // NotebookEdit a Bash. Rozhoduje podľa toho, kde session začala
 // (CLAUDE_PROJECT_DIR, nie aktuálne cwd, ktoré sa posúva s `cd`) a kam smeruje

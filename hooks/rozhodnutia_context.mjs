@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // rozhodnutia_context.mjs: pri štarte relácie agent s identitou dostane len
 // to, čo bez hooku nezistí: ktoré rozhodnutia sa zmenili, kým nebežal, a čo
 // na operátora čaká v Taskeri (návrh úlohy 390, časť 4.1). SessionStart

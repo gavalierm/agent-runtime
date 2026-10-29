@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // todo_after_comment.mjs — úloha agenta, na ktorej napísal komentár, nesmie
 // ostať v poradí (stav queued, scheduled, handoff alebo unassigned, kedysi todo; úloha Taskera 425). Dňa 23. 10. 2026 dvakrát: úloha 390
 // (podmienka hotového splnená) a 420 (nasadená, čaká na skúšku) ostali v poradí po

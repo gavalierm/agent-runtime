@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // git_pull.mjs — agent nespúšťa `git pull` (global §6, env/server/CLAUDE.md,
 // "Git na serveri"). Súbežné fetche viacerých relácií v jednom klone zapíšu
 // do `.git/FETCH_HEAD` dva riadky a pull padne; pull navyše podľa nastavenia

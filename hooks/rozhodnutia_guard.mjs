@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // rozhodnutia_guard.mjs: rozhodnutie sa zapisuje len cez bin/rozhodni.sh
 // (návrh úlohy 390, kontrola K2). PreToolUse pre Write, Edit, MultiEdit,
 // NotebookEdit a Bash (zapojuje ho env/server/install.sh a env/mac/settings.json).

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// check.mjs — jedinečnosť mien skillov a stav nasadenia. Exit 1 pri probléme.
+// check.mjs — jedinečnosť mien skillov, stav nasadenia, requires hookov a mŕtvy kód. Exit 1 pri probléme.
 //
 //   node check.mjs           vypíše všetko
 //   node check.mjs --quiet   mlčí, keď je všetko v poriadku (SessionStart hook)
@@ -26,6 +26,8 @@ import { denyProblems } from "./lib/deny_check.mjs";
 import { dupeProblems } from "./lib/rule_dupes.mjs";
 import { brainGlobalDir, workflowDir } from "./lib/paths.mjs";
 import { agentDefProblems } from "./lib/agent_defs.mjs";
+import { requiresProblems } from "./lib/hook_requires.mjs";
+import { deadCodeProblems } from "./lib/dead_code.mjs";
 
 const REPO = dirname(fileURLToPath(import.meta.url));
 // Prostredie: Mac má pracovisko ~/Work, server stromy agentov v /root.
@@ -420,6 +422,13 @@ problems.push(...dupeProblems(REPO, agentRepos().map((name) => ({ name, dir: res
 // Sub-agent implementator beží na Sonnete: agents/implementator.md nesie
 // `model: sonnet` (global §6, úloha 602, lib/agent_defs.mjs).
 problems.push(...agentDefProblems(REPO));
+
+// Každý hook nesie v druhom riadku `// requires: ...` (lib/hook_requires.mjs).
+problems.push(...requiresProblems(REPO));
+
+// Súbor kódu, ktorý nikde mimo seba a mimo testov nie je importovaný, volaný ani
+// menovaný, je mŕtvy; výnimky nesie lib/dead_code_allow.txt (lib/dead_code.mjs).
+problems.push(...deadCodeProblems(REPO));
 
 // RULES.md má strop slov, ktorý smie len klesať (lib/word_cap.mjs).
 problems.push(...wordCapProblems(REPO));

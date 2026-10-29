@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // no_operator_commands.mjs — agent nedá operátorovi príkaz na spustenie.
 // Krok pre operátora je len klik v jeho prehliadači alebo účte, príkaz spustí
 // agent. Chyba sa opakovala 15. 10. 2026, preto kontrola a nie próza.

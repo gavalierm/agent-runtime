@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // human_question.mjs — otázka pre človeka stojí sama (RULES.md §2, "A question
 // or step for a person stands alone, a task summary too"). Chyba 25. 10. 2026: zhrnutie
 // behu úlohy 573 znelo "Čaká na operátorovo A/B k zápisu do repa", web Taskera ho

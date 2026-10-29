@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: mac
 // project_data.mjs — dáta a repo projektu nejdú do .scratch agenta.
 // Chyba sa stala dvakrát: 16. 10. 2026 klon webu Kubo Rancher do
 // .scratch/kubo/web, 17. 10. 2026 záloha starého webu klienta

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // compact_block.mjs — kompakcia kontextu je zakázaný stav (D0190, operátor
 // 28. 10. 2026). PreCompact pre `manual` aj `auto`: skončí kódom 2, Claude Code
 // kompakciu preskočí. Nastavenie `autoCompactEnabled: false` ju vypína,

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: mac
 // server_work.mjs — službu na serveri spúšťa správca servera, nie zástupca
 // operátora na Macu. 18. 10. 2026 kontrola povolení zamietla agentovi štart
 // služby správcu úloh a zástupca na Macu ho spustil sám cez root SSH. Operátor to vytkol:

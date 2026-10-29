@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker, t3
 // reply_guard.mjs — odpoveď operátorovi je krátka a odkaz v nej funguje.
 // Dňa 22. 10. 2026 vlákno projektu napísalo operátorovi odpoveď s piatimi
 // odsekmi a odkazom na web, ktorý ešte nebežal. Operátor klikol, dostal chybu

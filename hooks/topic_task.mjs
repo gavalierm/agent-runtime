@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker, t3
 // topic_task.mjs — PostToolUse pre Bash: úloha založená `tasker task add`
 // vo vlákne témy sa sama zapíše do poľa `tasks` témy v topics.json, aby
 // správy mostu Taskera o nej šli do vlákna témy, nie do hlavného (úloha 421).

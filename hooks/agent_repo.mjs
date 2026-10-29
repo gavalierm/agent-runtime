@@ -1,3 +1,5 @@
+// agent_repo.mjs: repo agenta, v ktorom beží relácia
+// requires: mac
 // Repo agenta, v ktorom beží relácia: hlavný checkout projektu z
 // CLAUDE_PROJECT_DIR, z worktree .worktrees/<úloha> jeho hlavný checkout.
 // Stav tém, pamäť a SSH obal agenta sú tam, nie v repe kódu, odkiaľ

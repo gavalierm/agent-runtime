@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // own_mechanism.mjs — zadanie práce navrhuje nový vlastný mechanizmus a neukazuje,
 // že existujúci nástroj ho nemá (global/CLAUDE.md §6: "Before designing your own
 // mechanism, check whether the tool already does it"). Dňa 25. 10. 2026 správca agentov zadal

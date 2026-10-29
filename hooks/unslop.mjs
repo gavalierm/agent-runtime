@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // unslop.mjs — SessionStart hook. Vloží do kontextu relácie sekciu "Jadro"
 // skillu unslop, pár viet namiesto celého katalógu vzorov.
 //

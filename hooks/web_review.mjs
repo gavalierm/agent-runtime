@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // web_review.mjs — brána mockupu webu (D0041, od úlohy 645). Zmena vzhľadu
 // webu sa implementuje podľa schváleného mockupu dizajnérky Niny, nie po
 // jej posudku hotového webu.

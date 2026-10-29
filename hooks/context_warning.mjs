@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // context_warning.mjs — pokyn na čistý kontext pri hranici 80 tisíc
 // tokenov (DECISIONS.md 2026-10-19, "spotreba predplatného", predtým
 // 140 tisíc podľa DECISIONS.md 2026-10-14). UserPromptSubmit z .claude/settings.json repa.

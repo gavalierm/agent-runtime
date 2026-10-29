@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // tool_failure_block.mjs — druhý pokus o nástroj, ktorý v prostredí nefunguje,
 // sa zamietne (úloha 615). Dôvod pozri tool_failure_log.mjs: `gh` na serveri
 // nie je, `sudo` pod rootom netreba, prepínač `curl` verzia nepozná.
