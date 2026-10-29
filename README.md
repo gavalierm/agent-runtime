@@ -826,3 +826,44 @@ preskočia.
 sem nepatria (vzory sú v `lib/public_check.txt` v base64), `--commits <rozsah>`
 skontroluje meno autora a správy commitov. Hooky `.githooks/pre-commit` a
 `.githooks/pre-push` ho spúšťajú, zapnutie: `git config core.hooksPath .githooks`.
+
+## Presun (úloha 663, dávka 1a)
+
+Texty a kostra mozgu presunuté z troch zdrojov, kód hookov a knižníc sa v tejto
+dávke nemenil (dávka 1b). Plná mapa repa príde v dávke 1c. Zdroje: `agent-rules`
+(pravidlá servera), `agent-playbook` (verejná kópia pravidiel), `agentic-brain-template`
+(šablóna mozgu), skilly z klonu zástupcu operátora. Cesty zdrojov sú relatívne k ich koreňu.
+
+| nový súbor | odkiaľ |
+|---|---|
+| `RULES.md` | agent-rules: `global/CLAUDE.md` |
+| `output-styles/operator.md` | agent-rules: `global/output-styles/operator.md` |
+| `env/mac/gitignore` | agent-rules: `global/gitignore` |
+| `roles/*.md` (okrem zoznamu agentov `agents.md`) | agent-rules: `roles/*.md`; v `spravca-agentov.md` je účet na GitHube nahradený slovom "agenta" |
+| `agents/implementator.md` | agent-rules: `agents/implementator.md`; cesta worktree pod používateľom správcu úloh je `<home>/.worktrees/` |
+| `skills/unslop/SKILL.md` | agent-rules: `skills/unslop/SKILL.md`, pridané `scripts: none` |
+| `skills/uloha-postup/SKILL.md` | agent-rules: `skills/uloha-postup/SKILL.md`, pridané `scripts: none`, mená nahradené rolou |
+| `skills/schranka/SKILL.md` | agent-rules: `skills/schranka/SKILL.md`, pridané `scripts: none` |
+| `skills/artefakty/SKILL.md` | agent-rules: `skills/artefakty/SKILL.md`, pridané `scripts: none` |
+| `skills/dokonci/SKILL.md` | agent-rules: `skills/dokonci/SKILL.md` (cesty v texte na `dokonci.sh` a skúšku ostali pôvodné) |
+| `skills/dokonci/scripts/dokonci.sh` | agent-rules: `skills/dokonci/dokonci.sh` |
+| `test/dokonci.test.mjs` | agent-rules: `skills/dokonci/dokonci.test.mjs`, cesta k skriptu opravená |
+| `skills/error/SKILL.md` | nový, po anglicky: zlúčenie `skills/chyba/SKILL.md` z agent-rules a `skills/error/SKILL.md` zo šablóny. `scripts/error.sh` príde v dávke 1b (dnešný `bin/chyba.sh`) |
+| `skills/task-end/SKILL.md` | agentic-brain-template: `agentic-brain/skills/task-end/SKILL.md` |
+| `skills/task-end/scripts/task-end.sh` | agentic-brain-template: `agentic-brain/skills/task-end/scripts/task-end.sh` (bez zmeny, hľadá `bin/check.sh` o tri úrovne vyššie, v tomto repe ju treba nasmerovať na `brain/bin/check.sh`) |
+| `skills/browser/SKILL.md` | klon zástupcu operátora: `.claude/skills/prehliadac/SKILL.md` |
+| `skills/secret-from-operator/SKILL.md` | klon zástupcu operátora: `.claude/skills/tajomstvo-od-<operátor>/SKILL.md` |
+| `brain/RULES.md` | agentic-brain-template: `agentic-brain/RULES.md` |
+| `brain/bin/check.sh`, `adopt.sh`, `install.sh`, `decide.sh`, `pre-commit`, `repeat_guard.mjs`, `repeat_guard.allow` | agentic-brain-template: `agentic-brain/bin/*`, bez zmeny |
+| `brain/artifacts/README.md` | agentic-brain-template: `agentic-brain/artifacts/README.md` |
+| `brain/decisions/README.md` | agentic-brain-template: `agentic-brain/decisions/README.md` |
+| `brain/errors/REGISTER.md` | agentic-brain-template: `agentic-brain/errors/REGISTER.md` |
+| `brain/memory/MEMORY.md` | agentic-brain-template: `agentic-brain/memory/MEMORY.md` |
+| `brain/scratch/.gitkeep` | agentic-brain-template: `agentic-brain/scratch/.gitkeep` |
+| `test/brain/check.test.sh`, `adopt.test.sh`, `install.test.sh`, `repeat_guard.test.mjs`, `run.sh` | agentic-brain-template: `agentic-brain/test/*`, cesty opravené |
+| `test/brain/template.sh` | nový pomocník testov: zloží z `brain/` a zo `skills/error`, `skills/task-end` rozloženie šablóny (`agentic-brain/` s `skills/`) |
+| `test/brain/fixtures/error.sh`, `settings.json`, `template-ignore` | agentic-brain-template: `agentic-brain/skills/error/scripts/error.sh`, `.claude/settings.json`, ignorovací súbor koreňa. Náhrada, kým nevznikne `skills/error/scripts/error.sh` (dávka 1b) |
+| `docs/PLAYBOOK.md`, `docs/PLAYBOOK.en.md` | agent-playbook: `PLAYBOOK.md`, `PLAYBOOK.en.md` |
+| `LICENSE` | agent-playbook: `LICENSE` |
+| `docs/decisions-schema.md` | agent-playbook: `rozhodnutia/README.md` a `rozhodnutia/ROZSAHY.md` za sebou, nadpisy o stupeň nižšie |
+| `lib/public_check.txt` | zjednotenie s `lib/public_check.txt` z agent-playbook (riadok `+` s povoleným odkazom, doplnený komentár) |

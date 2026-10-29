@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Git pre-commit hook: runs agentic-brain/bin/check.sh and rejects the commit on error.
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+CHECK="$ROOT/agentic-brain/bin/check.sh"
+if [ ! -f "$CHECK" ]; then
+  echo "pre-commit: $CHECK is missing, skipping the check" >&2
+  exit 0
+fi
+if ! bash "$CHECK"; then
+  echo "pre-commit: commit rejected, fix the errors above (agentic-brain/bin/check.sh)" >&2
+  exit 1
+fi
+exit 0
