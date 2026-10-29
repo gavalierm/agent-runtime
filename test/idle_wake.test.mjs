@@ -35,8 +35,8 @@ function sandbox(entries) {
 }
 
 test("readOnlyCommand: čítanie áno, zápis nie", () => {
-  for (const c of ["ls /var/lib/adam", "AGENT_NAME=adam /opt/agent-rules/bin/tk task show 486 --json", "git status --short && git log --oneline -3", "grep -n x f | head", "sed -n 1,5p f"]) assert.equal(readOnlyCommand(c), true, c);
-  for (const c of ["tk comment 486 --body x", "git commit -m x -- f", "echo a > f", "sed -i s/a/b/ f", "/root/agent-runtime/reply.sh id", "node --test test/", "tk done 5 --summary x", "rm f"]) assert.equal(readOnlyCommand(c), false, c);
+  for (const c of ["ls /var/lib/adam", "AGENT_NAME=adam /opt/agentic-workflow/bin/tk task show 486 --json", "git status --short && git log --oneline -3", "grep -n x f | head", "sed -n 1,5p f"]) assert.equal(readOnlyCommand(c), true, c);
+  for (const c of ["tk comment 486 --body x", "git commit -m x -- f", "echo a > f", "sed -i s/a/b/ f", "/opt/agentic-workflow/reply.sh id", "node --test test/", "tk done 5 --summary x", "rm f"]) assert.equal(readOnlyCommand(c), false, c);
 });
 
 test("inboxMessages: tasker správa áno, na vedomie a slovo operátora nie", () => {
@@ -47,7 +47,7 @@ test("inboxMessages: tasker správa áno, na vedomie a slovo operátora nie", ()
 
 for (const id of [M1, M2]) {
   test(`replay ${id}: ťah len s čítaním založí úlohu agenti/adam s id správy a vláknom`, () => {
-    const s = sandbox([prompt(id), call("Bash", { command: "AGENT_NAME=adam /opt/agent-rules/bin/tk task show 486 --json" }), result, call("Bash", { command: "git status --short" }), result]);
+    const s = sandbox([prompt(id), call("Bash", { command: "AGENT_NAME=adam /opt/agentic-workflow/bin/tk task show 486 --json" }), result, call("Bash", { command: "git status --short" }), result]);
     const r = s.run();
     assert.equal(r.status, 0);
     assert.equal(r.stdout, "");

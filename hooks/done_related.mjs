@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker
 // done_related.mjs — po zavretí úlohy nesmie v tom istom projekte ostať
 // otázka pre človeka (needs_human) toho istého riešiteľa bez jeho komentára
 // v tom ťahu. Dňa 27. 10. 2026: audit 612 (projekt agenti) prepracoval celý
@@ -18,7 +19,8 @@ import { fileURLToPath } from "node:url";
 import { blockStop } from "../lib/deny.mjs";
 import { defaultDb } from "../lib/tasker_read.mjs";
 import { agentName } from "../lib/agent_name.mjs";
-import { hookEnv, rulesRepo } from "../lib/agent_env.mjs";
+import { hookEnv } from "../lib/agent_env.mjs";
+import { workflowDir } from "../lib/paths.mjs";
 import { turnStart } from "./todo_after_comment.mjs";
 
 // Úlohy needs_human riešiteľa `user` v projekte úlohy, ktorú `user` zavrel
@@ -42,10 +44,10 @@ export async function staleQuestions({ db, user, sinceMs }) {
   } finally { d.close(); }
 }
 
-export const POSTUP = (rows, rules = rulesRepo()) =>
+export const POSTUP = (rows, workflow = workflowDir()) =>
   `pre každú (${rows.map((r) => r.id).join(", ")}) jedno z: otázku zavretá úloha prekonala, `
   + "`tasker cancel <id>` a komentár s dôvodom a číslom zavretej úlohy; otázka platí ďalej, komentár, prečo ju "
-  + `výsledok zavretej úlohy nemení. Tasker spúšťaj cez \`${rules}/bin/tk ...\` (namiesto \`tasker ...\`).`;
+  + `výsledok zavretej úlohy nemení. Tasker spúšťaj cez \`${workflow}/bin/tk ...\` (namiesto \`tasker ...\`).`;
 
 export function reason(rows) {
   return "V tomto ťahu si zavrel úlohu a v jej projekte stojí tvoja otázka pre človeka (needs_human) bez tvojho komentára, "
@@ -68,5 +70,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (sinceMs == null) process.exit(0);
     rows = await staleQuestions({ db, user, sinceMs });
   } catch { process.exit(0); }
-  if (rows.length) blockStop(reason(rows), POSTUP(rows, rulesRepo(henv)));
+  if (rows.length) blockStop(reason(rows), POSTUP(rows, workflowDir(henv)));
 }

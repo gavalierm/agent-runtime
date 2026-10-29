@@ -1,5 +1,5 @@
 // Test hooku own_rule_scope.mjs. Hook sa spúšťa ako proces s HOME a AR_STATE
-// v dočasnom priečinku, živý stav (~/.local/state/agent-rules) a repá agentov
+// v dočasnom priečinku, živý stav (~/.local/state/agentic-workflow) a repá agentov
 // sa nemenia: hook cieľové súbory len číta. Replay chyby 23. 10. 2026: Edit
 // z prepisu vlákna agenta (relácia d7cf1c50, záznam 20:43:42) do CLAUDE.md jeho repa,
 // vstup je skopírovaný sem (cesta v domovskom priečinku skúšky), prepis sa môže rotovať.
@@ -13,7 +13,7 @@ import { agentRepoOf, check, chybaOdsek, seenBefore } from "../hooks/own_rule_sc
 
 const HOOK = new URL("../hooks/own_rule_scope.mjs", import.meta.url).pathname;
 const RULES = resolve(HOOK, "../..");
-const LIVE_STATE = join(homedir(), ".local/state/agent-rules");
+const LIVE_STATE = join(homedir(), ".local/state/agentic-workflow");
 
 // Skutočný vstup Edit z prepisu, riadok s časom 2026-10-23T20:43:42.
 const REAL = {
@@ -54,7 +54,7 @@ test("replay chyby: prvý Edit do CLAUDE.md repa agenta zamietnutý, rovnaký dr
   const first = run(e, real(e));
   assert.equal(first.permissionDecision, "deny");
   assert.match(first.permissionDecisionReason, /iný agent alebo rola/);
-  assert.match(first.permissionDecisionReason, /env\/<prostredie>\/CLAUDE\.md, global\/CLAUDE\.md alebo roles\//);
+  assert.match(first.permissionDecisionReason, /RULES\.md, env\/<prostredie>\/RULES\.md alebo roles\//);
   assert.match(first.permissionDecisionReason, /\nSprávny postup: /);
   assert.equal(run(e, real(e)), null);
 });
@@ -69,9 +69,9 @@ test("iná relácia alebo iný text sa zamietne znova", () => {
   assert.ok(run(e, changed));
 });
 
-test("zápis do agent-rules (env/server/CLAUDE.md) prejde hneď", () => {
+test("zápis do agentic-workflow (env/server/CLAUDE.md) prejde hneď", () => {
   const { e } = env();
-  for (const f of [join(RULES, "env/server/CLAUDE.md"), "/opt/agent-rules/env/server/CLAUDE.md", "/root/agent-rules/global/CLAUDE.md"]) {
+  for (const f of [join(RULES, "env/server/CLAUDE.md"), "/opt/agentic-workflow/env/server/CLAUDE.md", "/root/agentic-workflow/env/CLAUDE.md"]) {
     assert.equal(run(e, { ...real(e), tool_input: { ...real(e).tool_input, file_path: f } }), null, f);
   }
 });
@@ -101,7 +101,7 @@ test("Write a MultiEdit: pridanie zamietne, Write kratšieho obsahu prejde", () 
 test("ostatné nástroje, projekty a iné súbory hook nechá tak", () => {
   const { e } = env();
   assert.equal(run(e, { ...real(e), tool_name: "Bash", tool_input: { command: "echo" } }), null);
-  for (const f of [join(e.HOME, "adam/memory/MEMORY.md"), join(e.HOME, "CLAUDE.md"), join(e.HOME, ".claude/CLAUDE.md"), "/tmp/projekt/CLAUDE.md", join(e.HOME, "agent-rules/CLAUDE.md"), join(e.HOME, "adam/docs/x.md")]) {
+  for (const f of [join(e.HOME, "adam/memory/MEMORY.md"), join(e.HOME, "CLAUDE.md"), join(e.HOME, ".claude/CLAUDE.md"), "/tmp/projekt/CLAUDE.md", join(e.HOME, "agentic-workflow/CLAUDE.md"), join(e.HOME, "adam/docs/x.md")]) {
     assert.equal(run(e, { ...real(e), tool_input: { ...real(e).tool_input, file_path: f } }), null, f);
   }
 });
@@ -117,9 +117,9 @@ test("agentRepoOf: server, tasker-svc, Mac, worktree, projekt", () => {
   assert.equal(agentRepoOf("/Users/m/Work/agent-cyril/PERSONA.md", o), "/Users/m/Work/agent-cyril");
   assert.equal(agentRepoOf("/Users/m/Work/agenti/cyril/CLAUDE.md", o), "/Users/m/Work/agenti/cyril");
   assert.equal(agentRepoOf("/home/tasker-svc/agenti/viktor/CLAUDE.md", { ...o, taskerUser: undefined }), null, "bez AGENT_TASKER_USER sa nekontroluje");
-  assert.equal(agentRepoOf("/Users/m/Work/agent-rules/CLAUDE.md", o), null);
+  assert.equal(agentRepoOf("/Users/m/Work/agentic-workflow/CLAUDE.md", o), null);
   assert.equal(agentRepoOf("/Users/m/Work/projekt/CLAUDE.md", o), null);
-  assert.equal(agentRepoOf("/opt/agent-rules/CLAUDE.md", o), null);
+  assert.equal(agentRepoOf("/opt/agentic-workflow/CLAUDE.md", o), null);
 });
 
 test("používateľ behov úloh z runtime.env agenta (AGENT_TASKER_USER), bez neho sa /home/<používateľ>/agenti nekontroluje", () => {
@@ -132,7 +132,7 @@ test("používateľ behov úloh z runtime.env agenta (AGENT_TASKER_USER), bez ne
   assert.equal(run({ ...bez, AGENT_NAME: "iny" }, { ...input, session_id: "t2" }), null);
 });
 
-// Úloha 613: chyba agenta patrí do registra (chyba.sh), nie ako odsek "Chyba <dátum>"
+// Úloha 613: chyba agenta patrí do registra (error.sh), nie ako odsek "Chyba <dátum>"
 // do CLAUDE.md alebo PERSONA.md. Volanie check() priamo, stav a čítanie súborov v tmp.
 function direct() {
   const stateDir = join(mkdtempSync(join(tmpdir(), "ors-direct-")), "state");
@@ -140,14 +140,14 @@ function direct() {
   return { stateDir, exists: () => true };
 }
 const bash = (command, session_id = "b") => ({ session_id, cwd: "/tmp", tool_name: "Bash", tool_input: { command } });
-const CHYBA_DOVOD = /^Odsek Chyba .* nejde, chyba patrí do registra \(skill chyba\)\./;
+const CHYBA_DOVOD = /^Odsek Chyba .* nejde, chyba patrí do registra \(skill error\)\./;
 
 test("613 a: Edit s novým odsekom Chyba <dátum> je zamietnutý trvalo, druhý pokus tiež", () => {
   const o = direct();
   const input = edit("/root/adam/CLAUDE.md", "x", "x\n\nChyba 27. 10. 2026: x");
   assert.match(check(input, o), CHYBA_DOVOD);
   assert.match(check(input, o), CHYBA_DOVOD, "zopakovaný pokus neprejde");
-  assert.match(check({ ...input, tool_input: { ...input.tool_input, file_path: "/root/agent-rules/env/server/CLAUDE.md" } }, o), CHYBA_DOVOD);
+  assert.match(check({ ...input, tool_input: { ...input.tool_input, file_path: "/root/agentic-workflow/env/server/CLAUDE.md" } }, o), CHYBA_DOVOD);
   const m = { session_id: "m", cwd: "/tmp", tool_name: "MultiEdit", tool_input: { file_path: "/root/adam/PERSONA.md", edits: [{ old_string: "a", new_string: "a" }, { old_string: "b", new_string: "b\nChyba 5.1.2026: y" }] } };
   assert.match(check(m, o), CHYBA_DOVOD);
   assert.match(check(m, o), CHYBA_DOVOD);
@@ -175,7 +175,7 @@ test("613 d: Bash zápis odseku Chyba do CLAUDE.md alebo PERSONA.md je zamietnut
   const deny = [
     "cat >> /root/adam/CLAUDE.md <<'EOF'\n- Chyba 27. 10. 2026: x\nEOF",
     "sed -i 's|^## Git|Chyba 27. 10. 2026: x\\n## Git|' /root/adam/CLAUDE.md",
-    "printf 'Chyba 27. 10. 2026: x\\n' >> /root/agent-rules/env/server/CLAUDE.md",
+    "printf 'Chyba 27. 10. 2026: x\\n' >> /root/agentic-workflow/env/server/CLAUDE.md",
     "echo 'Chyba 27. 10. 2026: x' | tee -a /root/adam/PERSONA.md",
     "perl -pi -e 's/^## Git/Chyba 27. 10. 2026: x\\n## Git/' /root/adam/CLAUDE.md",
     "python3 -c \"open('/root/adam/PERSONA.md','a').write('Chyba 27. 10. 2026: x')\"",
@@ -196,12 +196,12 @@ test("613 d: Bash zápis odseku Chyba do CLAUDE.md alebo PERSONA.md je zamietnut
   for (const c of pass) assert.equal(check(bash(c, "p"), o), null, c);
 });
 
-test("613 d: hook ako proces zamietne Bash zápis s postupom chyba.sh --mechanizmus", () => {
+test("613 d: hook ako proces zamietne Bash zápis s postupom error.sh --mechanism", () => {
   const { e } = env();
   const r = run(e, bash("cat >> /root/adam/CLAUDE.md <<'EOF'\nChyba 27. 10. 2026: x\nEOF"));
   assert.equal(r.permissionDecision, "deny");
   assert.match(r.permissionDecisionReason, CHYBA_DOVOD);
-  assert.match(r.permissionDecisionReason, /\nSprávny postup: spusti \/opt\/agent-rules\/bin\/chyba\.sh --trieda <trieda> --subor <súbor s opravou> --mechanizmus <hook\|test\|deny\|rozhodnutie>:<cesta alebo id>/);
+  assert.match(r.permissionDecisionReason, /\nSprávny postup: spusti \/opt\/agentic-workflow\/skills\/error\/scripts\/error\.sh --class <trieda> --file <súbor s opravou> --mechanism <hook\|test\|deny\|decision>:<cesta alebo id>/);
   assert.equal(run(e, bash("grep -n 'Chyba 27. 10. 2026' /root/adam/CLAUDE.md")), null);
   assert.equal(run(e, bash("echo 'Chyba 27. 10. 2026: x'")), null);
 });

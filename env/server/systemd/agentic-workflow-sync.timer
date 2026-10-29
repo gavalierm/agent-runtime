@@ -1,0 +1,10 @@
+# Každých 5 minút spustí agentic-workflow-sync.service.
+[Unit]
+Description=Stiahnutie klonov agentov každých 5 minút
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

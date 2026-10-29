@@ -1,0 +1,7 @@
+# Výnimky z kontroly mŕtveho kódu (lib/dead_code.mjs). Riadok je `<cesta> <dôvod>`.
+# Výnimka bez dôvodu, na súbor, ktorý je niekde menovaný, alebo na neexistujúci súbor je chyba.
+# Nástroje spúšťané ručne alebo len v testoch.
+lib/path_check.mjs spúšťa ho človek ručne (`node lib/path_check.mjs`), opis v README
+lib/git_isolate.mjs pomocník testov, importujú ho len testy
+github_device_login.sh spúšťa ho človek ručne pri zriadení strojového účtu, opis v README
+brain/bin/decide.sh spúšťa ho agent podľa brain/RULES.md, opis v README

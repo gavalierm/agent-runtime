@@ -19,9 +19,9 @@ function repo() {
   const git = (...a) => execFileSync("git", ["-C", root, ...a], { env, encoding: "utf8" });
   git("init", "-q", "-b", "main");
   git("config", "user.email", "t@t"); git("config", "user.name", "T");
-  mkdirSync(join(root, "rozhodnutia"));
+  mkdirSync(join(root, "decisions"));
   const commit = (id, o, datum) => {
-    writeFileSync(join(root, "rozhodnutia", `${id}.md`), zaznam(id, o));
+    writeFileSync(join(root, "decisions", `${id}.md`), zaznam(id, o));
     git("add", "."); 
     execFileSync("git", ["-C", root, "commit", "-qm", id], { env: { ...env, GIT_AUTHOR_DATE: datum, GIT_COMMITTER_DATE: datum } });
   };
@@ -33,7 +33,7 @@ test("ranný súhrn vypíše len záznamy pridané za 24 h: číslo, kto, moc, k
   r.commit("D0001", {}, "2026-01-01T10:00:00Z");
   r.commit("D0002", { rozhodol: "Dana", moc: "operator", zapisal: "Dana", kluc: "dizajn.farba" }, new Date().toISOString());
   const kontrola = () => "D0002.md: moc operator nemá Dana podľa roles/agents.md\nupozornenie: rovnaký názov 'x' pri rôznych kľúčoch: D0002 (a), D0003 (b)\n";
-  const out = decisionsSection({ rulesRepo: r.root }, undefined, kontrola).join("\n");
+  const out = decisionsSection({ brainGlobal: r.root }, undefined, kontrola).join("\n");
   assert.match(out, /Nové rozhodnutia za 24 h \(1\)/);
   assert.match(out, /- D0002, zapísal Dana, rozhodol Dana, moc operator, kľúč dizajn\.farba: Názov D0002/);
   assert.doesNotMatch(out, /D0001/);
@@ -41,18 +41,18 @@ test("ranný súhrn vypíše len záznamy pridané za 24 h: číslo, kto, moc, k
   assert.match(out, /- upozornenie: rovnaký názov/);
 });
 
-test("build pridá sekciu rozhodnutí len s rulesRepo, čistá kontrola je v poriadku, bez nových záznamov žiadne", () => {
+test("build pridá sekciu rozhodnutí len s brainGlobal, čistá kontrola je v poriadku, bez nových záznamov žiadne", () => {
   const r = repo();
   r.commit("D0001", {}, "2026-01-01T10:00:00Z");
   const stub = () => "tasker ok";
   assert.doesNotMatch(build({}, stub, Date.now()), /rozhodnutia za 24 h/);
-  const out = build({ rulesRepo: r.root }, stub, Date.now(), { check: () => "" });
+  const out = build({ brainGlobal: r.root }, stub, Date.now(), { check: () => "" });
   assert.match(out, /Nové rozhodnutia za 24 h \(0\)/);
   assert.match(out, /- žiadne/);
   assert.match(out, /Kontrola rozhodnutí: v poriadku\./);
 });
 
 test("zlyhanie git logu sa v súhrne ukáže, súhrn neodpadne", () => {
-  const out = decisionsSection({ rulesRepo: "/nie/je" }, () => { throw new Error("nie je repo"); }, () => "");
+  const out = decisionsSection({ brainGlobal: "/nie/je" }, () => { throw new Error("nie je repo"); }, () => "");
   assert.match(out.join("\n"), /Rozhodnutia: git log zlyhal: nie je repo/);
 });

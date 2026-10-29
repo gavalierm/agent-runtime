@@ -1,12 +1,12 @@
 // Posledný riadok odpovede agenta pre čistý kontext a odovzdávka od
-// kontext.sh (repo agent-rules, lib/kontext.mjs). Budič ani sledovač model
+// bin/kontext.sh (lib/kontext.mjs). Budič ani sledovač model
 // nevolajú. Formát riadku:
 //   HOTOVO-KONTEXT                      holé slovo, ako spanok
 //   HOTOVO-KONTEXT spanok [<kľúč>]      len /clear
 //   HOTOVO-KONTEXT pokracuj <kľúč>      /clear a správa s ďalším krokom
 // Odovzdávka je $KONTEXT_DIR/<id relácie>.json (práva 600) s poľami key,
 // rezim, dalej, stav, cwd, at a po použití budičom consumed. Hook
-// clear_bridge.mjs repa agent-rules ju po /clear vloží do novej relácie
+// hooks/clear_bridge.mjs ju po /clear vloží do novej relácie
 // a zmaže. cfg.kontextDir nastavuje config() v lib.mjs, bez neho (testy)
 // sa odovzdávky nehľadajú.
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";

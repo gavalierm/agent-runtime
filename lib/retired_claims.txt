@@ -1,0 +1,9 @@
+# Zrušené tvrdenia. Riadok: regulárny výraz, tabulátor, dôvod s commitom alebo rozhodnutím.
+\b[Nn]ex(o|a|ovi|om)\b	agent prepustený a zmazaný 16. 10. 2026, PERSONA.md Hranice
+projekt\*\*\s*\|\s*git repozit	projekt je od 16. 10. 2026 priečinok s CLAUDE.md, repo je git (DECISIONS.md 2026-10-16)
+A file of another agent I never edit	cudzí agent: len persona, pamäť a nastavenie (agent-rules DECISIONS.md 2026-10-19 Prácu, na ktorú mám právo)
+First decide whose work it is	najprv právo z roly alebo persony (agent-rules DECISIONS.md 2026-10-19 Prácu, na ktorú mám právo)
+ask_agent\.sh.{0,60}--necakam(?!.*(odmietn|neexistuj))	nový ask_agent.sh má len čakám a --vedomie, --necakam odmietne (agent-rules DECISIONS.md 2026-10-20 Dva režimy novej správy)
+starts with your name and a colon	odpoveď agenta začína menom a dvojbodkou na jednom riadku s textom, od 23. 10. 2026 je meno s dvojbodkou samo na prvom riadku (rozhodnutia D0062)
+Zoznam `SCHVALENE\.md`|do `SCHVALENE\.md` zapíše|na zozname `SCHVALENE\.md`|v `SCHVALENE\.md` repa zástupcu	schválené triedy úkonov sú záznamy rozhodnutia/ s rozsahom schvalene, čítanie `rozhodnutia list --rozsah schvalene`, zápis `bin/rozhodni.sh --rozsah schvalene`, SCHVALENE.md je od 23. 10. 2026 zmrazený archív (úloha 399)
+T3 vykreslí jeden zalomený riadok	D0062 mylne tvrdilo, že T3 vykreslí zalomený riadok; markdown v T3 berie jeden nový riadok ako medzeru, oddeľuje až prázdny riadok (nové rozhodnutie nahradzuje D0062, 23. 10. 2026)

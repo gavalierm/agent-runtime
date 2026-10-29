@@ -1,9 +1,13 @@
 #!/bin/bash
 # Hook commit-msg repa agenta: bez traileru Co-Authored-By a Claude-Session,
 # autor "<Agent> (<stroj>)" s e-mailom, ktorý GitHub priradí k účtu
-# operátora (lib/commit_guard.sh repa pravidiel, 2026-10-19). Skript je v nasadenom klone pravidiel.
-guard=/opt/agent-rules/lib/commit_guard.sh
-[ -f "$guard" ] || guard="$HOME/Work/agent-rules/lib/commit_guard.sh"
+# operátora (lib/commit_guard.sh). Skript je v nasadenom klone kódu
+# (AGENT_WORKFLOW, inak na macOS ~/Work/agentic-workflow, inak /opt/agentic-workflow).
+wf="${AGENT_WORKFLOW:-}"
+if [ -z "$wf" ]; then
+    if [ "$(uname)" = Darwin ]; then wf="$HOME/Work/agentic-workflow"; else wf=/opt/agentic-workflow; fi
+fi
+guard="$wf/lib/commit_guard.sh"
 if [ -f "$guard" ]; then
     exec bash "$guard" "$1"
 fi

@@ -62,7 +62,7 @@ R=${AV_ROOT:-}
 HERE=$(cd "$(dirname "$0")" && pwd)
 HOOKS_SRC=${AV_HOOKS_SRC:-$HERE/agent-githooks}
 GH_REPO=${AV_GITHUB_REPO:-$HERE/github_repo.sh}
-RUNTIME_DIR=${AV_RUNTIME:-$HERE}
+WORKFLOW_DIR=${AV_WORKFLOW:-$HERE}
 T3_URL=${AV_T3_URL:-http://127.0.0.1:3773}
 AUTOSETTLE=${AV_AUTOSETTLE:-$HERE/t3_autosettle.mjs}
 TASKER_HOME=/home/$TASKER_USER/.tasker
@@ -102,7 +102,7 @@ if [ -n "$R" ]; then
   [[ $AUTOSETTLE == "$AV_STUBS"/* ]] || { echo "ochrana skúšky: AV_AUTOSETTLE nie je z $AV_STUBS" >&2; exit 3; }
 fi
 
-tk() { AGENT_NAME=$MANAGER TK_USER="$TASKER_USER" TK_HOME="$TASKER_HOME" "${AV_TK:-/opt/agent-rules/bin/tk}" "$@"; }
+tk() { AGENT_NAME=$MANAGER TK_USER="$TASKER_USER" TK_HOME="$TASKER_HOME" "${AV_TK:-$HERE/bin/tk}" "$@"; }
 tuser() { runuser -u "$TASKER_USER" -- "$@"; }
 
 # 1. Kľúč agenta
@@ -178,13 +178,13 @@ fi
 mkdir -p "$CFG"; chmod 700 "$CFG"
 if [ -f "$CFG/runtime.env" ]; then ok "$CFG/runtime.env"; else
   (umask 077; cat > "$CFG/runtime.env" <<EOF
-AGENT_RUNTIME=$RUNTIME_DIR
+AGENT_WORKFLOW=$WORKFLOW_DIR
 AGENT_WORKDIR=/root/$name
 AGENT_BOX=/var/lib/$name
 AGENT_MODEL=$model
 T3_URL=$T3_URL
 T3_TOKEN_FILE=/root/.config/$name/t3_token
-AGENT_REPLY_CMD="AGENT_NAME=$name $RUNTIME_DIR/reply.sh"
+AGENT_REPLY_CMD="AGENT_NAME=$name $WORKFLOW_DIR/reply.sh"
 AGENT_REPLY_ROUTE_$MANAGER=/var/lib/$MANAGER/inbox
 AGENT_RUNTIME_MODE=full-access
 TASKER_HOME=$TASKER_HOME

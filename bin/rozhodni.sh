@@ -1,9 +1,9 @@
 #!/bin/bash
-# Zápis rozhodnutia do rozhodnutia/ repa s rozhodnutiami: pridelí číslo, zapíše
-# súbor, prepíše INDEX.md, commitne pod menom agenta, pushne a podľa
-# ROZHODNI_SYNC_UNIT spustí sync. Úložisko a schéma sú v rozhodnutia/README.md
-# toho repa, logiku nesie lib/rozhodnutia.mjs. Skript žije v repe agent-runtime
-# a nepredpokladá, že leží v repe s rozhodnutiami.
+# Zápis rozhodnutia do decisions/ spoločného mozgu agentov: pridelí číslo,
+# zapíše súbor, prepíše INDEX.md, commitne pod menom agenta, pushne a podľa
+# ROZHODNI_SYNC_UNIT spustí sync. Schéma je v docs/decisions-schema.md, logiku
+# nesie lib/rozhodnutia.mjs. Skript nepredpokladá, že leží v repe s rozhodnutiami,
+# klon s nimi dáva lib/paths.sh (AGENT_BRAIN_GLOBAL).
 #
 # Použitie (text záznamu na stdin):
 #   rozhodni.sh --nazov N --kluc K --rozsah R,R --agenti A,A --rozhodol KTO
@@ -12,28 +12,28 @@
 #               [--zapisal správca agentov] [--datum RRRR-MM-DD] [--dry-run]
 #   rozhodni.sh --zrus D0007 --dovod "dôvod" [--dry-run]
 # --z-ulohy N doplní --zdroj a --uloha z úlohy Taskera (ROZHODNI_TASKER, inak
-# bin/tk z klonu pravidiel, lib/agent_rules.sh), explicitné --zdroj a --uloha
-# majú prednosť.
+# bin/tk tohto repa), explicitné --zdroj a --uloha majú prednosť.
 # --dry-run vypíše záznam a nezapíše nič, ani git. Rovnaký kľúč ako platný
 # záznam bez --nahradza skončí chybou s výpisom platných záznamov.
 #
-# Premenné: ROZHODNUTIA_REPO (klon s priečinkom rozhodnutia/, povinná),
+# Premenné: AGENT_BRAIN_GLOBAL (klon so spoločným mozgom, priečinok decisions/),
 # AGENT_NAME (kto píše, inak --zapisal), ROZHODNI_STROJ (meno stroja v mene
-# autora, inak hostname), ROZHODNUTIA_LIB (iný vstup lib/rozhodnutia.mjs, napríklad
-# re-export repa pravidiel s jeho kontrolami), ROZHODNI_SYNC_UNIT (jednotka
-# systemd, ktorú po pushi spustí sync klonu, bez nej sa sync nespúšťa),
-# ROZHODNI_TASKER (príkaz Taskera pre --z-ulohy), AGENT_RULES.
+# autora, inak hostname), ROZHODNI_SYNC_UNIT (jednotka systemd, ktorú po pushi
+# spustí sync klonu, bez nej sa sync nespúšťa), ROZHODNI_TASKER (príkaz Taskera
+# pre --z-ulohy), AGENT_WORKFLOW.
 # Commit nesie meno "<Agent> (<stroj>)". Kód 0 zapísané, 1 chyba, 2 zlé použitie.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-lib="${ROZHODNUTIA_LIB:-$here/../lib/rozhodnutia.mjs}"
-if [ -z "${ROZHODNUTIA_REPO:-}" ]; then
-    echo "Chýba ROZHODNUTIA_REPO: klon s priečinkom rozhodnutia/. Repo pravidiel má obal bin/rozhodni.sh, ktorý ju nastaví." >&2
+# shellcheck source=../lib/paths.sh
+. "$here/../lib/paths.sh"
+lib="$here/../lib/rozhodnutia.mjs"
+repo="$(brain_global_dir)"
+dir="$(decisions_dir)"
+if [ ! -d "$dir" ]; then
+    echo "Chýba priečinok rozhodnutí $dir: nastav AGENT_BRAIN_GLOBAL na klon so spoločným mozgom (priečinok decisions/)." >&2
     exit 2
 fi
-repo="$ROZHODNUTIA_REPO"
-dir="$repo/rozhodnutia"
 
 args=()
 dry=0
@@ -56,13 +56,11 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-# --z-ulohy N: zdroj a číslo úlohy z Taskera (ROZHODNI_TASKER, inak bin/tk z klonu pravidiel),
+# --z-ulohy N: zdroj a číslo úlohy z Taskera (ROZHODNI_TASKER, inak bin/tk tohto repa),
 # explicitné --zdroj a --uloha majú prednosť.
 if [ -n "$z_ulohy" ]; then
     if ! [[ "$z_ulohy" =~ ^[0-9]+$ ]]; then echo "--z-ulohy chce číslo úlohy, dostal som '$z_ulohy'." >&2; exit 2; fi
-    # shellcheck source=../lib/agent_rules.sh
-    . "$here/../lib/agent_rules.sh"
-    tasker_cmd="${ROZHODNI_TASKER:-$(agent_rules_dir)/bin/tk}"
+    tasker_cmd="${ROZHODNI_TASKER:-$here/tk}"
     if ! uj="$($tasker_cmd task show "$z_ulohy" --json 2>/dev/null)" || [ -z "$uj" ]; then
         echo "Úlohu $z_ulohy sa nepodarilo prečítať z Taskera, zapíš --zdroj a --uloha ručne." >&2
         exit 1
@@ -108,7 +106,7 @@ commit_out() {
     id="$(sed -n 1p <<<"$out")"
     nazov="$(sed -n 2p <<<"$out")"
     subory=()
-    while IFS= read -r f; do [ -n "$f" ] && subory+=("rozhodnutia/$f"); done < <(sed -n '3,$p' <<<"$out")
+    while IFS= read -r f; do [ -n "$f" ] && subory+=("decisions/$f"); done < <(sed -n '3,$p' <<<"$out")
     git_r add -- "${subory[@]}" || return 1
     if [ "$zrus" = 1 ]; then msg="Rozhodnutie $id zrušené: $nazov"; else msg="Rozhodnutie $id: $nazov"; fi
     if ! git_r -c user.name="$autor_c" commit -q -m "$msg" -- "${subory[@]}"; then
@@ -137,7 +135,7 @@ precisluj_lokalne() {
     tmpd="$(mktemp -d)"
     for sha in $shas; do
         git_r log -1 --format=%s "$sha" | grep -q '^Rozhodnutie D[0-9]\{4\}: ' || { rm -rf "$tmpd"; return 1; }
-        st="$(git_r diff-tree --no-commit-id --name-status -r "$sha" -- rozhodnutia | grep -E $'^A\trozhodnutia/D[0-9]{4}\.md$' || true)"
+        st="$(git_r diff-tree --no-commit-id --name-status -r "$sha" -- decisions | grep -E $'^A\tdecisions/D[0-9]{4}\.md$' || true)"
         [ -n "$st" ] || { rm -rf "$tmpd"; return 1; }
         f="${st#*$'\t'}"
         git_r show "$sha:$f" >"$tmpd/$sha.md"

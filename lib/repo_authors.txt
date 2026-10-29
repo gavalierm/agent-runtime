@@ -1,0 +1,2 @@
+# Vzor: autori povolení v repe: <meno repa z origin URL><TAB><mená agentov oddelené |><TAB><rozhodnutie>
+# Riadok bez záznamu = repo sa nemení. Číta ho lib/commit_guard.sh. Dáta nasadenia sú v $AGENT_BRAIN_GLOBAL/commit_guard/repo_authors.txt a majú prednosť.

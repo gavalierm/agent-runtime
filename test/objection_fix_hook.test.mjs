@@ -1,4 +1,4 @@
-// Hook objection_fix.mjs ako proces: replay uznanej chyby bez chyba.sh (úloha 426,
+// Hook objection_fix.mjs ako proces: replay uznanej chyby bez error.sh (úloha 426,
 // D0142), HOME v tmp, živý Tasker ani register chýb sa nepoužijú.
 import "../lib/git_isolate.mjs";
 import test from "node:test";
@@ -24,17 +24,17 @@ function hook(text, cmds) {
   return r.stdout ? JSON.parse(r.stdout) : null;
 }
 
-test("replay 390 a 420: hook zastaví ťah, ktorý uzná chybu bez chyba.sh", () => {
+test("replay 390 a 420: hook zastaví ťah, ktorý uzná chybu bez error.sh", () => {
   for (const t of ["Máš pravdu, úloha 390 ostala todo. Opravil som hook v 1a2b3c4.", "Moja chyba, úloha 420 ostala todo. Hook 1a2b3c4."]) {
     const o = hook(t, ["git add hooks/todo_after_comment.mjs && git commit -qm x -- hooks/todo_after_comment.mjs"]);
     assert.equal(o.decision, "block");
-    assert.match(o.reason, /chyba\.sh/);
-    assert.match(o.reason, /Správny postup: .*bin\/chyba\.sh --trieda/s);
+    assert.match(o.reason, /error\.sh/);
+    assert.match(o.reason, /Správny postup: .*scripts\/error\.sh --class/s);
   }
 });
 
-test("hook pustí ťah, ktorý uznal chybu, spustil chyba.sh a commitol opravu", () => {
-  const o = hook("Máš pravdu. Opravil som hook v 1a2b3c4.", ["git add hooks/x.mjs && git commit -qm x -- hooks/x.mjs", "/opt/agent-rules/bin/chyba.sh --trieda t --subor hooks/x.mjs"]);
+test("hook pustí ťah, ktorý uznal chybu, spustil error.sh a commitol opravu", () => {
+  const o = hook("Máš pravdu. Opravil som hook v 1a2b3c4.", ["git add hooks/x.mjs && git commit -qm x -- hooks/x.mjs", "/opt/agentic-workflow/skills/error/scripts/error.sh --class t --file hooks/x.mjs"]);
   assert.equal(o, null);
 });
 

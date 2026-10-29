@@ -1,0 +1,6 @@
+.scratch/
+LOG.md
+.DS_Store
+
+**/.claude/settings.local.json
+.worktrees/

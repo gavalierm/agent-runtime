@@ -1,17 +1,18 @@
 # Budič agenta <meno> (%i): schránka do vlákna T3, dozor nad behom a čistý
 # kontext. Systémová služba pod rootom, jedna inštancia na agenta, README.md,
 # časť Viac agentov. Nastavenie v %h/.config/%i/runtime.env (600).
-# AGENT_RUNTIME je priečinok s driver.mjs, predvolene klon tohto repa
-# v %h/agent-runtime.
+# AGENT_WORKFLOW je klon tohto repa (priečinok s driver.mjs), predvolene
+# /opt/agentic-workflow; runtime.env ho prekryje, preto je Environment pred
+# EnvironmentFile.
 [Unit]
 Description=Budic agenta %i, schranka do vlakna T3
 After=t3code.service t3code-%i.service network-online.target
 
 [Service]
 Environment=AGENT_NAME=%i
-Environment=AGENT_RUNTIME=%h/agent-runtime
+Environment=AGENT_WORKFLOW=/opt/agentic-workflow
 EnvironmentFile=-%h/.config/%i/runtime.env
-ExecStart=/usr/bin/env node ${AGENT_RUNTIME}/driver.mjs
+ExecStart=/usr/bin/env node ${AGENT_WORKFLOW}/driver.mjs
 Restart=always
 RestartSec=10
 

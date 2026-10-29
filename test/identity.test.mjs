@@ -25,7 +25,7 @@ function run(persona, extraEnv = {}) {
     if (persona !== null) writeFileSync(join(dir, "PERSONA.md"), persona);
     const out = execFileSync("node", [HOOK], {
       input: JSON.stringify({ session_id: "test1234", cwd: dir }),
-      env: { PATH: process.env.PATH, HOME, CLAUDE_PROJECT_DIR: "", AGENT_RULES_REPO: RULES, AGENT_THREADS: "", ...extraEnv },
+      env: { PATH: process.env.PATH, HOME, CLAUDE_PROJECT_DIR: "", AGENT_WORKFLOW: RULES, AGENT_THREADS: "", ...extraEnv },
     }).toString();
     return out ? JSON.parse(out).hookSpecificOutput.additionalContext : "";
   } finally {
@@ -67,19 +67,19 @@ test("bez PERSONA.md hook mlčí", () => {
   assert.equal(run(null), "");
 });
 
-test("klon pravidiel z AGENT_RULES_REPO, nie z umiestnenia hooku", () => {
-  const c = run("# Xaver\n\nRole: spravca-servera\n", { AGENT_RULES_REPO: join(RULES, "neexistuje") });
+test("klon pravidiel z AGENT_WORKFLOW, nie z umiestnenia hooku", () => {
+  const c = run("# Xaver\n\nRole: spravca-servera\n", { AGENT_WORKFLOW: join(RULES, "neexistuje") });
   assert.match(c, /Upozornenie: PERSONA.md uvádza rolu `spravca-servera`/);
 });
 
-test("klon pravidiel z runtime.env agenta (AGENT_RULES_REPO)", () => {
+test("klon pravidiel z runtime.env agenta (AGENT_WORKFLOW)", () => {
   mkdirSync(join(HOME, ".config/xaver"), { recursive: true });
   const other = mkdtempSync(join(tmpdir(), "identity-other-"));
   try {
     mkdirSync(join(other, "roles"));
     writeFileSync(join(other, "roles", "spravca-servera.md"), "# Pravidlá roly: z runtime.env\n");
-    writeFileSync(join(HOME, ".config/xaver/runtime.env"), `AGENT_RULES_REPO=${other}\n`);
-    const c = run("# Xaver\n\nRole: spravca-servera\n", { AGENT_RULES_REPO: "", AGENT_NAME: "xaver" });
+    writeFileSync(join(HOME, ".config/xaver/runtime.env"), `AGENT_WORKFLOW=${other}\n`);
+    const c = run("# Xaver\n\nRole: spravca-servera\n", { AGENT_WORKFLOW: "", AGENT_NAME: "xaver" });
     assert.match(c, /# Pravidlá roly: z runtime\.env/);
   } finally { rmSync(other, { recursive: true, force: true }); }
 });

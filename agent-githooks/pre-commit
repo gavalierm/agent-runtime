@@ -1,13 +1,20 @@
 #!/bin/bash
 # Hook pre-commit repa agenta. Zapína ho v klone
 #   git config core.hooksPath .githooks
-# Zábrana proti konfliktu main s otvorenou vetvou (lib/open_branch_guard.sh
-# repa agent-rules). Skript je v nasadenom klone pravidiel, bez neho hook
-# len varuje.
+# Zábrana proti konfliktu main s otvorenou vetvou (lib/open_branch_guard.sh) a
+# kontrola CLAUDE.md, PERSONA.md a značiek konfliktu (lib/claude_md_guard.sh).
+# Skripty sú v nasadenom klone kódu (AGENT_WORKFLOW, inak na macOS
+# ~/Work/agentic-workflow, inak /opt/agentic-workflow), bez nich hook len varuje.
 cd "$(git rev-parse --show-toplevel)" || exit 1
-guard=/opt/agent-rules/lib/open_branch_guard.sh
-if [ -f "$guard" ]; then
-    bash "$guard" || exit 1
-else
-    echo "Varovanie: chýba $guard, kontrola otvorených vetiev preskočená." >&2
+wf="${AGENT_WORKFLOW:-}"
+if [ -z "$wf" ]; then
+    if [ "$(uname)" = Darwin ]; then wf="$HOME/Work/agentic-workflow"; else wf=/opt/agentic-workflow; fi
 fi
+for name in claude_md_guard open_branch_guard; do
+    guard="$wf/lib/$name.sh"
+    if [ -f "$guard" ]; then
+        bash "$guard" || exit 1
+    else
+        echo "Varovanie: chýba $guard, kontrola $name preskočená." >&2
+    fi
+done

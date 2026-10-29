@@ -9,7 +9,7 @@ import { config, T3Client } from "../lib.mjs";
 import { tick } from "../driver.mjs";
 import { DONE_WORD } from "../supervise.mjs";
 
-// Odovzdávka, akú zapíše kontext.sh (repo agent-rules, lib/kontext.mjs).
+// Odovzdávka, akú zapíše kontext.sh (repo agentic-workflow, lib/kontext.mjs).
 function handoff(dir, key, over = {}) {
   writeFileSync(join(dir, `1a2b3c4d-0000-4000-8000-${key.padEnd(12, "0").slice(0, 12)}.json`), JSON.stringify({ key, rezim: "pokracuj", dalej: "dokončiť úlohu 7", stav: "pamäť zapísaná", cwd: "/x", at: "2026-10-23T10:00:00Z", ...over }));
 }

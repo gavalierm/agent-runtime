@@ -44,8 +44,8 @@
 // ktorú Tasker sám presunul blocked -> unassigned (actor tasker, všetky blokéry
 // hotové), ide jej zakladateľovi, ak je to agent s mostom (creator
 // human:<agent>, enabled nie 1), ako `nečakám`. Kurzor mosta je
-// $AGENT_STATE/tasker_bridge_last_id. Rozhodnutie v DECISIONS.md
-// repa agent-rules, 2026-10-19 "most z Taskera do schránky agenta".
+// $AGENT_STATE/tasker_bridge_last_id. Most z Taskera do schránky agenta
+// je rozhodnutie z 19. 10. 2026.
 //
 // Použitie: tasker_events.mjs [--once]
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -54,10 +54,11 @@ import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { config, ensureDir, log, writeInbox } from "./lib.mjs";
 import { readTopics, topicsPath, TOPIC_RE } from "./route.mjs";
+import { workflowDir } from "./lib/paths.mjs";
 
 const NAME = "agent-tasker-events";
-// Obal Taskera pre agenta pod rootom (agent-rules bin/tk, úloha 462).
-const TK = "/opt/agent-rules/bin/tk";
+// Obal Taskera pre agenta pod rootom (bin/tk tohto repa, úloha 462).
+const TK = join(workflowDir(), "bin", "tk");
 
 async function openDb(path) {
   // node:sqlite v Node 22 vypíše ExperimentalWarning, ten tu nič nenesie.
@@ -355,7 +356,7 @@ export function renderDecision(task, comment, cfg) {
   if (comment) lines.push("", `Komentár (${comment.author}, ${new Date(comment.created_at).toISOString()}):`, comment.body.slice(0, 4000));
   lines.push(
     "",
-    "Posúď: platí voľba aj po uzavretí úlohy (pravidlo, trieda úkonov, voľba stavu sveta)? Ak áno, zapíš ju /opt/agent-rules/bin/rozhodni.sh a riešiteľovi odpovedz komentárom. Ak platí len v úlohe, záznam nepíš.",
+    `Posúď: platí voľba aj po uzavretí úlohy (pravidlo, trieda úkonov, voľba stavu sveta)? Ak áno, zapíš ju ${join(workflowDir(), "bin", "rozhodni.sh")} a riešiteľovi odpovedz komentárom. Ak platí len v úlohe, záznam nepíš.`,
     `Detail: ${tasker} task show ${task.id} --json`,
   );
   return lines.join("\n");

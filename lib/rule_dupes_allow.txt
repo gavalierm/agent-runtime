@@ -1,0 +1,9 @@
+# Zámerné opakovanie pravidla (lib/rule_dupes.mjs). Jeden riadok na dvojicu:
+#   <id dvojice> <dôvod>
+# Id vypíše kontrola v nálezu ("id 0123456789"). Zmena textu ktorejkoľvek
+# jednotky zmení id, riadok treba potvrdiť znova.
+c43375f9a2 iné pravidlo: správca agentov mení stav čakajúcej úlohy po zápise výsledku, s čistým kontextom zdieľa len mená kontext.sh a príkazov
+7bd6579752 iné pravidlo: zástupca robí správy správcu agentov ako pokyn operátora, správca servera opisuje správy tasker-* a súrnu schránku, spoločné sú len cesty schránok
+3d257f78ae ukazovateľ jedného agenta na zdieľané pravidlo o schránke, kópie v CLAUDE.md agentov čistia podúlohy úlohy 621
+4d653324b6 iné pravidlo: správca agentov mení stav čakajúcej úlohy po zápise výsledku, s čistým kontextom zdieľa len mená kontext.sh a príkazov
+0841d2127c ukazovateľ správcu servera na režimy odpovede v env/server, nesie len odkaz a pravidlo o návrhu opravy bez --vedomie (úloha 626)

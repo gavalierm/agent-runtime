@@ -23,7 +23,7 @@ function setup() {
   const env = {
     PATH: process.env.PATH, HOME: root, AGENT_NAME: "adam", AGENT_BOX: box, AGENT_SWEEP_BOXES: box,
     TASKER_BIN: bin, TASKER_HOME: join(root, "th"), TASKER_DB: join(root, "none.db"),
-    AGENT_T3_DB: join(root, "none-t3.db"), AGENT_RULES_REPO: join(root, "none-rules"), AGENT_WORK_REPOS: join(root, "none-repo"),
+    AGENT_T3_DB: join(root, "none-t3.db"), AGENT_BRAIN_GLOBAL: join(root, "none-rules"), AGENT_WORK_REPOS: join(root, "none-repo"),
   };
   return { root, box, env };
 }

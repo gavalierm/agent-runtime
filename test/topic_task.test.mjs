@@ -40,14 +40,14 @@ function setup() {
   writeFileSync(mainFile, "thread:project:p:main\n");
   return { dir, dbPath, topicsFile, mainFile, topics: () => JSON.parse(readFileSync(topicsFile, "utf8")) };
 }
-const add = (stdout, command = "AGENT_NAME=adam /opt/agent-rules/bin/tk task add --title x --project p --json") => ({ tool_input: { command }, tool_response: { stdout, stderr: "" } });
+const add = (stdout, command = "AGENT_NAME=adam /opt/agentic-workflow/bin/tk task add --title x --project p --json") => ({ tool_input: { command }, tool_response: { stdout, stderr: "" } });
 
 test("newTaskIds: json, viac objektov, číslo bez --json, cudzí príkaz", () => {
   assert.deepEqual(newTaskIds("tasker task add --json", { stdout: '{\n "id": 421,\n "title": "a } {"\n}\n' }), [421]);
   assert.deepEqual(newTaskIds("tasker task add --json; tasker task add --json", { stdout: '{"id":5,"title":"a"}\n{"id":6,"title":"b"}\n' }), [5, 6]);
   assert.deepEqual(newTaskIds("tasker task add --title x --project p", { stdout: "77\n" }), [77]);
   assert.deepEqual(newTaskIds("tasker task add --json", { stdout: "77\n" }), [77]);
-  assert.deepEqual(newTaskIds("AGENT_NAME=adam /opt/agent-rules/bin/tk task add --json", { stdout: '{"id":9}' }), [9]);
+  assert.deepEqual(newTaskIds("AGENT_NAME=adam /opt/agentic-workflow/bin/tk task add --json", { stdout: '{"id":9}' }), [9]);
   assert.deepEqual(newTaskIds("tk task add --json", { stdout: "10\n" }), [10]);
   assert.deepEqual(newTaskIds("tasker task show 5 --json", { stdout: '{"id":5}' }), []);
   assert.deepEqual(newTaskIds("tasker task add --title x", { stdout: "" }), []);
@@ -152,7 +152,7 @@ function fakeTk(tasks, calls = []) {
   };
 }
 const T = (id, o = {}) => ({ id, title: `u${id}`, project: "agenti", created_at: NOW - 5000, actor: "human:adam", ...o });
-const PIPE = "AGENT_NAME=adam /opt/agent-rules/bin/tk task add --title x --project p --json | grep -o '\"id\":[0-9]*'";
+const PIPE = "AGENT_NAME=adam /opt/agentic-workflow/bin/tk task add --title x --project p --json | grep -o '\"id\":[0-9]*'";
 
 test("recentTasks: len čerstvé úlohy tohto agenta, názov z --title, bez mena nič", () => {
   const tasks = [T(1), T(2, { actor: "human:iny" }), T(3, { created_at: NOW - 600000 }), T(4, { title: "iny nazov" })];

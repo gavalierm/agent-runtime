@@ -28,9 +28,12 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, readdirSync, readFileSync, renameSync, statSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { NAME_RE, config, inboxEntries, log, parseHeader, parseName, writeInbox } from "./lib.mjs";
 import { operatorActors } from "./tasker_events.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 // Držané správy na vedomie bez ohľadu na vek: presunie ich zo schránky
 // agenta do processed a vráti zoznam pre súhrn. Schránky berie z
@@ -66,18 +69,18 @@ export function heldSection(items) {
   return lines;
 }
 
-// Nové rozhodnutia za 24 h z git logu repa pravidiel (nové súbory rozhodnutia/D*.md)
+// Nové rozhodnutia za 24 h z git logu spoločného mozgu (nové súbory decisions/D*.md)
 // a výstup `rozhodnutia.mjs check` (problémy a upozornenia na rovnaký názov
-// pri rôznych kľúčoch). Úloha 470, replay S9. Bez cfg.rulesRepo nerobí nič.
+// pri rôznych kľúčoch). Úloha 470, replay S9. Bez cfg.brainGlobal nerobí nič.
 // `git` a `check` sú vstrekované kvôli testu, nič sa nezapisuje.
 export function decisionsSection(cfg, git = (a) => execFileSync("git", a, { encoding: "utf8", timeout: 30_000 }),
   check = (lib, dir) => spawnSync("node", [lib, "check", "--dir", dir], { encoding: "utf8", timeout: 30_000 }).stdout ?? "") {
-  const repo = cfg.rulesRepo;
+  const repo = cfg.brainGlobal;
   if (!repo) return [];
   let files;
   try {
-    files = git(["-C", repo, "log", "--since=24 hours ago", "--diff-filter=A", "--name-only", "--format=", "--", "rozhodnutia/"])
-      .split("\n").map((l) => /^rozhodnutia\/(D\d{4})\.md$/.exec(l.trim())?.[1]).filter(Boolean);
+    files = git(["-C", repo, "log", "--since=24 hours ago", "--diff-filter=A", "--name-only", "--format=", "--", "decisions/"])
+      .split("\n").map((l) => /^decisions\/(D\d{4})\.md$/.exec(l.trim())?.[1]).filter(Boolean);
   } catch (e) {
     return ["", `Rozhodnutia: git log zlyhal: ${(e.stderr || e.message || "").toString().trim().slice(0, 300)}`];
   }
@@ -86,11 +89,11 @@ export function decisionsSection(cfg, git = (a) => execFileSync("git", a, { enco
   const lines = ["", `Nové rozhodnutia za 24 h (${files.length}):`, ""];
   for (const id of files) {
     let t = "";
-    try { t = readFileSync(join(repo, "rozhodnutia", `${id}.md`), "utf8"); } catch { /* záznam zmizol */ }
+    try { t = readFileSync(join(repo, "decisions", `${id}.md`), "utf8"); } catch { /* záznam zmizol */ }
     lines.push(`- ${id}, zapísal ${field(t, "zapisal") || "?"}, rozhodol ${field(t, "rozhodol") || "?"}, moc ${field(t, "moc") || "?"}, kľúč ${field(t, "kluc") || "?"}: ${field(t, "nazov")}`);
   }
   if (!files.length) lines.push("- žiadne");
-  const found = check(join(repo, "lib", "rozhodnutia.mjs"), join(repo, "rozhodnutia")).split("\n").map((l) => l.trim()).filter(Boolean);
+  const found = check(join(HERE, "lib", "rozhodnutia.mjs"), join(repo, "decisions")).split("\n").map((l) => l.trim()).filter(Boolean);
   lines.push("", found.length ? `Kontrola rozhodnutí (vráť commitom, autorovi pošli číslo):` : "Kontrola rozhodnutí: v poriadku.");
   for (const l of found) lines.push(`- ${l}`);
   return lines;

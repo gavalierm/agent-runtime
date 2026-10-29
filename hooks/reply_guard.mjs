@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: tasker, t3
 // reply_guard.mjs — odpoveď operátorovi je krátka a odkaz v nej funguje.
 // Dňa 22. 10. 2026 vlákno projektu napísalo operátorovi odpoveď s piatimi
 // odsekmi a odkazom na web, ktorý ešte nebežal. Operátor klikol, dostal chybu
@@ -14,7 +15,7 @@
 // žiada postup, podrobnosti, vysvetlenie alebo dokument, detailRequested), vetu
 // nad 35 slov, položku zoznamu s viac vetami alebo adresu http(s), ktorá dnes
 // neodpovedá. Zastaví na prvom probléme. Bloky kódu, inline kód, nadpisy,
-// tabuľky, zoznamy, štyri vety hlásenia chyby z bin/chyba.sh a riadky
+// tabuľky, zoznamy, štyri vety hlásenia chyby zo skills/error/scripts/error.sh a riadky
 // unslop:, identita:, Čaká na teba:, Príkaz pre teba a HOTOVO-KONTEXT (aj s režimom a kľúčom z kontext.sh) sa do
 // prózy nepočítajú.
 //
@@ -62,7 +63,7 @@
 // waitingProblem a decisionProblem sú vypnuté, kým prostredie nemá
 // AR_ROZHODNUTIA=1 (lib/agent_env.mjs, zapnute). Zapne ich nasadenie U5
 // jednou premennou v bloku env súboru settings.json (env/server/install.sh,
-// env/mac/settings.json). Bez prepínača sa správanie hooku nemení.
+// env/mac/install.sh, tabuľka env/hooks.mjs). Bez prepínača sa správanie hooku nemení.
 
 // Dňa 25. 10. 2026 zhrnutie behu úlohy 573 znelo "Čaká na operátorovo A/B k zápisu" a operátor
 // nevedel, čo sa ho pýta (úloha 575). waitingItemProblem (lib/human_question.mjs) zastaví
@@ -74,7 +75,9 @@ import { execFileSync } from "node:child_process";
 import { accountItemProblem, waitingItemProblem } from "../lib/human_question.mjs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { personaFor } from "../lib/agent_name.mjs";
+import { workflowDir } from "../lib/paths.mjs";
 import { lastReply } from "./no_operator_commands.mjs";
 import { blockStop } from "../lib/deny.mjs";
 import { lastTurn } from "./objection_fix.mjs";
@@ -85,7 +88,7 @@ export const MAX_SENTENCES = 3;
 export const MAX_SENTENCES_DETAIL = 6;
 export const MAX_WORDS = 35;
 
-// Riadky hlásenia uznanej chyby (bin/chyba.sh, global §4) sa do prózy nerátajú.
+// Riadky hlásenia uznanej chyby (skills/error/scripts/error.sh, global §4) sa do prózy nerátajú.
 const SKIP_LINE = /^(unslop:|overené:|identita:|čaká na teba:|príkaz pre teba|hotovo-kontext|tvrdil alebo urobil som:|pravda bola:|zmenil sa súbor |nabudúce to zastaví:)/i;
 
 // Operátor žiada dlhšiu odpoveď: postup, kroky, podrobnosti, vysvetlenie,
@@ -258,7 +261,7 @@ export function unverifiedPlan(text) {
   for (const s of parts.flatMap((x) => sentences(x))) {
     if (!UNVERIFIED.test(s)) continue;
     if (CANT_VERIFY.test(s) && NOT_READY.test(parts.join("\n"))) continue;
-    return `neoverená položka v návrhu: "${clip(s)}". Návrh ide na schválenie, až keď je všetko overené (global/CLAUDE.md §1). `
+    return `neoverená položka v návrhu: "${clip(s)}". Návrh ide na schválenie, až keď je všetko overené (RULES.md §1). `
       + "Over to teraz alebo napíš, prečo sa to overiť nedá, a že návrh nie je pripravený na schválenie.";
   }
   return null;
@@ -478,7 +481,7 @@ export function deadLinks(text, probe = curlProbe) {
 // decisionProblem a deadLinks vyššie.
 const ASK = "polož otázku ako úlohu `tasker ask <id> --body \"otázka, cesty A a B, odporúčanie\"` a v odpovedi daj jej odkaz";
 export const POSTUPY = [
-  [/^odpoveď nezačína menom|^za riadkom "/, "prepíš odpoveď: prvý riadok samotné `<Meno>:`, druhý prázdny, text od tretieho riadku (global/CLAUDE.md §2)"],
+  [/^odpoveď nezačína menom|^za riadkom "/, "prepíš odpoveď: prvý riadok samotné `<Meno>:`, druhý prázdny, text od tretieho riadku (RULES.md §2)"],
   [/viet prózy/, "skráť odpoveď na verdikt, dôvod a čo urobiť (najviac 3 vety prózy, zoznamy sa nerátajú); vynechaj, čo si neurobil a prečo, čo si nevedel zistiť a svoj názor; podrobnosti ulož do súboru v docs/ a v odpovedi uveď jeho cestu"],
   [/^veta so \d+ slovami/, "rozdeľ vetu na kratšie alebo ju zmaž a odpoveď prepíš"],
   [/^položka zoznamu/, "skráť položku zoznamu na jednu vetu a odpoveď prepíš"],
@@ -488,16 +491,16 @@ export const POSTUPY = [
   [/je localhost servera/, "nahraď adresu adresou z `tailscale serve status`: {HOST}:<port>"],
   [/^zmienka úlohy Taskera bez odkazu/, "vlož náhrady vypísané v dôvode (tvar `[úloha N]({WEB}/tasks/N)`) a odpoveď prepíš"],
   [/^položka "Čaká na teba" \(rozhodnutie\)/, "prepíš položku ako jednu vetu končiacu `?` (vec, voľba, odporúčanie), písmeno voľby (A/B) definuj ako `A) ...`; podrobnosti a čo spôsobí každá odpoveď patria do úlohy `tasker ask <id> --body \"...\"`"],
-  [/^položka "Čaká na teba" \(tvoj účet\)/, "pridaj riadok `Overené: <čo o stave operátorovho účtu si overil a ktorým príkazom alebo stránkou>; neoverené: <čo nevidíš>`; tvrdenie o jeho účte bez overenia napíš ako predpoklad, nie fakt (global/CLAUDE.md §1)"],
+  [/^položka "Čaká na teba" \(tvoj účet\)/, "pridaj riadok `Overené: <čo o stave operátorovho účtu si overil a ktorým príkazom alebo stránkou>; neoverené: <čo nevidíš>`; tvrdenie o jeho účte bez overenia napíš ako predpoklad, nie fakt (RULES.md §1)"],
   [/^"Čaká na teba" bez odkazu|v "Čaká na teba" v Taskeri neexistuje|v "Čaká na teba" je v stave/, ASK + "; stav práce drží Tasker, nie veta v odpovedi"],
-  [/^Tasker neodpovedal/, "over Tasker `/opt/agent-rules/bin/tk task list` a odpoveď pošli znova"],
+  [/^Tasker neodpovedal/, `over Tasker \`${join(workflowDir(), "bin", "tk")} task list\` a odpoveď pošli znova`],
   [/^veta ".*" hlási nové rozhodnutie/, "zapíš rozhodnutie `bin/rozhodni.sh --nazov ... --kluc ...` (text na stdin) a v odpovedi uveď jeho číslo D, alebo polož otázku `tasker ask <id> --body \"...\"`; staré rozhodnutie označ číslom D alebo dátumom"],
   [/^adresa .* dnes neodpovedá/, "over adresu `curl -sI <url>`, odkaz dávaj len na adresu, ktorá odpovedá, inak ju napíš bez https:// a dodaj, že ešte nebeží"],
 ];
 // {HOST} a {WEB} v postupe sú adresa webu Taskera z TASKER_WEB_URL (webExample).
 export function postupFor(reason, webUrl = process.env.TASKER_WEB_URL) {
   for (const [re, step] of POSTUPY) if (re.test(reason)) return step.replaceAll("{HOST}", webHost(webUrl)).replaceAll("{WEB}", webExample(webUrl));
-  return "prepíš odpoveď podľa dôvodu vyššie, pravidlá odpovede sú v global/CLAUDE.md §2";
+  return "prepíš odpoveď podľa dôvodu vyššie, pravidlá odpovede sú v RULES.md §2";
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

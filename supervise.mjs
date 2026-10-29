@@ -250,7 +250,7 @@ export async function superviseStep(cfg, client, threadId, t, now) {
 }
 
 // Agent sám ukončí odpoveď riadkom HOTOVO-KONTEXT, keď je nad hranicou
-// hooku context_warning.mjs repa agent-rules a rozpracované má v pamäti.
+// hooku context_warning.mjs a rozpracované má v pamäti.
 // Budič ho nevyzýva, výzva stála celý ťah navyše (čistý kontext na
 // slovo agenta, 2026-10-18). Riadok platí len
 // ako posledný neprázdny riadok odpovede, citát v texte prechod nespustí.

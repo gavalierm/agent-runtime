@@ -15,12 +15,11 @@ import { tick, classify, renderMessage } from "../driver.mjs";
 const TRI = "Výsledok: v\nDôkaz: d\nOtvorené: nič\n";
 
 const RUNTIME = join(dirname(fileURLToPath(import.meta.url)), "..");
-// ask_agent.sh nie je súčasť tohto repa (je v repe pravidiel, bin/), route.mjs berie z tohto
-// runtime. Testy, ktoré ho volajú, sa bez neho preskočia.
-const ASK = ["/root/agent-rules", "/opt/agent-rules", process.env.AGENT_RULES].filter(Boolean).map((d) => join(d, "bin/ask_agent.sh")).find((p) => existsSync(p));
-const SKIP_ASK = ASK ? false : "bin/ask_agent.sh z repa pravidiel nie je k dispozícii (AGENT_RULES)";
+// ask_agent.sh je v bin/ tohto repa, route.mjs berie z jeho koreňa (ASK_WORKFLOW).
+const ASK = join(RUNTIME, "bin/ask_agent.sh");
+const SKIP_ASK = existsSync(ASK) ? false : "bin/ask_agent.sh chýba";
 const target = (script, opts) => script === "ask_agent.sh"
-  ? [ASK, { ...opts, env: { ...opts?.env, ASK_RUNTIME: RUNTIME } }]
+  ? [ASK, { ...opts, env: { ...opts?.env, ASK_WORKFLOW: RUNTIME } }]
   : [join(RUNTIME, script), opts];
 // Skript beží asynchrónne, synchrónne spustenie by zablokovalo falošný T3.
 const run = async (script, args, opts) => {

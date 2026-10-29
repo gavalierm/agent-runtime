@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# agentic-brain check hook: runs check.sh for this repo and rejects the commit on error.
+# The repo's own agentic-brain/bin/check.sh (adopt.sh --standalone) wins, otherwise the hook uses
+# the check.sh path written at install time (check.sh --install-hook).
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+CHECK="$ROOT/agentic-brain/bin/check.sh"
+ARGS=()
+if [ ! -f "$CHECK" ]; then
+  CHECK="__CHECK__"
+  ARGS=("$ROOT")
+fi
+if [ ! -f "$CHECK" ]; then
+  echo "pre-commit: $CHECK is missing, skipping the check" >&2
+  exit 0
+fi
+if ! bash "$CHECK" "${ARGS[@]}"; then
+  echo "pre-commit: commit rejected, fix the errors above ($CHECK)" >&2
+  exit 1
+fi
+exit 0

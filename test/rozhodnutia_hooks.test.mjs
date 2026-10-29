@@ -1,7 +1,7 @@
 // Testy kontrol rozhodnutí v hookoch tohto repa (úloha 395, U4 návrhu 390, presun
-// úloha 528): K3 v reply_guard.mjs, sledovanie rozhodnutia/ v rules_delta.mjs
+// úloha 528): K3 v reply_guard.mjs, sledovanie decisions/ v rules_delta.mjs
 // a čítanie úloh Taskera (lib/tasker_read.mjs). Len fixtúry v dočasných
-// priečinkoch: klon s rozhodnutia/ (git init v tmp), DB Taskera v tmp
+// priečinkoch: klon s decisions/ (git init v tmp), DB Taskera v tmp
 // (TASKER_DB), HOME a CLAUDE_PROJECT_DIR v tmp. Živá DB ani klon sa nepoužijú:
 // TASKER_DB ukazuje vždy na tmp a fetchTasks pri neexistujúcej výslovnej DB
 // hodí chybu.
@@ -21,15 +21,14 @@ import { delta } from "../hooks/rules_delta.mjs";
 const HOOKS = join(dirname(fileURLToPath(import.meta.url)), "../hooks");
 const tmp = () => mkdtempSync(join(tmpdir(), "roz-"));
 const GIT_ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.com", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.com" };
-const cleanEnv = () => { const e = { ...process.env, ...GIT_ENV }; for (const k of ["GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE", "AR_ROZHODNUTIA", "TASKER_DB", "AR_CLONE", "AR_STATE", "AGENT_OPERATOR_NAME", "TASKER_WEB_URL", "AGENT_NAME", "TASKER_USER"]) delete e[k]; return e; };
+const cleanEnv = () => { const e = { ...process.env, ...GIT_ENV }; for (const k of ["GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE", "AR_ROZHODNUTIA", "TASKER_DB", "AR_STATE", "AGENT_OPERATOR_NAME", "TASKER_WEB_URL", "AGENT_NAME", "TASKER_USER"]) delete e[k]; return e; };
 
 function clone() {
   const dir = join(tmp(), "clone");
-  mkdirSync(join(dir, "rozhodnutia"), { recursive: true });
-  mkdirSync(join(dir, "global"), { recursive: true });
+  mkdirSync(join(dir, "decisions"), { recursive: true });
   const git = (...a) => { const r = spawnSync("git", ["-C", dir, ...a], { encoding: "utf8", env: cleanEnv() }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
   git("init", "-q");
-  const rec = (n) => writeFileSync(join(dir, "rozhodnutia", `D000${n}.md`), `---\nid: D000${n}\n---\nText.\n`);
+  const rec = (n) => writeFileSync(join(dir, "decisions", `D000${n}.md`), `---\nid: D000${n}\n---\nText.\n`);
   const commit = (m) => { git("add", "-A"); git("commit", "-q", "-m", m); };
   return { dir, rec, commit };
 }
@@ -131,15 +130,36 @@ test("reply_guard CLI: K3b číta príkazy z prepisu, stop_hook_active mlčí", 
   assert.equal(cli("reply_guard.mjs", { last_assistant_message: text, transcript_path: tr(null) }, { AGENT_OPERATOR_NAME: "Oskar" }).stdout, "", "vypnuté");
 });
 
-test("rules_delta: rozhodnutia/ ide do ťahu len so zapnutým prepínačom", () => {
+test("rules_delta: decisions/ ide do ťahu len so zapnutým prepínačom (delta aj hook)", () => {
   const { dir, rec, commit } = clone();
-  writeFileSync(join(dir, "global", "CLAUDE.md"), "v1\n"); commit("prvy");
-  const a = { clone: dir, sessionId: "s1", envName: "server" };
+  writeFileSync(join(dir, "RULES.md"), "v1\n"); commit("prvy");
+  const a = { clone: dir, sessionId: "s1" };
   const off = join(tmp(), "off"), on = join(tmp(), "on");
-  delta({ ...a, stateDir: off, rozhodnutia: false }); delta({ ...a, stateDir: on, rozhodnutia: true });
+  delta({ ...a, stateDir: off, paths: ["RULES.md"] }); delta({ ...a, stateDir: on, paths: ["RULES.md", "decisions/"] });
   rec(1); commit("zaznam");
-  assert.equal(delta({ ...a, stateDir: off, rozhodnutia: false }), null);
-  const text = delta({ ...a, stateDir: on, rozhodnutia: true });
+  assert.equal(delta({ ...a, stateDir: off, paths: ["RULES.md"] }), null);
+  const text = delta({ ...a, stateDir: on, paths: ["RULES.md", "decisions/"] });
   assert.match(text, /D0001\.md/);
   assert.match(text, /^\[pravidlá\]/);
+});
+
+test("rules_delta hook: dva klony, decisions/ z AGENT_BRAIN_GLOBAL len s AR_ROZHODNUTIA=1", () => {
+  const wf = clone(), brain = clone();
+  writeFileSync(join(wf.dir, "RULES.md"), "v1\n"); wf.commit("prvy");
+  mkdirSync(join(brain.dir, "env", "server"), { recursive: true });
+  writeFileSync(join(brain.dir, "env", "server", "RULES.md"), "s1\n"); brain.commit("prvy");
+  const run = (extra, sid) => spawnSync("node", [join(HOOKS, "rules_delta.mjs")], {
+    input: JSON.stringify({ session_id: sid }), encoding: "utf8",
+    env: { ...cleanEnv(), HOME: tmp(), AGENT_THREADS: "", AGENT_WORKFLOW: wf.dir, AGENT_BRAIN_GLOBAL: brain.dir, AR_STATE: join(tmp(), "st"), AR_ENV: "server", ...extra },
+  });
+  const states = { off: join(tmp(), "off"), on: join(tmp(), "on") };
+  for (const k of ["off", "on"]) assert.equal(run({ AR_STATE: states[k], ...(k === "on" ? { AR_ROZHODNUTIA: "1" } : {}) }, "s1").stdout, "");
+  writeFileSync(join(wf.dir, "RULES.md"), "v2\n"); wf.commit("pravidlo");
+  brain.rec(1); brain.commit("zaznam");
+  const off = run({ AR_STATE: states.off }, "s1").stdout;
+  assert.match(off, /v2/);
+  assert.doesNotMatch(off, /D0001\.md/);
+  const on = run({ AR_STATE: states.on, AR_ROZHODNUTIA: "1" }, "s1").stdout;
+  assert.match(on, /v2/);
+  assert.match(on, /D0001\.md/);
 });

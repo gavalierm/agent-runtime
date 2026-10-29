@@ -66,7 +66,7 @@ test("taskIdsInTitle: úloha N, #N, uN, holé číslo a slovo s číslom nie", (
   assert.deepEqual(ids("Projekt kolobeh (úloha 14)"), [14]);
   assert.deepEqual(ids("Úloha 614: pamäť"), [614]);
   assert.deepEqual(ids("domovnik #351"), [351]);
-  assert.deepEqual(ids("agent-rules u621b: hooky"), [621]);
+  assert.deepEqual(ids("agentic-workflow u621b: hooky"), [621]);
   assert.deepEqual(ids("skuska-casovac-612"), []);
   assert.deepEqual(ids("Eva (hlavné vlákno)"), []);
   assert.deepEqual(ids("úloha 1 a #2"), [1, 2]);

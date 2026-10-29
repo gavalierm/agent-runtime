@@ -85,7 +85,7 @@ if [ "${#missing[@]}" -gt 0 ]; then
         echo "Správny postup: telo má tri riadky, ktoré začínajú Výsledok:, Dôkaz: a Otvorené: (v ľubovoľnom poradí, za dvojbodkou text). Keď nič neostalo, napíš Otvorené: nič."
         echo "Príklad:"
         echo "Výsledok: reply.sh odmietne telo bez troch riadkov."
-        echo "Dôkaz: node --test v /root/agent-runtime, 0 zlyhaní."
+        echo "Dôkaz: ./test/run.sh v repe, 0 zlyhaní."
         echo "Otvorené: nič"
     } >&2
     exit 1

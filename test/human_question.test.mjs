@@ -4,12 +4,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { accountItemProblem, questionProblem, waitingItemProblem, usedLetters, decisionItems, unverifiedClaim } from "../lib/human_question.mjs";
 
-const SUMMARY = "Medzery v návrhu sú opravené, --gaps dáva kód 0 pri 1440 aj 390 px, hlavicka.sh 0 nálezov (1dd47fa). Čaká na Adamovo A/B k zápisu do agent-rules.";
+const SUMMARY = "Medzery v návrhu sú opravené, --gaps dáva kód 0 pri 1440 aj 390 px, hlavicka.sh 0 nálezov (1dd47fa). Čaká na Adamovo A/B k zápisu do agentic-workflow.";
 const COMMENT = "[Boris za Adama] Adam, máme prepísať vzor pre dashboardy v repe pravidiel podľa nového detailu úlohy v Taskeri?\n\n"
-  + "Vzor je artefakt dashboard-playbook (/opt/agent-rules/artifacts/dashboard-playbook). Tasker už novú hlavičku má, podľa variantu A, ktorý si vybral v úlohe 541 (urobil ju Cyril v úlohe 566). "
+  + "Vzor je artefakt dashboard-playbook (/opt/agentic-workflow/artifacts/dashboard-playbook). Tasker už novú hlavičku má, podľa variantu A, ktorý si vybral v úlohe 541 (urobil ju Cyril v úlohe 566). "
   + "Nad názvom úlohy je riadok Prehľad / Projekt / Úloha #N, stav a akcie sú v riadku názvu.\n\n"
-  + "Keď odpovieš áno, Dana zapíše nové znenie do agent-rules. Keď odpovieš nie, napíš, čo zmeniť. Odporúčam áno.";
-const ITEM = "Hotovo.\n\nČaká na teba:\n- (rozhodnutie) úloha 573: A) zapísať návrh do agent-rules, B) napíš, čo zmeniť. Odporúčam A.";
+  + "Keď odpovieš áno, Dana zapíše nové znenie do agentic-workflow. Keď odpovieš nie, napíš, čo zmeniť. Odporúčam áno.";
+const ITEM = "Hotovo.\n\nČaká na teba:\n- (rozhodnutie) úloha 573: A) zapísať návrh do agentic-workflow, B) napíš, čo zmeniť. Odporúčam A.";
 
 test("zhrnutie behu z úlohy 573 sa zamietne: bez otázky a s nedefinovaným A/B", () => {
   const why = questionProblem(SUMMARY);

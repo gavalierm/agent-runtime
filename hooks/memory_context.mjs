@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // memory_context.mjs — vloží index pamäte agenta do kontextu relácie
 // (úloha 614). SessionStart, beží pri štarte, obnovení, /clear aj
 // kompakcii, takže pamäť je v kontexte aj po /clear, bez pokynu v správe

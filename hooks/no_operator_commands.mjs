@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// requires: none
 // no_operator_commands.mjs — agent nedá operátorovi príkaz na spustenie.
 // Krok pre operátora je len klik v jeho prehliadači alebo účte, príkaz spustí
 // agent. Chyba sa opakovala 15. 10. 2026, preto kontrola a nie próza.
@@ -104,7 +105,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         + "je klik v prehliadači alebo účte. Príkaz spusti sám alebo ho zadaj agentovi a odpoveď prepíš. "
         + `Keď ho nevie spustiť žiadny agent alebo oň ${op.nom} požiadal, daj nad blok riadok "Príkaz pre teba, lebo <dôvod>".`,
       "príkaz spusti sám cez Bash a v odpovedi napíš výsledok; keď ho nevie spustiť žiadny agent alebo oň " + op.nom + " požiadal, "
-        + "daj nad blok riadok \"Príkaz pre teba, lebo <dôvod>\" (global/CLAUDE.md §6).",
+        + "daj nad blok riadok \"Príkaz pre teba, lebo <dôvod>\" (RULES.md §6).",
     );
   }
 }

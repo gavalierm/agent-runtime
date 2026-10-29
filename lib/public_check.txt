@@ -1,7 +1,8 @@
 # Vzory mien a adries, ktoré nesmú byť vo verejnom repe. Riadok je rozšírený
 # regulárny výraz (JavaScript, bez rozlíšenia veľkosti písmen) v base64, aby
 # zoznam sám mená nevyzrádzal. Kontrola je lib/public_check.mjs. Vzor pridaj
-# až po overení, na čo odkazuje každý jeho nález.
+# až po overení, na čo odkazuje každý jeho nález. Riadok začínajúci znakom +
+# je povolený odkaz (regulárny výraz v base64), jeho zhoda sa pred kontrolou vyreže.
 bWFyY2Vs
 aHVnbw==
 XGJyb25cYg==
@@ -21,3 +22,4 @@ c3Bldm5paw==
 dmFzZG9tdmFzYnl0
 W8Whc110W2XEm11wW2HDoV1u
 KD88IVthLXowLTkuXyUrLV0pKD8hZ2l0QClbYS16MC05Ll8lKy1dK0AoPyFleGFtcGxlXC4pW2EtejAtOS1dKyhcLlthLXowLTktXSspKlwuW2Etel17Mix9
++aHR0cHM6Ly9naXRodWJcLmNvbS9nYXZhbGllcm0vYWdlbnQtKHBsYXlib29rfHJ1bnRpbWUpXGI=

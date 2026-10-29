@@ -5,4 +5,5 @@ Description=Zobudenie agenta na Macu webhookom T3
 [Service]
 Type=oneshot
 Environment=MAC_WAKE_AGENT=cyril
-ExecStart=%h/agent-runtime/mac_wake.sh
+Environment=AGENT_WORKFLOW=/opt/agentic-workflow
+ExecStart=/usr/bin/env bash ${AGENT_WORKFLOW}/mac_wake.sh
