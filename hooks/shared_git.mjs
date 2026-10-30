@@ -118,8 +118,11 @@ export const HOOKS_BYPASS_POSTUP =
 // Voľby `git add` s hodnotou v ďalšom argumente (tvar `--voľba=hodnota` ju nespotrebuje).
 const ADD_OPT_VAL = new Set(["--pathspec-from-file", "--chmod"]);
 
-// Pathspec, ktorý zoberie celý strom alebo jeho nadradený priečinok: `:/`, `:(top)`, `*`, `..`, `../..`.
-const ADD_WIDE_PATH = /^(?::\/*|:<top>\/*|\*|(?:\.\.\/*)+)$/;
+// Pathspec, ktorý zoberie celý strom, celý aktuálny priečinok alebo nadradený priečinok: `:/`, `:/*`,
+// `:(top)`, `:(top)*`, `:(top,glob)**`, `*`, `./*` (tak shell rozbalí `./*`), `..`, `../..`, `../*`.
+// Konkrétna cesta (`:(top)memory/a.md`, `./memory/*.md`, `../x.txt`) je úzka a prejde.
+// V gitCalls sa `:(x)` zamení na `:<x>`.
+const ADD_WIDE_PATH = /^(?::[/*]*|:<[^>]*\btop\b[^>]*>[/*]*|\*+|\.\/+\*+|(?:\.\/+)?(?:\.\.\/*)+\**)$/;
 
 // Vráti dôvod ("-A", "--all", "-u", ".", pathspec, "commit -a"), keď príkaz zbiera zmeny plošne, inak null.
 // `git stage` je alias `git add`. `git commit -a` / `--all` pridá všetky sledované zmeny bez výberu súborov.

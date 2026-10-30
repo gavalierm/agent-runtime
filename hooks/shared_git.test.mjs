@@ -240,6 +240,23 @@ test("addAll: git stage je alias git add (úloha 694, kolo 2)", async () => {
   assert.equal(addAll("git stage f.txt"), null);
 });
 
+test("addAll: ./*, :/*, :(top)* a magic pathspec so slovom top sú plošné (úloha 694, kolo 3)", async () => {
+  const { addAll } = await import("./shared_git.mjs");
+  for (const [c, r] of [
+    ["git add ./*", "./*"], ["git add './*'", "./*"], ['git add "./*"', "./*"], ["git add .//*", ".//*"], ["git add ./**", "./**"],
+    ["git add ':/*'", ":/*"], ["git add :/*", ":/*"], ["git add ':/**'", ":/**"], ["git add ':(top)*'", ":(top)*"],
+    ["git add ':(top)/'", ":(top)/"], ["git add ':(top,glob)**'", ":(top,glob)**"], ["git add ':(glob,top)'", ":(glob,top)"],
+    ["git add '../*'", "../*"], ["git add ./..", "./.."], ["git stage ./*", "./*"], ["git -C /x add ':(top)*'", ":(top)*"],
+  ]) assert.equal(addAll(c), r, c);
+});
+
+test("addAll: konkrétny súbor a úzky vzor prejdú (úloha 694, kolo 3)", async () => {
+  const { addAll } = await import("./shared_git.mjs");
+  for (const c of ["git add ':(top)memory/a.md'", "git add :/memory/a.md", "git add ./memory/*.md", "git add ../x.txt", "git add ':(glob)*.md'",
+    "git add ':(top)memory/*'", "git add ':(top)*.md'", "git add ./a.md", "git add ../memory/*.md"])
+    assert.equal(addAll(c), null, c);
+});
+
 test("addAll: dovolené tvary prejdú (úloha 694, kolo 2)", async () => {
   const { addAll } = await import("./shared_git.mjs");
   for (const c of ["git add memory/a.md", 'git add "a b.txt"', "git add .gitignore", "git add .claude/x", "git add ./memory/a.md",

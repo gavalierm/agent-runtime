@@ -217,9 +217,10 @@ test("git add -A, --all a . zamietne, git add súboru pustí (úloha 694)", () =
 
 test("plošné git add -u, stage, pathspec a commit -a zamietne, bežné tvary pustí (úloha 694, kolo 2)", () => {
   for (const c of ["git commit -a -m x", "git commit -am x", "git commit --all -m x", "git add -u", "git add --update", "git add :/",
-    'git add ":(top)"', "git add *", "git add ..", "git add ../", "git stage .", "git stage -A", "cd /root/x && git commit -am x"])
+    'git add ":(top)"', "git add *", "git add ..", "git add ../", "git add ./*", "git add './*'", "git add ':/*'", "git add ':(top)*'", "git stage .", "git stage -A", "cd /root/x && git commit -am x"])
     assert.equal(foreignGitReason(c), "ADD_ALL", c);
-  for (const c of ["git add memory/a.md", "git commit -m x -- f", "git commit --amend --no-edit", "git commit -S -m x", "git add -p"])
+  for (const c of ["git add memory/a.md", "git commit -m x -- f", "git commit --amend --no-edit", "git commit -S -m x", "git add -p",
+    "git add ':(top)memory/a.md'", "git add :/memory/a.md", "git add ./memory/*.md", "git add ../x.txt"])
     assert.equal(foreignGitReason(c, { cwd: "/tmp" }), null, c);
   assert.equal(run({ command: "git commit -am x" }), "deny");
 });
