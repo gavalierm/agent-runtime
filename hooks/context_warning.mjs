@@ -11,7 +11,8 @@
 // operátor.
 // Číta prepis relácie a sčíta vstupné tokeny poslednej odpovede modelu.
 // Nad hranicou pridá do kontextu pokyn, pod ňou mlčí. Oznámenie ide na
-// prvý riadok odpovede a prácu nebrzdí (rozhodnutie z 15. 10. 2026).
+// riadok hneď za menom, prvý riadok je len meno (global §2, reply_guard.mjs),
+// a prácu nebrzdí (rozhodnutie z 15. 10. 2026).
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -48,7 +49,7 @@ process.stdout.write(
   JSON.stringify({
     hookSpecificOutput: {
       hookEventName: "UserPromptSubmit",
-      additionalContext: process.env.T3CODE_HOME ? t3 : `Kontext relácie má ${Math.round(used / 1000)} tisíc tokenov, hranica je ${WARN / 1000} tisíc. Zapíš rozpracované do pamäte a commitni. Odpoveď začni samostatným riadkom "Kontext: ${Math.round(used / 1000)} tisíc tokenov, čistý kontext je na tebe." Prácu kvôli kontextu nekráť, neodkladaj a odpoveď nezadrž, o čistom kontexte rozhoduje ${OP.nom} (PERSONA.md, Kontinuita).`,
+      additionalContext: process.env.T3CODE_HOME ? t3 : `Kontext relácie má ${Math.round(used / 1000)} tisíc tokenov, hranica je ${WARN / 1000} tisíc. Zapíš rozpracované do pamäte a commitni. Za riadkom s menom daj samostatný riadok "Kontext: ${Math.round(used / 1000)} tisíc tokenov, čistý kontext je na tebe." Prácu kvôli kontextu nekráť, neodkladaj a odpoveď nezadrž, o čistom kontexte rozhoduje ${OP.nom} (PERSONA.md, Kontinuita).`,
     },
   }),
 );

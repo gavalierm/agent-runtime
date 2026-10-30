@@ -24,9 +24,10 @@ test("pod hranicou mlčí", () => {
   assert.equal(run(70_000, {}), "");
 });
 
-test("mimo T3 oznámenie prvým riadkom, bez slova pre budič", () => {
+test("mimo T3 oznámenie na riadku za menom, bez slova pre budič", () => {
   const c = run(150_000, {});
-  assert.match(c, /Odpoveď začni samostatným riadkom "Kontext: 150 tisíc tokenov/);
+  assert.match(c, /Za riadkom s menom daj samostatný riadok "Kontext: 150 tisíc tokenov/);
+  assert.doesNotMatch(c, /Odpoveď začni/);
   assert.doesNotMatch(c, /HOTOVO-KONTEXT/);
 });
 

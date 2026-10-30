@@ -89,7 +89,7 @@ export const MAX_SENTENCES_DETAIL = 6;
 export const MAX_WORDS = 35;
 
 // Riadky hlásenia uznanej chyby (skills/error/scripts/error.sh, global §4) sa do prózy nerátajú.
-const SKIP_LINE = /^(unslop:|overené:|identita:|čaká na teba:|príkaz pre teba|hotovo-kontext|tvrdil alebo urobil som:|pravda bola:|zmenil sa súbor |nabudúce to zastaví:)/i;
+const SKIP_LINE = /^(unslop:|overené:|kontext:|identita:|čaká na teba:|príkaz pre teba|hotovo-kontext|tvrdil alebo urobil som:|pravda bola:|zmenil sa súbor |nabudúce to zastaví:)/i;
 
 // Operátor žiada dlhšiu odpoveď: postup, kroky, podrobnosti, vysvetlenie,
 // dokument, súhrn, návrh, analýzu alebo porovnanie (global §2, "Longer only
