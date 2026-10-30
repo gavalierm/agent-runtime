@@ -4,7 +4,7 @@
 // (návrh úlohy 390, kontrola K2). PreToolUse pre Write, Edit, MultiEdit,
 // NotebookEdit a Bash (zapojuje ho tabuľka env/hooks.mjs cez env/server/install.sh a env/mac/install.sh).
 // Zamietne zápis do záznamov a indexu v decisions/ (D0001.md, INDEX.md)
-// inak než skriptom. DECISIONS.md a SCHVALENE.md chráni len zmrazený log:
+// inak než skriptom; INDEX.md len tam, kde je v decisions/ aj ROZSAHY.md (cudzie repo bez registra ho smie písať ručne). DECISIONS.md a SCHVALENE.md chráni len zmrazený log:
 // súbor, ktorý má v prvých 10 riadkoch značku `<!-- rozhodnutia: zmrazene -->`. Značku mu pri
 // migrácii (U7 až U9) vloží commit s archívom, odvtedy ho nikto neprepíše,
 // ani značku nezmaže. Pred zmrazením log ostáva voľný, agenti doň zapisujú ďalej. README.md a ROZSAHY.md v decisions/ sa upravujú
@@ -14,15 +14,16 @@
 // skript píše sám. Parser ako foreign_git.mjs: heredoc a text v úvodzovkách
 // s medzerou sú dáta, nie cieľ zápisu.
 
-import { readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stripHeredocs } from "./no_model_wait.mjs";
 import { denyTool } from "../lib/deny.mjs";
 import { stripProse } from "./foreign_git.mjs";
 import { workflowDir } from "../lib/paths.mjs";
 
-const RECORDS = /(?:^|\/)decisions\/(?:D\d{4}|INDEX)\.md$/;
+const RECORDS = /(?:^|\/)decisions\/D\d{4}\.md$/;
+const INDEX = /(?:^|\/)decisions\/INDEX\.md$/;
 const LOG = /(?:^|\/)(?:DECISIONS|SCHVALENE)\.md$/;
 export const ZMRAZENE = "<!-- rozhodnutia: zmrazene -->";
 
@@ -32,9 +33,12 @@ export const ZMRAZENE = "<!-- rozhodnutia: zmrazene -->";
 export function isFrozen(p, cwd = process.cwd()) {
   try { return readFileSync(resolve(cwd, p), "utf8").split("\n", 10).some((l) => l.trim() === ZMRAZENE); } catch { return false; }
 }
+// INDEX.md chráni len decisions/ s ROZSAHY.md, teda register, do ktorého píše
+// rozhodni.sh. Relatívnu cestu rozloží proti cwd volania ako isFrozen.
+export const hasRegister = (p, cwd = process.cwd()) => existsSync(join(dirname(resolve(cwd, p)), "ROZSAHY.md"));
 export const isProtected = (raw, cwd) => {
   const p = raw.replace(/^['"]+|['"]+$/g, "");
-  return RECORDS.test(p) || (LOG.test(p) && isFrozen(p, cwd));
+  return RECORDS.test(p) || (INDEX.test(p) && hasRegister(p, cwd)) || (LOG.test(p) && isFrozen(p, cwd));
 };
 
 export const POSTUP =

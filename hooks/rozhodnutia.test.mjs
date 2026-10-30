@@ -90,6 +90,11 @@ for (const f of ["DECISIONS.md", "SCHVALENE.md"]) {
   writeFileSync(join(Z, f), `# Archív\n${ZMRAZENE}\n\nstarý obsah\n`);
   writeFileSync(join(FREE, f), "# Log\n\nzápis\n");
 }
+// Register rozhodnutí má v decisions/ aj ROZSAHY.md, cudzie repo bez neho nie (úloha 693).
+const REG = tmp();
+const NOREG = tmp();
+for (const d of [REG, NOREG]) mkdirSync(join(d, "decisions"));
+writeFileSync(join(REG, "decisions", "ROZSAHY.md"), "# Rozsahy\n");
 const guardRun = (input) => spawnSync("node", [join(HOOKS, "rozhodnutia_guard.mjs")], { input: JSON.stringify(input), encoding: "utf8", env: cleanEnv() }).stdout;
 
 test("guard K2: Edit na DECISIONS.md prejde, kým log nie je zmrazený, po zmrazení deny", () => {
@@ -110,8 +115,8 @@ test("guard K2: Edit na DECISIONS.md prejde, kým log nie je zmrazený, po zmraz
   assert.equal(edit(late), "");
 });
 
-test("guard K2: záznam decisions/D0001.md a INDEX.md dá deny vždy, aj neexistujúci", () => {
-  for (const f of ["/nikde/decisions/D0001.md", join(tmp(), "decisions", "INDEX.md")])
+test("guard K2: záznam decisions/D0001.md dá deny vždy, aj neexistujúci, INDEX.md v registri", () => {
+  for (const f of ["/nikde/decisions/D0001.md", join(REG, "decisions", "INDEX.md")])
     for (const tool of ["Edit", "Write", "MultiEdit"])
       assert.equal(JSON.parse(guardRun({ tool_name: tool, tool_input: { file_path: f } })).hookSpecificOutput.permissionDecision, "deny", `${tool} ${f}`);
   assert.equal(guardRun({ tool_name: "Bash", tool_input: { command: "/opt/agentic-workflow/bin/rozhodni.sh --nazov 'Test' --kluc a.b --rozsah server --agenti boris --rozhodol Oskar --moc operator --zdroj 'vlákno Adam' <<'EOF'\ntext DECISIONS.md\nEOF", cwd: Z } }), "");
@@ -119,7 +124,7 @@ test("guard K2: záznam decisions/D0001.md a INDEX.md dá deny vždy, aj neexist
 });
 
 test("guard K2: Write, MultiEdit, zmrazené logy aj Bash zápisy", () => {
-  for (const p of [join(Z, "SCHVALENE.md"), join(Z, "DECISIONS.md"), "decisions/D0007.md", "/opt/agentic-workflow/decisions/INDEX.md"])
+  for (const p of [join(Z, "SCHVALENE.md"), join(Z, "DECISIONS.md"), "decisions/D0007.md", join(REG, "decisions", "INDEX.md")])
     for (const tool of ["Write", "MultiEdit"]) assert.ok(guardReason({ tool_name: tool, tool_input: { file_path: p }, cwd: Z }), `${tool} ${p}`);
   assert.ok(guardReason({ tool_name: "Write", tool_input: { file_path: "DECISIONS.md" }, cwd: Z }), "relatívna cesta voči cwd");
   assert.equal(guardReason({ tool_name: "Write", tool_input: { file_path: "DECISIONS.md" }, cwd: FREE }), null);
@@ -132,8 +137,8 @@ test("guard K2: Write, MultiEdit, zmrazené logy aj Bash zápisy", () => {
     "sed -i.bak -e 's/a/b/' DECISIONS.md",
     `printf x | tee -a ${Z}/DECISIONS.md`,
     "cp /tmp/x decisions/D0003.md",
-    "cd /opt/agentic-workflow && echo x >decisions/INDEX.md",
   ]) assert.ok(bashTarget(c, Z), c);
+  assert.ok(bashTarget("echo x >decisions/INDEX.md", REG), "INDEX.md v registri");
   assert.equal(bashTarget("echo x >> DECISIONS.md", FREE), null, "voľný log");
   for (const c of [
     "grep -n rozhodol /root/adam/DECISIONS.md",
@@ -144,6 +149,19 @@ test("guard K2: Write, MultiEdit, zmrazené logy aj Bash zápisy", () => {
     "node lib/rozhodnutia.mjs show R153 2>&1",
     "cp DECISIONS.md /tmp/",
   ]) assert.equal(bashTarget(c, Z), null, c);
+});
+
+test("guard K2: INDEX.md je chránený len v decisions/ s ROZSAHY.md, D0001.md všade", () => {
+  const verdict = (tool_name, tool_input, cwd) => guardRun({ tool_name, tool_input, cwd }) ? "deny" : "";
+  for (const [tool, input] of [["Write", { file_path: "decisions/INDEX.md" }], ["Bash", { command: "echo x > decisions/INDEX.md" }], ["Bash", { command: "echo x >> decisions/INDEX.md" }]]) {
+    assert.equal(verdict(tool, input, NOREG), "", `bez ROZSAHY.md prejde: ${JSON.stringify(input)}`);
+    assert.equal(verdict(tool, input, REG), "deny", `s ROZSAHY.md deny: ${JSON.stringify(input)}`);
+  }
+  assert.equal(verdict("Write", { file_path: join(NOREG, "decisions", "INDEX.md") }, "/"), "", "absolútna cesta bez ROZSAHY.md");
+  assert.equal(verdict("Write", { file_path: join(REG, "decisions", "INDEX.md") }, "/"), "deny", "absolútna cesta s ROZSAHY.md");
+  assert.equal(verdict("Write", { file_path: join(NOREG, "decisions", "neexistuje", "INDEX.md") }, "/"), "", "podpriečinok bez ROZSAHY.md");
+  for (const [tool, input] of [["Write", { file_path: "decisions/D0001.md" }], ["Bash", { command: "echo x > decisions/D0001.md" }]])
+    for (const cwd of [NOREG, REG]) assert.equal(verdict(tool, input, cwd), "deny", `${JSON.stringify(input)} v ${cwd === REG ? "REG" : "NOREG"}`);
 });
 
 test("env/hooks.mjs zapíše oba hooky rozhodnutí a AR_ROZHODNUTIA, opakovaný beh nič nezdvojí", () => {
