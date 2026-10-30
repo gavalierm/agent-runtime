@@ -218,6 +218,8 @@ test("(k) citlivé a necitlivé tvary", () => {
     "cp k /home/user/.ssh/authorized_keys", "echo k >> /home/user/.ssh/config", "dd if=x of=/etc/x", "rsync -a x/ /etc/x/", "tar -xzf a.tgz -C /etc",
     "tar --extract --file a.tgz --directory=/usr/local", "unzip -o a.zip -d /opt/x", "chgrp g /etc/x", "truncate -s 0 /var/lib/x/log",
     "cat <<E > /etc/x\nfoo\nE", "find /etc -name x -exec rm {} +", "find /etc/x -delete", "xargs -a list.txt systemctl restart", "find . -name x -exec systemctl restart x \\;",
+    "chattr +i /etc/x", "chattr -i /etc/x", "chattr -R +i /usr/x", "ssh-keygen -f /root/.ssh/id_x", "ssh-keygen -t ed25519 -f /home/user/.ssh/id_x -N ''",
+    "openssl req -new -out /etc/ssl/x.pem -keyout /etc/ssl/x.key", "openssl genrsa -out /usr/local/x.key 2048",
     // obaly
     "timeout -s KILL 10 systemctl restart x", "nice -n 5 apt install x", "ionice -c 3 apt-get install x", "sudo -u svc -- apt install x", "sudo -uroot apt install x",
   ];
@@ -233,6 +235,8 @@ test("(k) citlivé a necitlivé tvary", () => {
     "docker ps", "docker logs x", "nft list ruleset", "iptables -L -n", "iptables -S", "nmcli device status", "sysctl net.ipv4.ip_forward", "passwd -S x", "chage -l x",
     "systemctl list-units", "systemctl is-active x", "dpkg -l", "dpkg -s x", "apt list --upgradable", "apt-get --help", "curl -fsSL https://x | jq .", "curl https://x | bash -c 'cat'",
     "tar -czf /tmp/a.tgz -C /etc .", "tar -tzf a.tgz", "unzip a.zip -d /tmp/x", "rsync -a /etc/x /tmp/x/", "find /etc -name x -exec grep y {} +", "find /var/lib -name x",
+    "chattr +i /tmp/x", "lsattr /etc/x", "ssh-keygen -f /tmp/k", "ssh-keygen -l -f /root/.ssh/id_x", "ssh-keygen -y -f /etc/ssh/ssh_host_key",
+    "openssl x509 -in /etc/ssl/x.pem -noout -text", "openssl req -new -out /tmp/x.pem -keyout /tmp/x.key",
     "xargs -a list.txt cat", "timeout 10 ls", "nice -n 5 ls", "sudo -u svc ls /etc", "bash create-nothing.txt", "git status", "AGENT_NAME=x /opt/code/reply.sh a <<'E'\nVýsledok: rm /etc/x\nE",
   ];
   for (const c of yes) assert.ok(sensitiveName(c), `má byť citlivé: ${c}`);

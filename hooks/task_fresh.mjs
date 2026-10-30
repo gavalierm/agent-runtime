@@ -44,7 +44,7 @@ const LINES_MAX = 8;
 // `env`, `timeout`, `nice`, `xargs`, `find -exec`; text v heredoci sa nerozkladá) s prvým
 // slovom ako basename, a na riadku "write <cieľ>" pre každý cieľ zápisu (presmerovanie
 // `>`/`>>`, `tee`, `cp`, `mv`, `install`, `ln`, `sed -i`, `chmod`, `chown`, `chgrp`, `rm`,
-// `mkdir`, `touch`, `truncate`, `dd of=`, `rsync`, `tar -C`, `unzip -d`, `find -delete`).
+// `mkdir`, `touch`, `truncate`, `chattr`, `ssh-keygen -f`, `openssl -out`, `dd of=`, `rsync`, `tar -C`, `unzip -d`, `find -delete`).
 // Cieľ s premennou alebo `$(...)` sa nedá určiť, prejde. Čisto čítacie tvary (`ufw status`,
 // `crontab -l`, `nft list`, `iptables -L`, `tailscale serve status`) nie sú citlivé.
 // Inštalácia rúrou (`curl ... | sh`) sa posudzuje zvlášť v sensitiveName.
@@ -208,7 +208,17 @@ export function writeTargets(words) {
   const pos = args.filter((a) => !a.startsWith("-"));
   if (["tee", "rm", "mkdir", "touch", "truncate"].includes(prog)) targets.push(...pos);
   else if (prog === "chmod" || prog === "chown" || prog === "chgrp") targets.push(...pos.slice(1));
-  else if (prog === "install" && flags.includes("-d")) targets.push(...pos);
+  else if (prog === "chattr") targets.push(...pos.filter((a) => !/^[+=][A-Za-z]+$/.test(a)));
+  else if (prog === "ssh-keygen") {
+    // `-f` je cieľ zápisu pri tvorbe kľúča, pri `-l`, `-y` a `-F` sa kľúč len číta.
+    const f = optValue(args, "-f", null);
+    if (f !== undefined && !flags.some((x) => ["-l", "-y", "-F"].includes(x))) targets.push(f);
+  } else if (prog === "openssl") {
+    for (const o of ["-out", "-keyout"]) {
+      const v = optValue(args, o, null);
+      if (v !== undefined) targets.push(v);
+    }
+  } else if (prog === "install" && flags.includes("-d")) targets.push(...pos);
   else if (["cp", "mv", "install", "ln"].includes(prog)) {
     const t = optValue(args, "-t", "--target-directory");
     if (t !== undefined) targets.push(t);
