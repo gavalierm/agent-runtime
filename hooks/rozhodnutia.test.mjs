@@ -164,6 +164,52 @@ test("guard K2: INDEX.md je chránený len v decisions/ s ROZSAHY.md, D0001.md v
     for (const cwd of [NOREG, REG]) assert.equal(verdict(tool, input, cwd), "deny", `${JSON.stringify(input)} v ${cwd === REG ? "REG" : "NOREG"}`);
 });
 
+test("guard K2: INDEX.md cez cd a ~ v príkaze Bash (fail closed, úloha 693)", () => {
+  // base/home je HOME, base/brain je register s ROZSAHY.md; cwd hooku je cudzí priečinok bez registra.
+  const base = tmp();
+  const home = join(base, "home");
+  const brain = join(base, "brain");
+  mkdirSync(home); mkdirSync(join(brain, "decisions"), { recursive: true });
+  writeFileSync(join(brain, "decisions", "ROZSAHY.md"), "# Rozsahy\n");
+  const run = (command, cwd = NOREG) => {
+    const out = spawnSync("node", [join(HOOKS, "rozhodnutia_guard.mjs")], { input: JSON.stringify({ tool_name: "Bash", cwd, tool_input: { command } }), encoding: "utf8", env: { ...cleanEnv(), HOME: home } }).stdout;
+    return out ? "deny" : "";
+  };
+  // Bod 1: relatívna cesta sa rozloží proti cd v príkaze, nie proti cwd hooku.
+  for (const c of [
+    `cd ${brain} && echo x > decisions/INDEX.md`,
+    `cd ${brain}/decisions && echo x > INDEX.md`,
+    `cd ${brain}; echo x >> decisions/INDEX.md`,
+    `(cd ${brain} && echo x > decisions/INDEX.md)`,
+    `true || cd ${brain}\necho x > decisions/INDEX.md`,
+    `cd /tmp/x && echo x > decisions/INDEX.md`, // zámer: cd v príkaze, cieľ neoverím, zamietnuté
+    `cd /tmp/x && tee decisions/INDEX.md`,
+  ]) assert.equal(run(c), "deny", c);
+  // Bod 2: `~` a `$HOME` sa rozbalia na HOME, `..` sa rozloží.
+  for (const c of [
+    "echo x > ~/../brain/decisions/INDEX.md",
+    "echo x > $HOME/../brain/decisions/INDEX.md",
+    "echo x > ${HOME}/../brain/decisions/INDEX.md",
+    "cp /tmp/x ~/../brain/decisions/INDEX.md",
+    "D=x; echo x > $D/INDEX.md",
+    "echo x > $B/decisions/INDEX.md", // iná premenná: nevie sa rozložiť, chránené
+  ]) assert.equal(run(c), "deny", c);
+  // Dovolené: absolútna cesta bez registra, čítanie, cd bez zápisu do INDEX.md, `cd` len ako text.
+  for (const c of [
+    "echo x > /tmp/decisions/INDEX.md",
+    `echo x > ${NOREG}/decisions/INDEX.md`,
+    `cd /tmp && cat ${brain}/decisions/INDEX.md`,
+    `cd ${brain} && cat decisions/INDEX.md`,
+    `cd ${brain} && grep D0203 decisions/INDEX.md > /tmp/o`,
+    `cd ${brain} && echo x > /tmp/decisions/INDEX.md`,
+    "echo x > ~/decisions/INDEX.md",
+    "echo cd x > decisions/INDEX.md",
+    "echo x > decisions/INDEX.md",
+  ]) assert.equal(run(c), "", c);
+  // Write a Edit s relatívnou cestou ostávajú podľa cwd, `cd` tam nie je.
+  assert.equal(guardReason({ tool_name: "Write", tool_input: { file_path: "decisions/INDEX.md" }, cwd: NOREG }), null);
+});
+
 test("env/hooks.mjs zapíše oba hooky rozhodnutí a AR_ROZHODNUTIA, opakovaný beh nič nezdvojí", () => {
   const dir = tmp();
   writeFileSync(join(dir, "settings.json"), JSON.stringify({ env: { X: "1" }, hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "iny" }] }] } }));

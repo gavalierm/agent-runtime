@@ -10,12 +10,13 @@
 // ani značku nezmaže. Pred zmrazením log ostáva voľný, agenti doň zapisujú ďalej. README.md a ROZSAHY.md v decisions/ sa upravujú
 // ručne, nová značka rozsahu patrí do commitu s prvým záznamom, ktorý ju
 // používa. V Bash zachytí presmerovanie (`>`, `>>`), `tee`, `cp`/`mv`/`install`
-// s cieľom v chránenom súbore a `sed -i`. Príkaz s bin/rozhodni.sh prejde,
+// s cieľom v chránenom súbore a `sed -i`. Príkaz s `cd` alebo cesta s `$` chráni INDEX.md vždy (fail closed, cd mení cwd, ktorý hook nepozná). Príkaz s bin/rozhodni.sh prejde,
 // skript píše sám. Parser ako foreign_git.mjs: heredoc a text v úvodzovkách
 // s medzerou sú dáta, nie cieľ zápisu.
 
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stripHeredocs } from "./no_model_wait.mjs";
 import { denyTool } from "../lib/deny.mjs";
@@ -24,6 +25,7 @@ import { workflowDir } from "../lib/paths.mjs";
 
 const RECORDS = /(?:^|\/)decisions\/D\d{4}\.md$/;
 const INDEX = /(?:^|\/)decisions\/INDEX\.md$/;
+const INDEX_NAME = /(?:^|\/)INDEX\.md$/; // pri `cd` stačí meno súboru, priečinok hook nepozná
 const LOG = /(?:^|\/)(?:DECISIONS|SCHVALENE)\.md$/;
 export const ZMRAZENE = "<!-- rozhodnutia: zmrazene -->";
 
@@ -36,9 +38,26 @@ export function isFrozen(p, cwd = process.cwd()) {
 // INDEX.md chráni len decisions/ s ROZSAHY.md, teda register, do ktorého píše
 // rozhodni.sh. Relatívnu cestu rozloží proti cwd volania ako isFrozen.
 export const hasRegister = (p, cwd = process.cwd()) => existsSync(join(dirname(resolve(cwd, p)), "ROZSAHY.md"));
-export const isProtected = (raw, cwd) => {
-  const p = raw.replace(/^['"]+|['"]+$/g, "");
-  return RECORDS.test(p) || (INDEX.test(p) && hasRegister(p, cwd)) || (LOG.test(p) && isFrozen(p, cwd));
+
+// Cesta z príkazu Bash: shell rozbalí `~` a `$HOME` na začiatku, hook ich
+// rozbalí tiež. Zostatok `$` (iná premenná) hook nevie rozložiť.
+export function expandHome(p) {
+  const home = process.env.HOME || homedir();
+  return p.replace(/^(?:~|\$HOME|\$\{HOME\})(?=\/|$)/, home);
+}
+// Príkaz Bash mení pracovný priečinok: token `cd` na začiatku úseku.
+export const hasCd = (cmd) => /(?:^|[;&|(\n])\s*cd(?:\s|$)/.test(cmd);
+
+// opts.shell: cesta je z príkazu Bash (rozbalenie `~`, `$`); opts.cd: príkaz
+// obsahuje `cd`, relatívna cesta sa potom nerozloží proti cwd hooku. Obe
+// vetvy chránia INDEX.md bez ohľadu na ROZSAHY.md (fail closed).
+export const isProtected = (raw, cwd, opts = {}) => {
+  let p = raw.replace(/^['"]+|['"]+$/g, "");
+  if (opts.shell) p = expandHome(p.replace(/[)}]+$/, ""));
+  const index = (INDEX.test(p) && hasRegister(p, cwd))
+    || (opts.shell && p.includes("$") && INDEX_NAME.test(p))
+    || (opts.cd && !isAbsolute(p) && INDEX_NAME.test(p));
+  return RECORDS.test(p) || index || (LOG.test(p) && isFrozen(p, cwd));
 };
 
 export const POSTUP =
@@ -52,8 +71,9 @@ export const MESSAGE =
 
 // Vráti zapisovaný chránený cieľ príkazu Bash alebo null.
 export function bashTarget(raw, cwd) {
-  const isP = (p) => isProtected(p, cwd);
   const flat = stripProse(stripHeredocs(raw));
+  const opts = { shell: true, cd: hasCd(flat) };
+  const isP = (p) => isProtected(p, cwd, opts);
   for (const seg of flat.split(/[;&|\n]+/)) {
     if (/rozhodni\.sh/.test(seg)) continue;
     // Presmerovanie: `>`, `>>`, `2>`, `&>` (bez `>&`, `2>&1`).
