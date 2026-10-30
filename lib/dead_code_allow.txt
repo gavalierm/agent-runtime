@@ -6,3 +6,4 @@ lib/git_isolate.mjs pomocník testov, importujú ho len testy
 github_device_login.sh spúšťa ho človek ručne pri zriadení strojového účtu, opis v README
 brain/bin/decide.sh spúšťa ho agent podľa brain/RULES.md, opis v README
 github_repo_visibility.sh spúšťa ho správca agentov ručne pri zmene viditeľnosti repa, opis v rozhodnutí D0200
+github_foreign_repo.sh spúšťa ho správca agentov ručne, keď cudzí účet pozve strojový účet do repa, opis v skille github-repo mozgu

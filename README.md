@@ -26,7 +26,7 @@ Operátor píše do vlákna priamo z T3 desktopu alebo mobilu.
 | `morning.mjs` | ranný súhrn do schránky (s `--stdout` vypíše telo súhrnu bez hlavičky správy na stdout a do schránky nič nezapíše, presunie sa len držaná správa `na vedomie`, úloha 618, D0183): `tasker summary --since 24h`, držané správy, nové rozhodnutia, rozloženie práce a zásahy operátora za 24 h (udalosti a posuny poradia v Taskeri, komentáre agenta za operátora, správy operátora z webu v T3; úloha 605), stojace úlohy s príčinou a otvorené needs_human s vekom, prerušené behy (killed, cancelled) s udalosťami úlohy, neprázdne klony a správy iných agentov v processed (úloha 607, D0179), značka `[s <operátorom>]` pri hotovej úlohe, do ktorej operátor v okne písal (správa v T3 vo vlákne s číslom úlohy v názve, komentár v úlohe; úloha 653), pokyn na začiatku: report len z týchto dát |
 | `start_agent.mjs` | založí projekt T3 nad klonom repa a vlákno agenta, id vlákna uloží do stavu |
 | `lib.mjs` | nastavenie, schránka, klient T3 (REST na čítanie, `/ws` na príkazy) |
-| `agent_vlakno.sh`, `github_repo.sh`, `github_repo_visibility.sh`, `github_device_login.sh` | zriadenie agenta (kľúč, repo, klony, schránka, budič, agent v Taskeri) |
+| `agent_vlakno.sh`, `github_repo.sh`, `github_repo_visibility.sh`, `github_foreign_repo.sh`, `github_device_login.sh` | zriadenie agenta (kľúč, repo, klony, schránka, budič, agent v Taskeri) |
 | `browser.sh`, `browser/` | Chrome so sandboxom pod volajúcim (nie root) alebo pod iným používateľom (z roota) |
 | `secret_drop.sh`, `secret_drop.mjs` | jednorazová stránka na odovzdanie tajomstva |
 | `systemd/` | šablóna budiča `agent-driver@.service`, jednotky udalostí Taskera a ranného súhrnu, `tmpfiles.d` schránky a drop-in `t3code.service` |
@@ -698,7 +698,7 @@ prostredia. `reply.sh` si `runtime.env` agenta načíta sám.
 | `TASKER_EXTERNAL_AGENTS` | prázdne | agenti s vláknom T3 (cez dvojbodku), ktorým most posiela úlohy |
 | `TASKER_OPERATORS` | `operator` | mená ľudí (cez dvojbodku), ktorých komentár nesie rozhodnutie |
 | `TASKER_BOX_<meno>` | `/var/lib/<meno>` | schránka agenta z mosta |
-| `AGENT_MANAGER` | (povinné pre `agent_vlakno.sh`, `github_repo.sh`, `github_device_login.sh`) | agent, v ktorého `~/.config/<meno>` sú tokeny GitHubu a `runtime.env` s trasami |
+| `AGENT_MANAGER` | (povinné pre `agent_vlakno.sh`, `github_repo.sh`, `github_foreign_repo.sh`, `github_device_login.sh`) | agent, v ktorého `~/.config/<meno>` sú tokeny GitHubu a `runtime.env` s trasami |
 | `AGENT_RESERVED` | prázdne | mená cez dvojbodku, ktoré `agent_vlakno.sh` odmietne |
 | `AGENT_GH_OWNER` | (povinné) | účet GitHubu, v ktorom sú repá agentov |
 | `AGENT_GH_MACHINE` | (povinné) | strojový účet GitHubu s kľúčmi `/root/.ssh/<účet>_<meno>` |
