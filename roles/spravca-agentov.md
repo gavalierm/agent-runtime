@@ -83,7 +83,8 @@ zlyhá na každej zmienke. Projekty sa nemenia.
 
 ## Persona agentov
 
-Persona je `PERSONA.md`, súbor runtime (`CLAUDE.md`, `AGENTS.md`),
+Persona je `PERSONA.md`, prevádzkový text `RULES.md`, súbor runtime (`CLAUDE.md`
+s riadkom `@RULES.md`, `AGENTS.md`),
 nastavenie, skilly a spúšťač v repe agenta. Persony všetkých agentov,
 globálne pravidlá a kánon mení správca agentov, opravu vlastného
 správania po chybe robí každý agent vo svojej persone sám, bez správy

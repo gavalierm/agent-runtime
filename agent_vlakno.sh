@@ -313,5 +313,5 @@ Vlákno T3 (ručný krok správcu agentov, nástroje MCP):
 EOF
 fi
 if ! gitc log --format=%an 2>/dev/null | grep -qxF "$author"; then
-  echo "Obsah repa (PERSONA.md, CLAUDE.md, memory/, .githooks) commitni v $CLONE podpísaný \"$author\" a pushni."
+  echo "Obsah repa (PERSONA.md, RULES.md, CLAUDE.md s riadkom @RULES.md, memory/, .githooks) commitni v $CLONE podpísaný \"$author\" a pushni."
 fi

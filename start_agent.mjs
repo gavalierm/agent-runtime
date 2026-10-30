@@ -25,7 +25,7 @@ import { config, ensureDir, T3Client } from "./lib.mjs";
 export function startPrompt(title = "Agent", replyCmd = "reply.sh") {
   return [
     `Si ${title}. Toto vlákno je tvoj trvalý beh na serveri.`,
-    "Prečítaj PERSONA.md a CLAUDE.md v tomto repe a urob štart relácie podľa nich (git fetch a rebase). Pamäť máš v kontexte z hooku.",
+    "Prečítaj PERSONA.md a RULES.md (CLAUDE.md ich importuje) v tomto repe a urob štart relácie podľa nich (git fetch a rebase). Pamäť máš v kontexte z hooku.",
     `Správy zo schránky prichádzajú ako <schranka od=... id=...>. Na každú, ktorá chce odpoveď, odpovedz príkazom z jej hlavičky (${replyCmd}).`,
     "Na túto správu odpovedz jednou vetou, že bežíš.",
   ].join("\n");
