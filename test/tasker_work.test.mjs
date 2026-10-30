@@ -481,3 +481,26 @@ test("zámok: hook po druhom /clear nehlási vlastnú starú reláciu s .session
     }
   }
 });
+
+test("výzva s novým číslom úlohy zapíše čas `at`, rovnaké číslo ho ponechá (úloha 690)", () => {
+  const sb = sandbox();
+  const file = join(sb.dir, "cache", "agentic-workflow", "tasker_work_current", "S2");
+  const before = Date.now();
+  run(sb, prompt("Úloha 689"));
+  const first = JSON.parse(readFileSync(file, "utf8"));
+  assert.equal(first.n, 689);
+  assert.ok(first.at >= before && first.at <= Date.now());
+  // Rovnaké číslo vo výzve zo schránky ponechá `at`, výzva bez čísla zruší príznak a `at` zachová.
+  writeFileSync(file, JSON.stringify({ ...first, at: 1000 }));
+  run(sb, prompt(inboxMsg("Úloha 689 má komentár")));
+  assert.equal(JSON.parse(readFileSync(file, "utf8")).at, 1000);
+  run(sb, prompt("a ešte toto"));
+  assert.equal(JSON.parse(readFileSync(file, "utf8")).at, 1000);
+  // Iné číslo má nový čas.
+  run(sb, prompt("Úloha 690"));
+  assert.ok(JSON.parse(readFileSync(file, "utf8")).at >= before);
+  // Zapisujúci nástroj `at` zachová.
+  const at = JSON.parse(readFileSync(file, "utf8")).at;
+  run(sb, bash());
+  assert.equal(JSON.parse(readFileSync(file, "utf8")).at, at);
+});

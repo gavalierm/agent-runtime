@@ -101,7 +101,7 @@ export function taskNumber(text) {
   return found ? Number(found[1] || found[2] || found[3]) : null;
 }
 
-function agentName(input, env = process.env) {
+export function agentName(input, env = process.env) {
   if (env.AGENT_NAME) return env.AGENT_NAME;
   try {
     const root = env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd();
@@ -112,7 +112,7 @@ function agentName(input, env = process.env) {
 }
 
 // Spustí `tk <argv>` (alebo TASKER_WORK_CMD) a vráti stdout alebo "".
-function tk(agent, argv, env = process.env) {
+export function tk(agent, argv, env = process.env) {
   const cmd = env.TASKER_WORK_CMD;
   const henv = hookEnv({}, { AGENT_NAME: agent, ...env });
   const run = cmd ? [cmd, argv] : [henv.AGENT_TK || join(workflowDir(henv), "bin", "tk"), argv];
@@ -132,7 +132,7 @@ const safeId = (s) => String(s || "").replace(/[^\w-]/g, "_");
 const WRITE_TOOLS = new Set(["Bash", "Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const REPORT_EVERY_MS = 60 * 60_000;
 
-function currentFile(session, env = process.env) {
+export function currentFile(session, env = process.env) {
   const base = env.XDG_CACHE_HOME || join(env.HOME || homedir(), ".cache");
   return join(base, "agentic-workflow", "tasker_work_current", String(session).replace(/[^\w-]/g, "_"));
 }
@@ -154,12 +154,15 @@ function userPrompt(input) {
   let cur = null;
   try { cur = JSON.parse(readFileSync(file, "utf8")); } catch {}
   if (n === null) {
-    // Slovo operátora bez čísla zruší príznak schránky, číslo ostáva.
-    if (cur && cur.inbox && !inbox) saveCurrent(file, { n: cur.n, reportedAt: 0 });
+    // Slovo operátora bez čísla zruší príznak schránky, číslo ostáva (aj `at`).
+    if (cur && cur.inbox && !inbox) saveCurrent(file, { n: cur.n, reportedAt: 0, ...(cur.at ? { at: cur.at } : {}) });
     return;
   }
   if (cur && cur.n === n && !!cur.inbox === inbox) return;
-  saveCurrent(file, inbox ? { n, reportedAt: 0, inbox: true } : { n, reportedAt: 0 });
+  // `at`: čas, odkedy relácia na úlohe pracuje (nové číslo), hook task_fresh.mjs z neho
+  // počíta záznamy úlohy, ktoré relácia ešte nečítala. Rovnaké číslo si čas ponechá.
+  const at = cur && cur.n === n && cur.at ? cur.at : Date.now();
+  saveCurrent(file, inbox ? { n, reportedAt: 0, inbox: true, at } : { n, reportedAt: 0, at });
 }
 
 // Práca v hlavnom vlákne: ohlási aktuálnu úlohu relácie pri zapisujúcom nástroji.
