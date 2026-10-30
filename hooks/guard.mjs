@@ -6,35 +6,24 @@
 // zápis. Je to zábrana, nie sandbox: číta cesty v tool_input a v texte
 // príkazu, nie to, čo spustený skript urobí.
 //
-//   začiatok              voľne                              inak
-//   projekt               pod cwd                            ask, aj /tmp
-//   repo kódu             samo, ~/Work/agenti, konfigurácia  ask
-//   (agentic-workflow)    agentov v ~/Work: CLAUDE.md,
-//                         PERSONA.md, AGENTS.md, .claude/
-//   ~/Work/agenti/<meno>  repo okrem persony, projekty       ask, aj persona
-//                         z permissions.additionalDirectories
-//   ~/Work/agenti         ~/Work/agenti/scratch              ask
-//   ~/Work                ~/Work/scratch                     ask
-//   mimo ~/Work           pod cwd                            ask
+//   začiatok              zápis                              výsledok
+//   projekt               pod cwd a všade inde               allow
+//   repo kódu             všade                              allow
+//   (agentic-workflow)
+//   ~/Work/agenti/<meno>  repo, projekty, všade inde         allow, persona deny
+//   ~/Work/agenti         všade                              allow
+//   ~/Work                všade                              allow
+//   mimo ~/Work           všade                              allow
 //
-// Hook nikdy nevracia deny. Každý zápis mimo voľného územia ide operátorovi
-// na potvrdenie, koncové zamietnutie by operátorovi nedalo cestu zmenu
-// povoliť (rozhodnutie z 19. 10. 2026). V relácii bez
-// operátora (claude -p) harness otázku zamietne sám.
+// Agent na Macu beží vo full-access a žiadny hook mu nekladie otázku na
+// schválenie (D0206, nahrádza D0013). Otázka hooku by vlákno zastavila aj
+// v bypassPermissions, preto hook nevracia otázku. Jediné zamietnutie je
+// zápis do persony agenta s identitou: PERSONA.md, CLAUDE.md, AGENTS.md,
+// .claude/ a skills/ v jeho repe. Personu mení len správca agentov alebo
+// operátor (roles/ROLES.md). Deny preto nesie postup: zmenu pošli správcovi
+// agentov správou (ask_agent.sh, adresát je v roles/agents.md) a nepíš ju sama.
 //
-// Správca agentov (roles/ROLES.md) spravuje konfiguráciu každého agenta bez
-// súhlasu operátora, relácia v repe kódu ju zapisuje v jeho mene, zmena
-// štruktúry ~/Work ide cez súhlas operátora. Agent s identitou nemení vlastnú
-// personu, mení ju správca agentov (rozhodnutia z 14. a 18. 10. 2026). Persona sú PERSONA.md, CLAUDE.md, AGENTS.md,
-// .claude/ a skills/ v repe agenta.
-//
-// Rola "rules" je len relácia v repe, ktoré nesie tento hook. Tam beží zábrana jednej relácie
-// z .claude/settings.json repa. Relácia v ~/Work/agenti ju nemá, 14. 10. 2026
-// tam stará relácia zapisovala popri novej, preto do repa agenta nezapíše
-// nič (rozhodnutie zo 14. 10. 2026).
-//
-// V každej role je voľná aj vlastná pamäť harnessu,
-// ~/.claude/projects/<začiatok s pomlčkami>/memory. Pamäť iného projektu nie.
+// Rozdiel medzi rolami dnes platí len pre agenta, ostatné pustia každý zápis.
 //
 // Pri allow mlčí (exit 0 bez JSON), aby nepreskočil ostatné pravidlá.
 // Test: CLAUDE_PROJECT_DIR=/cesta node hooks/guard.mjs < vstup.json, vstup je
@@ -49,20 +38,12 @@
 
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve, sep } from "node:path";
+import { denyTool } from "../lib/deny.mjs";
 
 const HOME = homedir();
-const WORK = resolve(HOME, "Work");
-const AGENTI = resolve(WORK, "agenti");
-// Repo kódu je to, ktoré nesie tento hook. Meno a miesto priečinka sa
-// môže zmeniť, hook pritom nesmie zamknúť vlastný presun.
-const RULES = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const CLAUDE_HOME = resolve(HOME, ".claude");
-const FREE = new Set(["/dev/null", "/dev/stdout", "/dev/stderr", "/dev/tty"]);
-// Pamäť, ktorú harness agentovi prideľuje. Názov priečinka je cesta začiatku
-// session, v ktorej harness každý znak mimo písmen a číslic nahradil pomlčkou.
-const memoryOf = (dir) => resolve(CLAUDE_HOME, "projects", dir.replace(/[^A-Za-z0-9]/g, "-"), "memory");
+// Agent s identitou beží v ~/Work/agenti/<meno>, priamo pod ~/Work/agenti.
+const AGENTI = resolve(HOME, "Work", "agenti");
 
 let input;
 try {
@@ -78,32 +59,10 @@ const cwd = resolve(process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd()
 const shell = resolve(input.cwd || cwd);
 const tool = input.tool_name || "";
 const ti = input.tool_input || {};
-const role =
-  cwd === RULES
-    ? "rules"
-    : cwd === AGENTI
-      ? "agenti"
-      : cwd.startsWith(AGENTI + sep) && !cwd.slice(AGENTI.length + 1).includes(sep)
-      ? "agent"
-      : cwd === WORK
-        ? "root"
-        : "project";
+const isAgent = cwd.startsWith(AGENTI + sep) && !cwd.slice(AGENTI.length + 1).includes(sep);
 
-// Konfigurácia agenta: súbory, ktoré riadia jeho správanie.
-const CONFIG = /\/(CLAUDE|PERSONA|AGENTS)\.md$|\/\.claude(\/|$)/;
+// Persona agenta: súbory, ktoré riadia jeho správanie.
 const PERSONA = ["PERSONA.md", "CLAUDE.md", "AGENTS.md", ".claude", "skills"].map((n) => resolve(cwd, n));
-
-// Projekty agenta s identitou. Rovnaký zoznam dáva spúšťač relácii cez --add-dir.
-function projects() {
-  const out = [];
-  for (const f of ["settings.json", "settings.local.json"]) {
-    try {
-      const j = JSON.parse(readFileSync(resolve(cwd, ".claude", f), "utf8"));
-      for (const d of j.permissions?.additionalDirectories || []) out.push(expand(String(d), cwd));
-    } catch {}
-  }
-  return out;
-}
 
 const inside = (p, dir) => p === dir || p.startsWith(dir + sep);
 
@@ -346,26 +305,10 @@ function pathsFromBash() {
 // --- rozhodnutie ---------------------------------------------------------------
 
 function decide(p) {
-  if (FREE.has(p)) return "allow";
-  if (inside(p, memoryOf(cwd))) return "allow";
-  switch (role) {
-    case "rules":
-      if (inside(p, RULES) || inside(p, AGENTI)) return "allow";
-      return inside(p, WORK) && CONFIG.test(p) ? "allow" : "ask";
-    case "agent":
-      if (PERSONA.some((d) => inside(p, d))) return "ask";
-      if (inside(p, cwd)) return "allow";
-      return projects().some((d) => inside(p, d)) ? "allow" : "ask";
-    case "agenti":
-      return inside(p, resolve(AGENTI, "scratch")) ? "allow" : "ask";
-    case "root":
-      return inside(p, resolve(WORK, "scratch")) ? "allow" : "ask";
-    default:
-      return inside(p, cwd) ? "allow" : "ask";
-  }
+  return isAgent && PERSONA.some((d) => inside(p, d)) ? "deny" : "allow";
 }
 
-const RANK = { allow: 0, ask: 1 };
+const RANK = { allow: 0, deny: 1 };
 const paths = tool === "Bash" ? pathsFromBash() : pathsFromTool();
 let decision = "allow";
 let culprit = null;
@@ -378,22 +321,7 @@ for (const p of paths) {
 }
 if (decision === "allow") process.exit(0);
 
-const tilde = (p) => p.replace(HOME, "~");
-const where = role === "rules" ? `${tilde(RULES)} a ~/Work/agenti` : role === "root" ? "~/Work" : tilde(cwd);
-const agenti = role === "agenti";
-const persona = role === "agent" && PERSONA.some((d) => inside(culprit, d));
-const reason = agenti
-  ? `Relácia v ~/Work/agenti nie je relácia repa kódu a nemá zábranu jednej relácie. Agent beží vo svojom repe ~/Work/agenti/<meno>. Zápis ${tilde(culprit)} potrebuje súhlas operátora.`
-  : persona
-  ? `${tilde(culprit)} je persona agenta. Mení ju správca agenta, opravu vlastnej chyby agent sám, so súhlasom operátora.`
-  : `${tilde(culprit)} je mimo územia ${where}, zápis potrebuje súhlas operátora. Dočasné súbory patria do <cwd>/scratch/.`;
-
-process.stdout.write(
-  JSON.stringify({
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: decision,
-      permissionDecisionReason: reason,
-    },
-  }),
+denyTool(
+  `${culprit.replace(HOME, "~")} je persona agenta. Personu mení len správca agentov alebo operátor.`,
+  "Pošli zmenu správcovi agentov cez ask_agent.sh, jeho meno je v roles/agents.md, a personu nepíš sám.",
 );

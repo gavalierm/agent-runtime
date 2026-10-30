@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // guard.replay.mjs — prehrá cez guard.mjs každý Bash príkaz z prepisov
-// v ~/.claude/projects a vypíše tie, ktoré hook zamietol alebo pri ktorých by
-// sa pýtal. Slúži na hľadanie falošných zamietnutí: výpis prejdi a každý
-// príkaz, ktorý mimo územia nezapisuje, pridaj ako prípad do guard.test.mjs.
+// v ~/.claude/projects a vypíše tie, ktoré hook zamietol (zápis do persony
+// agenta, D0206). Slúži na hľadanie falošných zamietnutí: výpis prejdi a každý
+// príkaz, ktorý personu nemení, pridaj ako prípad do guard.test.mjs.
 // Spusti: node hooks/guard.replay.mjs [--dni N]   (predvolene 30 dní)
 
 import { spawnSync } from "node:child_process";
@@ -71,4 +71,4 @@ for (const dir of readdirSync(ROOT)) {
 for (const h of hits) {
   console.log(`\n[${h.decision}] ${h.start.replace(H, "~")}\n  ${h.reason}\n  ${h.command.replace(/\n/g, "\n  ").slice(0, 600)}`);
 }
-console.log(`\n${total} príkazov, ${hits.length} zamietnutých alebo s otázkou`);
+console.log(`\n${total} príkazov, ${hits.length} zamietnutých`);
