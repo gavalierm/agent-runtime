@@ -2,10 +2,10 @@
 // replay úlohy 689). Živý Tasker sa nevolá: tk je falošný skript, ktorý vypíše JSON úlohy
 // zo súboru (test ho medzi krokmi prepisuje) a zapíše volanie do logu. HOME aj
 // XDG_CACHE_HOME sú v tmp.
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, chmodSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,8 +15,13 @@ const HOOK = join(dirname(fileURLToPath(import.meta.url)), "task_fresh.mjs");
 const SHOW = "tk task show 689 --json";
 const INSTALL = "bash host/server/install_remote.sh";
 
+// Dočasné priečinky sa po testoch zmažú, run.sh zlyhá na úniku (úloha 701).
+const dirs = [];
+after(() => { for (const d of dirs) rmSync(d, { recursive: true, force: true }); });
+
 function sandbox({ current = { n: 689, reportedAt: 0, at: Date.now() - 3_600_000 }, env = {} } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "task_fresh-"));
+  dirs.push(dir);
   const log = join(dir, "calls.log");
   const json = join(dir, "task.json");
   const fake = join(dir, "fake-tk.sh");
