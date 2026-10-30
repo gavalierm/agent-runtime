@@ -16,6 +16,8 @@ The register is `errors/REGISTER.md` of the brain where the error happened:
 - the code repo (`agentic-brain/errors/`), when the error is in the code of a repo that carries a brain,
 - the global brain, in every other case.
 
+A clone marked `agentic.readonly` (a live clone pulled by a timer) is refused: pass `--brain` with the agent's own write clone of that brain.
+
 One row is one occurrence.
 
 ## What the agent decides

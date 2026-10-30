@@ -130,6 +130,7 @@ for f in "$AR_CLAUDE_DIR/settings.json" "$AR_RUNS_HOME/.claude/settings.json"; d
     contains "compact: $f" '[false, "operator"]'
 done
 # Git
+check "git: test (AR_*) neoznačí klon kódu agentic.readonly" 1 git -C "$WF" config --type=bool --get agentic.readonly
 check "git: e-mail z konfigurácie" 0 git config --global user.email
 contains "git: e-mail" "agent@example.org"
 check "git: globálny hooksPath klonu kódu" 0 git config --global core.hooksPath

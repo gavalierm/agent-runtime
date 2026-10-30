@@ -20,7 +20,8 @@
 #     mimo hookov (pluginy, jazyk), existujúca hodnota vyhráva
 # $ENV_ROOT/CLAUDE.md a domov používateľa behov dostanú odkaz na
 # `<mozog>/env/server/RULES.md`. Git: user.email, core.hooksPath klonu kódu,
-# enable_repo_hooks.sh pod používateľom behov. Systemd: agentic-workflow-sync
+# enable_repo_hooks.sh pod používateľom behov, `agentic.readonly true` v živých
+# klonoch kódu a mozgu (len živý stroj). Systemd: agentic-workflow-sync
 # (.service a .timer, sync.sh ťahá oba klony).
 #
 # Pôvodný súbor alebo priečinok, ktorý nie je odkaz, skript presunie do
@@ -237,6 +238,18 @@ if [ "$LIVE" = 1 ] || [ -n "${GIT_CONFIG_GLOBAL:-}" ]; then
 fi
 if [ -n "$RUNS_HOME" ]; then
     ex runs bash "$WORKFLOW/git-hooks/enable_repo_hooks.sh" "$RUNS_HOME" "$WORKFLOW/git-hooks/global"
+fi
+
+# Živé klony kódu a mozgu ťahá časovač `git pull --ff-only`, nezacommitnutá zmena
+# ho zastaví. Značka agentic.readonly chráni klony pred zápisom skriptov, ktoré v
+# nich necommitujú (error.sh ju odmietne). Nastavuje sa len na živom stroji, test
+# s AR_* nesmie označiť klon, z ktorého beží.
+if [ "$LIVE" = 1 ]; then
+    for clone in "$WORKFLOW" "$BRAIN"; do
+        if git -C "$clone" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            git -C "$clone" config agentic.readonly true
+        fi
+    done
 fi
 
 # Systemd: sync klonov. Šablóna nesie @WORKFLOW@ a @BRAIN@ namiesto ciest.

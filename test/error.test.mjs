@@ -241,6 +241,28 @@ test("register sa nájde z pracovného priečinka: agentic-brain/errors, errors 
   assert.equal(rows(regNested).length, 2, "--brain s koreňom repa nájde agentic-brain/errors");
 });
 
+test("register v klone so značkou agentic.readonly sa odmietne, bez značky sa zapíše", () => {
+  const clone = join(dir, "ro-clone");
+  const reg = mkreg(clone);
+  const g = (...a) => spawnSync("git", ["-C", clone, ...a], { encoding: "utf8" });
+  g("init", "-q");
+  assert.equal(g("config", "agentic.readonly", "true").status, 0);
+  const before = readFileSync(reg, "utf8");
+  const refused = run(args("ro-trieda", clone));
+  assert.equal(refused.status, 1, refused.stderr);
+  assert.equal(readFileSync(reg, "utf8"), before, "register ostal nezmenený");
+  assert.match(refused.stderr, /agentic\.readonly/);
+  assert.match(refused.stderr, /--brain/);
+  assert.match(refused.stderr, /Správny postup/);
+  // --open len číta, značka ho nezastaví.
+  assert.equal(run(["--open", "--brain", clone]).status, 0);
+  // Ten istý register bez značky riadok zapíše.
+  assert.equal(g("config", "agentic.readonly", "false").status, 0);
+  const ok = run(args("ro-trieda", clone));
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.equal(rows(reg).length, 1);
+});
+
 test("zápis nikdy nejde mimo tmp: živý globálny mozog ostal nedotknutý", () => {
   for (const reg of [regA, join(globalBrain, "errors", "REGISTER.md")]) assert.ok(reg.startsWith(tmpdir()), reg);
 });

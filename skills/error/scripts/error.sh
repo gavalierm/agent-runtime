@@ -25,6 +25,9 @@
 #                      exists, else errors/REGISTER.md at the root, else the register of the
 #                      global brain (lib/paths.sh, AGENT_BRAIN_GLOBAL)
 #
+# A register in a clone marked `git config agentic.readonly true` (the live clones that a timer
+# pulls) is refused with code 1, --brain then points to the write clone of the brain.
+#
 # Environment:
 #   ERROR_AGENT      name of the agent (for the task title), else AGENT_NAME, TASKER_USER, else
 #                    "# Name" of PERSONA.md in CLAUDE_PROJECT_DIR or the current folder
@@ -116,6 +119,11 @@ shown="${file#"$top"/}"
 
 if [ ! -f "$reg" ]; then
     fail 1 "error register $reg is missing" "pass --brain <folder with errors/REGISTER.md> or run error.sh in a repo that has a brain (adopt.sh creates the register)"
+fi
+# A live clone pulled by a timer (`git pull --ff-only`) is read only: an uncommitted row would stop its sync.
+reg_top="$(git -C "$(dirname "$reg")" rev-parse --show-toplevel 2>/dev/null)" || reg_top=""
+if [ -n "$reg_top" ] && [ "$(git -C "$reg_top" config --type=bool --get agentic.readonly 2>/dev/null)" = true ]; then
+    fail 1 "error register $reg is in a read-only clone (git config agentic.readonly is true), an uncommitted row would stop its sync" "pass --brain <the agent's own write clone of that brain> and run error.sh again"
 fi
 
 agent="${ERROR_AGENT:-${AGENT_NAME:-${TASKER_USER:-}}}"

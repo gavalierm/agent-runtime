@@ -985,7 +985,7 @@ v spoločnom mozgu (`AGENT_BRAIN_GLOBAL`). Cesty v tabuľkách sú relatívne ku
 
 | cesta | čo to je |
 |---|---|
-| `env/server/install.sh` | nasadenie na server (root): importy pravidiel, skilly, agenti, `settings.json` z `env/hooks.mjs` (`main` root, `runs` používateľ behov), git, jednotky sync |
+| `env/server/install.sh` | nasadenie na server (root): importy pravidiel, skilly, agenti, `settings.json` z `env/hooks.mjs` (`main` root, `runs` používateľ behov), git (aj `agentic.readonly true` v živých klonoch kódu a mozgu, `error.sh` do nich nezapíše), jednotky sync |
 | `env/server/sync.sh` | časovač ťahá klon kódu aj mozgu a hlási zmenu `RULES.md` oboch a `env/server/` mozgu |
 | `env/server/systemd/` | `agentic-workflow-sync.service` a `.timer` (šablóna so zástupnými znakmi, `install.sh` ich nahradí cestami klonov) |
 | `env/server/config.env.example` | vzor `<mozog>/env/server/config.env` (`RUNS_USER`, `GIT_EMAIL`, `ENV_ROOT`, `LEGACY_PATHS`, `LEGACY_UNITS`) |
