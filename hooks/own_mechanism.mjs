@@ -43,6 +43,12 @@ export const MECHANISM = [
   ["polling", word(String.raw`polling\p{L}*`)],
   ["nová služba", word(String.raw`nov\p{L}{0,4}\s+služ\p{L}*`)],
   ["nový skript", word(String.raw`nov\p{L}{0,4}\s+skript\p{L}*`)],
+  // Prístup pre používateľa je mechanizmus stroja: zadanie ho nesie ako cieľ a
+  // riadok `Nástroj overený:` s príkazom (dpkg -s sudo, rozsah podpríkazov),
+  // nie ako hotové pravidlo (chyba 30. 10. 2026, úloha 689: pravidlo sudoers
+  // na stroji bez balíka sudo, s celým tasker namiesto obmedzeného príkazu).
+  ["sudo", word(String.raw`sudo(?:ers)?`)],
+  ["authorized_keys", word(String.raw`authorized_keys`)],
 ];
 
 // Riadok, ktorým zadávateľ ukáže, že existujúci nástroj mechanizmus nemá.

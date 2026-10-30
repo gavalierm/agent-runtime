@@ -51,7 +51,7 @@ test("tvary príkazu: tasker, cesta, premenné, komentár, --body=, sh -c", () =
 });
 
 test("slová mechanizmu a slovenské tvary", () => {
-  for (const t of ["slučka", "slučku", "slučkou", "SYSTEMD", "Systemd-Run", "timer", "crontab", "cron", "daemon", "watcher", "polling", "nová služba", "novú službu", "nový skript", "nového skriptu", "novým skriptom"]) {
+  for (const t of ["slučka", "slučku", "slučkou", "SYSTEMD", "Systemd-Run", "timer", "crontab", "cron", "daemon", "watcher", "polling", "nová služba", "novú službu", "nový skript", "nového skriptu", "novým skriptom", "sudo", "sudoers", "NOPASSWD:SETENV: sudo", "authorized_keys"]) {
     assert.ok(chk(`tk comment 1 --body ${sq(`použijeme ${t} na to`)}`), t);
   }
   for (const t of ["timeout", "deployment", "scronch", "nová úloha", "nový test", "služba beží"]) {
@@ -107,7 +107,7 @@ test("echo, grep, cat a iné príkazy so zmienkou pustí; zadanie bez mechanizmu
 });
 
 test("zoznam slov nie je prázdny a každé slovo zamieta (sabotáž zoznamu musí zhodiť test)", () => {
-  assert.ok(MECHANISM.length >= 9);
+  assert.ok(MECHANISM.length >= 11);
   for (const [name, re] of MECHANISM) assert.ok(re instanceof RegExp, name);
   assert.ok(chk(`tk comment 1 --body "systemd"`));
 });
