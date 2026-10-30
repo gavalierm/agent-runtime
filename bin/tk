@@ -46,11 +46,4 @@ home="${TK_HOME:-/home/$user/.tasker}"
 if [ "$(id -un)" = "$user" ]; then
     exec env TASKER_HOME="$home" TASKER_USER="$name" tasker "$@"
 fi
-# Root prepne používateľa cez runuser. Iný používateľ (zástupca z druhého
-# stroja cez ssh) potrebuje v sudoers pravidlo len na tasker ako $user:
-# `<kto> ALL=($user) NOPASSWD:SETENV: /usr/local/bin/tasker`. SETENV pustí
-# premenné na príkazovom riadku, `sudo -n` padne hneď, keď pravidlo chýba.
-if [ "$(id -u)" = 0 ]; then
-    exec runuser -u "$user" -- env TASKER_HOME="$home" TASKER_USER="$name" tasker "$@"
-fi
-exec sudo -n -u "$user" TASKER_HOME="$home" TASKER_USER="$name" /usr/local/bin/tasker "$@"
+exec runuser -u "$user" -- env TASKER_HOME="$home" TASKER_USER="$name" tasker "$@"
