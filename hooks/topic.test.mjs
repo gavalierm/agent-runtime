@@ -127,6 +127,11 @@ ok("zdieľaný git za cd zamietnutý", check(C, "Bash", { command: `cd x && ${G}
 for (const c of ["status", "pull --rebase", "checkout -b x", "log --oneline"])
   ok(`bežný git povolený: ${c}`, check(C, "Bash", { command: `${G} ${c}` }) === "");
 ok("commit povolený", check(C, "Bash", { command: `${G} add a b && ${G} commit -m x` }) === "");
+for (const c of ["add -A", "add --all", "add .", "add -Av", "-C x add -A", "-c user.name=x add ."])
+  ok(`plošné git add zamietnuté: ${c}`, check(C, "Bash", { command: `${G} ${c}` }).includes("global §6"));
+ok("plošné git add za cd zamietnuté", check(C, "Bash", { command: `cd x && ${G} add -A` }).includes("global §6"));
+ok("git add súboru povolený", check(C, "Bash", { command: `${G} add a.txt b.txt` }) === "");
+ok("text o git add -A povolený", check(C, "Bash", { command: `${G} commit -m "zákaz git add -A" -- a` }) === "");
 
 ok("cudzie ID s lomkou sa nečíta", check("../../etc/passwd", "Write", write).includes("nedostal ID"));
 

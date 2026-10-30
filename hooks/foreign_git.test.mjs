@@ -203,3 +203,28 @@ test("git stash list, rebase, commit a text so stash pustí", () => {
   assert.equal(foreignGitReason("cat <<'EOF'\ngit stash\nEOF"), null);
   assert.equal(run({ command: "git rebase origin/main" }), "");
 });
+
+test("git add -A, --all a . zamietne, git add súboru pustí (úloha 694)", () => {
+  assert.equal(foreignGitReason("git add -A"), "ADD_ALL");
+  assert.equal(foreignGitReason("git -C /root/x add --all"), "ADD_ALL");
+  assert.equal(foreignGitReason("cd /root/x && git add ."), "ADD_ALL");
+  assert.equal(foreignGitReason("runuser -u tasker-svc -- git add -Av"), "ADD_ALL");
+  assert.equal(foreignGitReason("git add f.txt", { cwd: "/tmp" }), null);
+  assert.equal(foreignGitReason('git commit -m "git add -A"'), null);
+  assert.equal(run({ command: "git add ." }), "deny");
+  assert.equal(run({ command: "git add f.txt" }), "");
+});
+
+test("replay 30. 10. 2026: git add -A v klone agenta, hook v tmp cwd (úloha 694)", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "u694-fg-"));
+  try {
+    const command = "cd /root/agent/.scratch/sablona/repo && git add -A";
+    const out = execFileSync("node", [HOOK], { input: JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd }) }).toString();
+    const h = JSON.parse(out).hookSpecificOutput;
+    assert.equal(h.permissionDecision, "deny");
+    assert.match(h.permissionDecisionReason, /git add -A/);
+    assert.match(h.permissionDecisionReason, /git commit -m "<správa>" -- <zoznam vlastných súborov>/);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});

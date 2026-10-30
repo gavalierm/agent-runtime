@@ -11,6 +11,7 @@
 // clean a --autostash (hooks/shared_git.mjs), aj pod runuser a sudo -u.
 // Štvrtá kontrola (úloha 621): `git -c core.hooksPath=...`, `--no-verify` a
 // `git commit -n` vypnú hooky repa (hooksBypass v hooks/shared_git.mjs).
+// Piata kontrola (úloha 694): `git add -A`, `--all` a `.` (addAll v hooks/shared_git.mjs).
 // Druhý výskyt 22. 10. 2026: vlákno webového projektu spustilo ako root
 // `git fetch` v klone /home/<používateľ správcu úloh>/projekty/web/web-repo.
 // `.git/FETCH_HEAD` ostal rootovi a fetch pod používateľom správcu úloh padol. Git
@@ -30,7 +31,7 @@ import { readFileSync, statSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stripHeredocs } from "./no_model_wait.mjs";
-import { SHARED_GIT, SHARED_GIT_MESSAGE, SHARED_GIT_POSTUP, hooksBypass, HOOKS_BYPASS_MESSAGE, HOOKS_BYPASS_POSTUP } from "./shared_git.mjs";
+import { SHARED_GIT, SHARED_GIT_MESSAGE, SHARED_GIT_POSTUP, hooksBypass, HOOKS_BYPASS_MESSAGE, HOOKS_BYPASS_POSTUP, addAll, ADD_ALL_MESSAGE, ADD_ALL_POSTUP } from "./shared_git.mjs";
 import { denyTool } from "../lib/deny.mjs";
 
 const SAFE = /safe\.directory/i;
@@ -254,6 +255,8 @@ export function foreignGitReason(raw, { cwd = null, stat = statSync, uid = proce
   if (SHARED_GIT.test(stripProse(stripHeredocs(raw)))) return "SHARED_GIT";
   // Štvrtá kontrola (úloha 621): vypnutie hookov repa (-c core.hooksPath, --no-verify, commit -n).
   if (hooksBypass(raw)) return "HOOKS_BYPASS";
+  // Piata kontrola (úloha 694): plošné `git add` (-A, --all, .), global §6.
+  if (addAll(raw)) return "ADD_ALL";
   return ownerReason(raw, { cwd, stat, uid });
 }
 
@@ -284,5 +287,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!why) process.exit(0);
   if (why === "SHARED_GIT") denyTool(SHARED_GIT_MESSAGE, SHARED_GIT_POSTUP);
   else if (why === "HOOKS_BYPASS") denyTool(`${HOOKS_BYPASS_MESSAGE} (${hooksBypass(String(ti.command || ""))})`, HOOKS_BYPASS_POSTUP);
+  else if (why === "ADD_ALL") denyTool(`${ADD_ALL_MESSAGE} (git add ${addAll(String(ti.command || ""))})`, ADD_ALL_POSTUP);
   else denyTool(`${why.startsWith("git ako uid") ? MESSAGE_OWNER : MESSAGE} (${why})`, POSTUP);
 }

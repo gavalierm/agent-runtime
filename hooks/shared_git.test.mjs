@@ -1,9 +1,12 @@
-// shared_git.mjs: git príkazy, ktoré zahodia cudzie súbory (stash, reset --hard ...)
-// a obchádzanie hookov repa (core.hooksPath, --no-verify, commit -n). Test púšťa
+// shared_git.mjs: git príkazy, ktoré zahodia cudzie súbory (stash, reset --hard ...),
+// obchádzanie hookov repa (core.hooksPath, --no-verify, commit -n) a plošné
+// `git add` (-A, --all, .). Test púšťa
 // hook foreign_git.mjs (server) len vstupom na stdin, git sa nespúšťa nikdy.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,8 +14,9 @@ const DIR = dirname(fileURLToPath(import.meta.url));
 const HOOK = join(DIR, "foreign_git.mjs");
 
 // Vráti hookSpecificOutput z hooku foreign_git.mjs pre príkaz Bash, null keď mlčí.
-function run(command) {
-  const out = execFileSync("node", [HOOK], { input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }) }).toString();
+function run(command, cwd) {
+  const input = { tool_name: "Bash", tool_input: { command }, ...(cwd ? { cwd } : {}) };
+  const out = execFileSync("node", [HOOK], { input: JSON.stringify(input) }).toString();
   return out ? JSON.parse(out).hookSpecificOutput : null;
 }
 const denied = (command) => run(command)?.permissionDecision === "deny";
@@ -103,4 +107,99 @@ test("hooksBypass je dostupný pre topic.mjs (Mac)", async () => {
   assert.ok(hooksBypass("git commit -n -m x"));
   assert.ok(hooksBypass("git -c core.hooksPath=/x commit"));
   assert.equal(hooksBypass('git commit -m "x"'), null);
+});
+
+test("git add -A, --all a . zamietne s odkazom na commit so zoznamom súborov", () => {
+  const r = run("git add -A");
+  assert.equal(r?.permissionDecision, "deny");
+  assert.match(r.permissionDecisionReason, /global §6/);
+  assert.match(r.permissionDecisionReason, /git commit -m "<správa>" -- <zoznam vlastných súborov>/);
+  assert.match(r.permissionDecisionReason, /Správny postup:/);
+  for (const c of [
+    "git add -A",
+    "git add --all",
+    "git add .",
+    "git add ./",
+    "git add -Av",
+    "git add -vA",
+    "git add -A .",
+    "git add -A src/x.mjs",
+    "git add -f .",
+    "git add -- .",
+    "git add 'f.txt' \".\"",
+    "git -C /root/x add -A",
+    "git -c user.name=x add .",
+    "git -C /root/x -c core.quotepath=off add --all",
+    "git --no-pager add -A",
+    "cd /root/x && git add -A",
+    "ls; git add .",
+    "git status | git add -A",
+    "sh -c 'git add -A'",
+    "runuser -u tasker-svc -- git add -A",
+    "sudo -u tasker-svc git add .",
+    "env X=1 git add -A",
+    "X=1 git add --all",
+    "git add -A && git commit -m x",
+    "echo x\ngit add -A",
+  ]) assert.ok(denied(c), c);
+});
+
+test("git add konkrétneho súboru a text o git add -A pustí", () => {
+  for (const c of [
+    "git add f.txt",
+    "git add hooks/shared_git.mjs hooks/topic.mjs",
+    "git add -- f.txt",
+    "git add -f f.txt",
+    "git add -N f.txt",
+    "git add -p f.txt",
+    "git add -u hooks/x.mjs",
+    "git add .gitignore",
+    "git add ./f.txt",
+    "git add ..",
+    "git add --chmod=+x bin/x.sh",
+    "git add --pathspec-from-file list.txt",
+    "git -C /root/x add f.txt",
+    "git -C . add f.txt",
+    "git -c user.name=x add f.txt",
+    "git add -n f.txt",
+    "git commit -m x -- f",
+    "git commit -am x",
+    "git status -A",
+    "git log --all",
+    "git log -A",
+    "git diff .",
+    "git status .",
+    "git stash list",
+    "git remote add origin .",
+    "git worktree add -b u1 ../x origin/main",
+    "git submodule add . x",
+    'git commit -m "zákaz git add -A, git add --all a git add ."',
+    "echo 'git add -A'",
+    "echo git add -A",
+    "grep -rn 'git add -A' .",
+    "grep -rn 'git add .' hooks",
+    "cat <<'EOF'\ngit add -A\ngit add .\nEOF",
+    "# git add -A",
+  ]) assert.ok(!denied(c), c);
+});
+
+test("replay 30. 10. 2026: git add -A v klone agenta, hook v tmp cwd", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "u694-"));
+  try {
+    const r = run("cd /root/agent/.scratch/sablona/repo && git add -A", cwd);
+    assert.equal(r?.permissionDecision, "deny");
+    assert.match(r.permissionDecisionReason, /git add -A/);
+    assert.match(r.permissionDecisionReason, /git commit -m/);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("addAll je dostupný pre topic.mjs (Mac)", async () => {
+  const { addAll } = await import("./shared_git.mjs");
+  assert.equal(addAll("git add -A"), "-A");
+  assert.equal(addAll("git add --all"), "--all");
+  assert.equal(addAll("git add ."), ".");
+  assert.equal(addAll("git add f.txt"), null);
+  assert.equal(addAll('git commit -m "git add -A"'), null);
 });

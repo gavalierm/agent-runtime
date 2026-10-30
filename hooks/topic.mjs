@@ -36,7 +36,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AGENT_REPO } from "./agent_repo.mjs";
-import { SHARED_GIT, SHARED_GIT_MESSAGE, SHARED_GIT_POSTUP, hooksBypass, HOOKS_BYPASS_MESSAGE, HOOKS_BYPASS_POSTUP } from "./shared_git.mjs";
+import { SHARED_GIT, SHARED_GIT_MESSAGE, SHARED_GIT_POSTUP, hooksBypass, HOOKS_BYPASS_MESSAGE, HOOKS_BYPASS_POSTUP, addAll, ADD_ALL_MESSAGE, ADD_ALL_POSTUP } from "./shared_git.mjs";
 import { denyTool } from "../lib/deny.mjs";
 import { operatorForms } from "../lib/agent_env.mjs";
 
@@ -221,6 +221,8 @@ export function verdict({ session_id: id, tool_name: tool, tool_input: inp = {} 
     return [SHARED_GIT_MESSAGE, SHARED_GIT_POSTUP];
   if (tool === "Bash" && hooksBypass(inp.command || ""))
     return [HOOKS_BYPASS_MESSAGE, HOOKS_BYPASS_POSTUP];
+  if (tool === "Bash" && addAll(inp.command || ""))
+    return [ADD_ALL_MESSAGE, ADD_ALL_POSTUP];
   const f = foreignOwner(topic, tool, inp);
   if (f)
     return [

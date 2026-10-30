@@ -8,6 +8,7 @@
 //
 // Od úlohy 621 aj príkazy, ktoré vypnú hooky repa: `git -c core.hooksPath=...`
 // a `--no-verify` (na `git commit` aj `-n`). Pozri `hooksBypass` nižšie.
+// Od úlohy 694 aj plošné `git add -A`, `--all` a `.` (global §6). Pozri `addAll`.
 import { stripHeredocs } from "./no_model_wait.mjs";
 import { cmdStart, stripProse } from "./foreign_git.mjs";
 
@@ -49,8 +50,9 @@ function commitShortHasN(t) {
   return false;
 }
 
-// Vráti "core.hooksPath", "--no-verify" alebo "commit -n", keď príkaz vypína hooky repa, inak null.
-export function hooksBypass(raw) {
+// Úseky príkazu, v ktorých sa priamo spúšťa git: `tokens` úseku a index `gi` príkazu git.
+// Text v heredoci a v úvodzovkách sa vynechá, `sh -c '...'` sa rozbalí.
+function* gitCalls(raw) {
   const norm = stripHeredocs(String(raw)).replace(/(^|[;&|(\n]\s*)((?:ba|da|z)?sh)\s+-[a-z]*c(?=\s)/g, "$1$2 -c");
   const flat = stripProse(norm)
     .replace(/\b(?:ba|da|z)?sh\s+(?:-\S+\s+)*?-\w*c\s+['"]/g, "")
@@ -67,6 +69,13 @@ export function hooksBypass(raw) {
       }
     }
     if (gi < 0 || gi >= tokens.length || !IS_GIT.test(tokens[gi])) continue;
+    yield { tokens, gi };
+  }
+}
+
+// Vráti "core.hooksPath", "--no-verify" alebo "commit -n", keď príkaz vypína hooky repa, inak null.
+export function hooksBypass(raw) {
+  for (const { tokens, gi } of gitCalls(raw)) {
     let i = gi + 1;
     while (i < tokens.length && tokens[i].startsWith("-")) {
       const o = tokens[i];
@@ -97,3 +106,39 @@ export const HOOKS_BYPASS_MESSAGE =
 export const HOOKS_BYPASS_POSTUP =
   "hooky repa musia bežať: oprav, čo hook hlási (`node check.mjs`, značky konfliktu, meno autora), a zopakuj " +
   "`git commit -m \"<správa>\" -- <zoznam vlastných súborov>` bez `-c core.hooksPath` a bez `--no-verify`.";
+
+// --- plošné `git add` (úloha 694) -------------------------------------------
+// Global §6 zakazuje `git add -A`, `git add --all` a `git add .`: do indexu
+// pribudnú aj súbory inej relácie a tajomstvá. 30. 10. 2026 prešiel `git add -A`
+// v klone bez zásahu hooku. `git add <konkrétny súbor>` prejde. Rozbor príkazu
+// je ten z hooksBypass (gitCalls), text v heredoci a v úvodzovkách hook pustí.
+// Voľby `git add` s hodnotou v ďalšom argumente (tvar `--voľba=hodnota` ju nespotrebuje).
+const ADD_OPT_VAL = new Set(["--pathspec-from-file", "--chmod"]);
+
+// Vráti "-A", "--all" alebo "." podľa toho, čo príkaz `git add` zbiera plošne, inak null.
+export function addAll(raw) {
+  for (const { tokens, gi } of gitCalls(raw)) {
+    let i = gi + 1;
+    while (i < tokens.length && tokens[i].startsWith("-")) i += GIT_OPT_VAL.has(tokens[i]) ? 2 : 1;
+    if (unq(tokens[i]) !== "add") continue;
+    let paths = false;
+    for (let k = i + 1; k < tokens.length; k++) {
+      const t = unq(tokens[k]);
+      if (!paths && t === "--") paths = true;
+      else if (!paths && t.startsWith("-")) {
+        if (t === "--all") return "--all";
+        if (/^-[A-Za-z]+$/.test(t) && t.includes("A")) return "-A";
+        if (ADD_OPT_VAL.has(t)) k++;
+      } else if (/^\.\/*$/.test(t)) return ".";
+    }
+  }
+  return null;
+}
+
+export const ADD_ALL_MESSAGE =
+  "`git add -A`, `git add --all` a `git add .` zoberú do indexu aj rozpracované súbory inej relácie a súbory, " +
+  "ktoré nepatria do commitu (global §6, env/server/CLAUDE.md, Git na serveri). Pridaj len vlastné súbory.";
+
+export const ADD_ALL_POSTUP =
+  "commitni zoznam vlastných súborov: `git commit -m \"<správa>\" -- <zoznam vlastných súborov>`; " +
+  "nový súbor najprv `git add <cesta k súboru>`, bez `-A`, `--all` a `.` (global §6).";
