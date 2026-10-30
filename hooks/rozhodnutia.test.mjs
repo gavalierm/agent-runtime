@@ -203,11 +203,49 @@ test("guard K2: INDEX.md cez cd a ~ v príkaze Bash (fail closed, úloha 693)", 
     `cd ${brain} && grep D0203 decisions/INDEX.md > /tmp/o`,
     `cd ${brain} && echo x > /tmp/decisions/INDEX.md`,
     "echo x > ~/decisions/INDEX.md",
-    "echo cd x > decisions/INDEX.md",
     "echo x > decisions/INDEX.md",
   ]) assert.equal(run(c), "", c);
+  // `echo cd` je falošný zásah, ktorý fail closed prijíma (slovo cd kdekoľvek).
+  assert.equal(run("echo cd x > decisions/INDEX.md"), "deny");
   // Write a Edit s relatívnou cestou ostávajú podľa cwd, `cd` tam nie je.
   assert.equal(guardReason({ tool_name: "Write", tool_input: { file_path: "decisions/INDEX.md" }, cwd: NOREG }), null);
+});
+
+test("guard K2: INDEX.md cez pushd, builtin cd, blok, if, sh -c, ~user, ~+ a \"$HOME\" (tretie kolo, úloha 693)", () => {
+  const base = tmp();
+  const home = join(base, "home");
+  const brain = join(base, "brain");
+  mkdirSync(home); mkdirSync(join(brain, "decisions"), { recursive: true });
+  writeFileSync(join(brain, "decisions", "ROZSAHY.md"), "# Rozsahy\n");
+  const run = (command, cwd = NOREG) => {
+    const out = spawnSync("node", [join(HOOKS, "rozhodnutia_guard.mjs")], { input: JSON.stringify({ tool_name: "Bash", cwd, tool_input: { command } }), encoding: "utf8", env: { ...cleanEnv(), HOME: home } }).stdout;
+    return out ? "deny" : "";
+  };
+  for (const c of [
+    `pushd ${brain} && echo x > decisions/INDEX.md`, // 1
+    `builtin cd ${brain} && echo x > decisions/INDEX.md`, // 2
+    `{ cd ${brain}; echo x > decisions/INDEX.md; }`, // 3
+    `if true; then cd ${brain}; fi; echo x > decisions/INDEX.md`, // 4
+    `sh -c "cd ${brain} && echo x > decisions/INDEX.md"`, // 5
+    `bash -lc 'cd ${brain} && echo x > decisions/INDEX.md'`,
+    `pushd ${brain}; popd; tee decisions/INDEX.md`,
+    "echo x > ~root/../brain/decisions/INDEX.md", // 6
+    "echo x > ~-/decisions/INDEX.md",
+    "echo x > ~1/decisions/INDEX.md",
+    'echo x > "$HOME"/../brain/decisions/INDEX.md', // stará medzera
+    "echo x > '$HOME'/../brain/decisions/INDEX.md",
+    'cp /tmp/x "$HOME"/../brain/decisions/INDEX.md',
+  ]) assert.equal(run(c), "deny", c);
+  assert.equal(run("echo x > ~+/decisions/INDEX.md", brain), "deny", "~+ v cwd registra"); // 7
+  // Protipríklady: bez zápisu, bez cd v príkaze alebo s cieľom mimo INDEX.md.
+  for (const c of [
+    `cd /tmp && cat ${brain}/decisions/INDEX.md`,
+    "echo x > /tmp/decisions/INDEX.md",
+    "pushd /tmp && ls",
+    `cd ${brain} && echo x > ~root/out.md`,
+    "echo x > ~root/out.md",
+    "sh script.sh > /tmp/o",
+  ]) assert.equal(run(c), "", c);
 });
 
 test("env/hooks.mjs zapíše oba hooky rozhodnutí a AR_ROZHODNUTIA, opakovaný beh nič nezdvojí", () => {

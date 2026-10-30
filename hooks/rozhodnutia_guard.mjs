@@ -10,7 +10,7 @@
 // ani značku nezmaže. Pred zmrazením log ostáva voľný, agenti doň zapisujú ďalej. README.md a ROZSAHY.md v decisions/ sa upravujú
 // ručne, nová značka rozsahu patrí do commitu s prvým záznamom, ktorý ju
 // používa. V Bash zachytí presmerovanie (`>`, `>>`), `tee`, `cp`/`mv`/`install`
-// s cieľom v chránenom súbore a `sed -i`. Príkaz s `cd` alebo cesta s `$` chráni INDEX.md vždy (fail closed, cd mení cwd, ktorý hook nepozná). Príkaz s bin/rozhodni.sh prejde,
+// s cieľom v chránenom súbore a `sed -i`. Príkaz so slovom `cd`, `pushd`, `popd` alebo s `sh -c` a cesta s `$` alebo `~user` chránia INDEX.md vždy (fail closed, cwd a rozbalenie hook nepozná). Príkaz s bin/rozhodni.sh prejde,
 // skript píše sám. Parser ako foreign_git.mjs: heredoc a text v úvodzovkách
 // s medzerou sú dáta, nie cieľ zápisu.
 
@@ -45,17 +45,27 @@ export function expandHome(p) {
   const home = process.env.HOME || homedir();
   return p.replace(/^(?:~|\$HOME|\$\{HOME\})(?=\/|$)/, home);
 }
-// Príkaz Bash mení pracovný priečinok: token `cd` na začiatku úseku.
-export const hasCd = (cmd) => /(?:^|[;&|(\n])\s*cd(?:\s|$)/.test(cmd);
+// Príkaz Bash môže zmeniť pracovný priečinok: slovo `cd`, `pushd`, `popd`
+// kdekoľvek v surovom príkaze alebo volanie shellu s `-c` (`sh -c`, `bash -lc`).
+// Testuje sa surový text vrátane úvodzoviek a heredocov, `echo cd` zasiahne
+// tiež (fail closed, príkaz môže cwd zmeniť spôsobom, ktorý hook nepozná).
+export const hasCd = (raw) => /\b(?:cd|pushd|popd)\b/.test(raw)
+  || /(?<![\w.-])(?:sh|bash|dash|zsh)\b[^;&|\n]*?\s-[A-Za-z]*c/.test(raw);
 
-// opts.shell: cesta je z príkazu Bash (rozbalenie `~`, `$`); opts.cd: príkaz
-// obsahuje `cd`, relatívna cesta sa potom nerozloží proti cwd hooku. Obe
+// opts.shell: cesta je z príkazu Bash (úvodzovky sa odstránia, rozbalí sa `~`,
+// `~/...`, `$HOME`; iný tvar `~` a zvyšné `$` sa nedá rozložiť); opts.cd:
+// príkaz môže zmeniť cwd, relatívna cesta sa nerozloží proti cwd hooku. Tieto
 // vetvy chránia INDEX.md bez ohľadu na ROZSAHY.md (fail closed).
 export const isProtected = (raw, cwd, opts = {}) => {
   let p = raw.replace(/^['"]+|['"]+$/g, "");
-  if (opts.shell) p = expandHome(p.replace(/[)}]+$/, ""));
+  let tilde = false; // `~root`, `~+`, `~-`, `~1`: shell ich rozbalí, hook nie
+  if (opts.shell) {
+    p = p.replace(/['"]/g, "").replace(/[)}]+$/, "");
+    if (/^~/.test(p) && !/^~(?:\/|$)/.test(p)) tilde = true;
+    else p = expandHome(p);
+  }
   const index = (INDEX.test(p) && hasRegister(p, cwd))
-    || (opts.shell && p.includes("$") && INDEX_NAME.test(p))
+    || (opts.shell && (p.includes("$") || tilde) && INDEX_NAME.test(p))
     || (opts.cd && !isAbsolute(p) && INDEX_NAME.test(p));
   return RECORDS.test(p) || index || (LOG.test(p) && isFrozen(p, cwd));
 };
@@ -71,13 +81,14 @@ export const MESSAGE =
 
 // Vráti zapisovaný chránený cieľ príkazu Bash alebo null.
 export function bashTarget(raw, cwd) {
-  const flat = stripProse(stripHeredocs(raw));
-  const opts = { shell: true, cd: hasCd(flat) };
+  // stripProse zachová text za `-c`, nie za `-lc`: zložená voľba s c sa zjednotí na `-c`.
+  const flat = stripProse(stripHeredocs(raw).replace(/(\s)-[A-Za-z]+c(?=\s*['"])/g, "$1-c"));
+  const opts = { shell: true, cd: hasCd(raw) };
   const isP = (p) => isProtected(p, cwd, opts);
   for (const seg of flat.split(/[;&|\n]+/)) {
     if (/rozhodni\.sh/.test(seg)) continue;
     // Presmerovanie: `>`, `>>`, `2>`, `&>` (bez `>&`, `2>&1`).
-    for (const m of seg.matchAll(/(?<![<>])\d*>>?(?!&)\s*(['"]?)([^\s'"<>]+)\1/g)) if (isP(m[2])) return m[2];
+    for (const m of seg.matchAll(/(?<![<>])\d*>>?(?!&)\s*([^\s<>]+)/g)) if (isP(m[1])) return m[1].replace(/^['"]+|['"]+$/g, "");
     const tokens = seg.trim().split(/\s+/).filter(Boolean);
     const at = tokens.findIndex((t) => /^(?:\S*\/)?(sed|tee|cp|mv|install)$/.test(t));
     if (at < 0) continue;
