@@ -16,6 +16,10 @@ const tmpDirs = [];
 const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
 after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
+// Skript zriaďuje agenta na serveri (useradd, systemd, runuser) a na Macu padá aj s podstavenými
+// príkazmi (nález zástupcu na Macu 31. 10. 2026), preto sa skúška mimo Linuxu preskočí.
+const SKIP = process.platform !== "linux" && "agent_vlakno.sh beží len na linuxovom serveri";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO = join(here, "..");
 const SCRIPT = join(REPO, "agent_vlakno.sh");
@@ -122,7 +126,7 @@ echo "overené: kľúč účtu example-agent má prístup"`);
 
 const mode = (p) => (statSync(p).mode & 0o777).toString(8);
 
-test("prvý beh zriadi všetko, druhý nič nezmení", () => {
+test("prvý beh zriadi všetko, druhý nič nezmení", { skip: SKIP }, () => {
   const { R, run, state } = setup();
   const a = run();
   assert.equal(a.status, 0, a.out);
@@ -193,7 +197,7 @@ test("prvý beh zriadi všetko, druhý nič nezmení", () => {
   assert.equal(readFileSync(join(R, "root/.config/adam/runtime.env"), "utf8"), adamEnv);
 });
 
-test("--thread zapíše id vlákna a zostáva už len obsah repa", () => {
+test("--thread zapíše id vlákna a zostáva už len obsah repa", { skip: SKIP }, () => {
   const { R, run } = setup();
   assert.equal(run().status, 0);
   const id = "thread:project:aaaa-1:bbbb-2";
@@ -209,7 +213,7 @@ test("--thread zapíše id vlákna a zostáva už len obsah repa", () => {
   assert.deepEqual(settles(b), []);
 });
 
-test("--bez-behov: bez klonu behov, agent v Taskeri vypnutý, druhý beh nič nezmení", () => {
+test("--bez-behov: bez klonu behov, agent v Taskeri vypnutý, druhý beh nič nezmení", { skip: SKIP }, () => {
   const { R, run, state } = setup();
   const a = run([NAME, "Tst", "--bez-behov"]);
   assert.equal(a.status, 0, a.out);
@@ -227,7 +231,7 @@ test("--bez-behov: bez klonu behov, agent v Taskeri vypnutý, druhý beh nič ne
   assert.ok(!existsSync(join(R, "home/tasker-svc/agenti", NAME)));
 });
 
-test("--bez-behov upozorní na už existujúci klon behov", () => {
+test("--bez-behov upozorní na už existujúci klon behov", { skip: SKIP }, () => {
   const { R, run } = setup();
   mkdirSync(join(R, "home/tasker-svc/agenti", NAME), { recursive: true });
   const a = run([NAME, "Tst", "--bez-behov"]);
@@ -235,7 +239,7 @@ test("--bez-behov upozorní na už existujúci klon behov", () => {
   assert.match(a.out, /POZOR: bez behov, ale .* existuje/);
 });
 
-test("agent v Taskeri s iným workdir dostane len workdir", () => {
+test("agent v Taskeri s iným workdir dostane len workdir", { skip: SKIP }, () => {
   const { run, state } = setup();
   writeFileSync(join(state, "agent"), "/home/tasker-svc/projekty/x/x-web\n");
   const a = run();
@@ -245,7 +249,7 @@ test("agent v Taskeri s iným workdir dostane len workdir", () => {
   assert.equal(readFileSync(join(state, "agent"), "utf8").trim(), "/home/tasker-svc/agenti/tst");
 });
 
-test("existujúci runtime.env, t3_token a kľúč sa neprepíšu", () => {
+test("existujúci runtime.env, t3_token a kľúč sa neprepíšu", { skip: SKIP }, () => {
   const { R, run } = setup();
   mkdirSync(join(R, `root/.config/${NAME}`), { recursive: true });
   writeFileSync(join(R, `root/.config/${NAME}/runtime.env`), "AGENT_MODEL=ine\n", { mode: 0o600 });
@@ -257,7 +261,7 @@ test("existujúci runtime.env, t3_token a kľúč sa neprepíšu", () => {
   assert.ok(!/MUT t3 /.test(a.log));
 });
 
-test("ochrana skúšky: bez podstavených príkazov skript nič nezapíše", () => {
+test("ochrana skúšky: bez podstavených príkazov skript nič nezapíše", { skip: SKIP }, () => {
   const { R, run, base } = setup();
   const empty = join(base, "prazdne");
   mkdirSync(empty);
@@ -269,7 +273,7 @@ test("ochrana skúšky: bez podstavených príkazov skript nič nezapíše", () 
   assert.equal(r2.status, 3, r2.out);
 });
 
-test("vstupy: zlé meno, adam a boris, chýbajúce zobrazované meno", () => {
+test("vstupy: zlé meno, adam a boris, chýbajúce zobrazované meno", { skip: SKIP }, () => {
   const { run } = setup();
   assert.equal(run(["Emil", "Emil"]).status, 2);
   assert.equal(run(["adam", "Adam"]).status, 2);
@@ -278,7 +282,7 @@ test("vstupy: zlé meno, adam a boris, chýbajúce zobrazované meno", () => {
   assert.equal(run([NAME, "Tst", "--thread", "a b"]).status, 2);
 });
 
-test("skúška sa nedotkla živých ciest", () => {
+test("skúška sa nedotkla živých ciest", { skip: SKIP }, () => {
   setup().run();
   for (const p of [`/var/lib/${NAME}`, `/root/${NAME}`, `/etc/tmpfiles.d/${NAME}-inbox.conf`, `/root/.config/${NAME}`,
     `/root/.ssh/example-agent_${NAME}`, `/root/.local/state/${NAME}`, `/home/tasker-svc/agenti/${NAME}`]) {
