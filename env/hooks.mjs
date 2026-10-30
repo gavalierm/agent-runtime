@@ -8,7 +8,10 @@
 // Riadok tabuľky: súbor hooku, udalosť, matcher (null = bez matchera), timeout
 // v sekundách (null = predvolený), requires (musí sedieť s druhým riadkom
 // `// requires:` v hooks/<súbor>, kontrola je v check.mjs a v env/hooks.test.mjs),
-// kde beží:
+// kde beží. Meno súboru bez lomky je v hooks/. Cesta s lomkou, napríklad
+// brain/bin/repeat_guard.mjs, je od koreňa klonu a nemá hlavičku requires, lebo
+// ten istý súbor ide aj do samostatnej kópie mozgu; kontrola overí len jeho
+// existenciu. Druhy:
 //   main   interaktívne relácie na serveri (root)
 //   runs   behy správcu úloh pod používateľom behov
 //   mac    interaktívne relácie na Macu
@@ -66,6 +69,7 @@ export const TABLE = [
   R("sed_line.mjs", "PreToolUse", "Bash", null, ["none"], ["main", "runs", "mac"]),
   R("secret_read.mjs", "PreToolUse", "Bash", null, ["none"], ["main", "runs", "mac"]),
   R("agreement_send.mjs", "PreToolUse", "Bash", null, ["inbox"], ["main", "mac"]),
+  R("brain/bin/repeat_guard.mjs", "PreToolUse", "Bash", null, ["none"], ["main", "runs", "mac"]),
   R("project_data.mjs", "PreToolUse", "Bash", null, ["mac"], ["agent"]),
   R("server_work.mjs", "PreToolUse", "Bash", null, ["mac"], ["agent"]),
   R("deploy_readonly.mjs", "PreToolUse", BASH_EDIT, null, ["none"], ["main", "runs"]),
@@ -103,11 +107,14 @@ export const HELPERS = ["agent_repo.mjs", "shared_git.mjs"];
 const COMMON = { autoCompactEnabled: false, outputStyle: "operator" };
 const EXTRA = { attribution: { commit: "", pr: "", sessionUrl: false }, env: { AR_ROZHODNUTIA: "1" } };
 
+// check.mjs a cesty s lomkou ležia od koreňa klonu, ostatné hooky v hooks/.
+const fromRoot = (file) => file === "check.mjs" || file.includes("/");
+
 export const rowsFor = (kind) => TABLE.filter((r) => r.where.includes(kind));
 
 // Príkaz hooku. Na Macu s cestou pod domovom `node "$HOME/..."`, inde holá cesta.
 function command(row, kind, hooksDir, workflowDir, home) {
-  const script = row.file === "check.mjs" ? join(workflowDir, row.file) : join(hooksDir, row.file);
+  const script = fromRoot(row.file) ? join(workflowDir, row.file) : join(hooksDir, row.file);
   let p = script;
   if (kind === "mac" && home && (p === home || p.startsWith(home + "/"))) p = `"$HOME${p.slice(home.length)}"`;
   else if (/\s/.test(p)) p = `"${p}"`;
@@ -141,9 +148,13 @@ export function settingsFor(kind, hooksDir, workflowDir, opts = {}) {
   return s;
 }
 
-// Meno súboru hooku z príkazu `node <cesta>/hooks/<meno>.mjs ...` alebo `check.mjs`.
+// Meno súboru hooku z príkazu `node <cesta>/hooks/<meno>.mjs ...`, `check.mjs`
+// alebo cesty od koreňa klonu z tabuľky (`brain/bin/repeat_guard.mjs`). Pred
+// `brain/` stojí lomka, takže samostatná kópia `agentic-brain/bin/...` nie je naša.
+const rx = (f) => f.replace(".mjs", "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const names = (pred) => [...new Set(TABLE.map((r) => r.file).filter(pred))].map(rx).join("|");
 const OURS = new RegExp(
-  `^node\\s+"?\\S*/(?:hooks/(${[...new Set(TABLE.map((r) => r.file).filter((f) => f !== "check.mjs"))].map((f) => f.replace(".mjs", "")).join("|")})\\.mjs|(check)\\.mjs"?\\s+--quiet)"?(\\s.*)?$`,
+  `^node\\s+"?\\S*/(?:hooks/(${names((f) => !fromRoot(f))})\\.mjs|(check)\\.mjs"?\\s+--quiet|(${names((f) => f.includes("/"))})\\.mjs)"?(\\s.*)?$`,
 );
 export const isOurs = (command) => OURS.test(String(command ?? ""));
 
@@ -234,6 +245,10 @@ export function tableProblems(repo) {
     for (const w of r.where) if (!KINDS.includes(w)) problems.push(`${label}: kde beží má hodnotu ${w} mimo ${KINDS.join("|")}`);
     if (r.file === "check.mjs") {
       if (!existsSync(join(repo, "check.mjs"))) problems.push(`${label}: súbor neexistuje`);
+      continue;
+    }
+    if (r.file.includes("/")) {
+      if (!existsSync(join(repo, r.file))) problems.push(`${label}: ${r.file} neexistuje`);
       continue;
     }
     inTable.add(r.file);

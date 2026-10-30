@@ -117,6 +117,10 @@ contains "používateľ behov: tool_failure_report z kódu" "node $WF/hooks/tool
 contains "používateľ behov: cudzí hook ostane" "iny-beh"
 lacks "používateľ behov: hook starého klonu zmizne" "/opt/stary/"
 lacks "používateľ behov nemá hooky len pre root" "unslop.mjs"
+check "root: repeat_guard z kódu presne raz" 0 jq_ "$AR_CLAUDE_DIR/settings.json" 'sum(1 for ev in d["hooks"].values() for g in ev for h in g["hooks"] if h["command"] == "node '"$WF"'/brain/bin/repeat_guard.mjs")'
+contains "root: repeat_guard raz" "1"
+check "používateľ behov: repeat_guard z kódu presne raz" 0 jq_ "$AR_RUNS_HOME/.claude/settings.json" 'sum(1 for ev in d["hooks"].values() for g in ev for h in g["hooks"] if h["command"] == "node '"$WF"'/brain/bin/repeat_guard.mjs")'
+contains "používateľ behov: repeat_guard raz" "1"
 check "zákazy rootu ostanú" 0 jq_ "$AR_CLAUDE_DIR/settings.json" 'd["permissions"]["deny"]'
 contains "mkfs ostane" "mkfs"
 check "cudzí kľúč používateľa behov ostane" 0 jq_ "$AR_RUNS_HOME/.claude/settings.json" 'd["model"]'

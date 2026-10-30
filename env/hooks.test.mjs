@@ -47,6 +47,7 @@ PreToolUse|Bash||rm_target.mjs
 PreToolUse|Bash||sed_line.mjs
 PreToolUse|Bash||secret_read.mjs
 PreToolUse|Bash||agreement_send.mjs
+PreToolUse|Bash||repeat_guard.mjs
 PreToolUse|^(Edit|Write|MultiEdit|NotebookEdit|Bash)$||deploy_readonly.mjs
 PreToolUse|^(Bash|Monitor)$|3|subagent_foreground.mjs
 PreToolUse|^(Bash|Edit|Write|MultiEdit|NotebookEdit)$|3|sonnet_delegation.mjs
@@ -78,6 +79,7 @@ PreToolUse|Bash||tool_failure_block.mjs
 PreToolUse|Bash||rm_target.mjs
 PreToolUse|Bash||sed_line.mjs
 PreToolUse|Bash||secret_read.mjs
+PreToolUse|Bash||repeat_guard.mjs
 PreToolUse|^(Edit|Write|MultiEdit|NotebookEdit|Bash)$||deploy_readonly.mjs
 PostToolUseFailure|Bash|5|tool_failure_log.mjs
 PreCompact||3|compact_block.mjs`.split("\n");
@@ -91,6 +93,7 @@ PreToolUse|Bash||git_pull.mjs
 PreToolUse|Bash||sed_line.mjs
 PreToolUse|Bash||secret_read.mjs
 PreToolUse|Bash||agreement_send.mjs
+PreToolUse|Bash||repeat_guard.mjs
 PreToolUse|^(Write|Edit|MultiEdit|NotebookEdit|Bash)$||rozhodnutia_guard.mjs
 PreToolUse|^(Write|Edit|MultiEdit|Bash)$||own_rule_scope.mjs
 PreToolUse|^(Agent|Task)$|3|tasker_work.mjs
@@ -102,30 +105,42 @@ UserPromptSubmit|||agreement_scope.mjs
 UserPromptSubmit|||rules_delta.mjs
 PreCompact||3|compact_block.mjs`.split("\n");
 
-test("main: dnešných 43 hookov rootu, po udalostiach v dnešnom poradí", () => {
+test("main: dnešných 44 hookov rootu, po udalostiach v dnešnom poradí", () => {
   const got = flat(hooksFor("main", HOOKS, WF));
-  assert.equal(got.length, 43);
+  assert.equal(got.length, 44);
   assert.deepEqual(byEvent(got), byEvent(MAIN));
 });
 
-test("runs: dnešných 14 hookov používateľa behov", () => {
+test("runs: dnešných 15 hookov používateľa behov", () => {
   const got = flat(hooksFor("runs", HOOKS, WF));
-  assert.equal(got.length, 14);
+  assert.equal(got.length, 15);
   assert.deepEqual(byEvent(got), byEvent(RUNS));
 });
 
-test("mac: dnešných 19 hookov Macu", () => {
+test("mac: dnešných 20 hookov Macu", () => {
   const got = flat(hooksFor("mac", HOOKS, WF, { home: "/Users/x" }));
-  assert.equal(got.length, 19);
+  assert.equal(got.length, 20);
   assert.deepEqual(byEvent(got), byEvent(MAC));
 });
 
 test("skupiny: Bash hooky rootu sú v jednej skupine, tasker_work s iným timeoutom v inej", () => {
   const pre = hooksFor("main", HOOKS, WF).PreToolUse;
   assert.equal(pre[0].matcher, "Bash");
-  assert.equal(pre[0].hooks.length, 15);
+  assert.equal(pre[0].hooks.length, 16);
   const tw = pre.filter((g) => g.hooks.some((h) => h.command.endsWith("/tasker_work.mjs")));
   assert.deepEqual(tw.map((g) => [g.matcher, g.hooks.find((h) => h.command.endsWith("/tasker_work.mjs")).timeout]), [["^(Agent|Task)$", 3], ["^(Bash|Edit|Write|MultiEdit|NotebookEdit)$", 10]]);
+});
+
+test("repeat_guard: cesta od koreňa klonu, raz v skupine Bash pre main, runs aj mac, agent ho nemá", () => {
+  const want = { main: "node /w/brain/bin/repeat_guard.mjs", runs: "node /w/brain/bin/repeat_guard.mjs", mac: 'node "$HOME/w/brain/bin/repeat_guard.mjs"' };
+  for (const [k, cmd] of Object.entries(want)) {
+    const h = hooksFor(k, k === "mac" ? "/Users/x/w/hooks" : HOOKS, k === "mac" ? "/Users/x/w" : WF, { home: "/Users/x" });
+    const all = Object.values(h).flatMap((gs) => gs.flatMap((g) => g.hooks.map((x) => x.command)));
+    assert.equal(all.filter((c) => c.includes("repeat_guard.mjs")).length, 1, k);
+    assert.ok(all.includes(cmd), k);
+    assert.ok(h.PreToolUse.find((g) => g.matcher === "Bash").hooks.some((x) => x.command.includes("repeat_guard.mjs")), `${k}: v skupine Bash`);
+  }
+  assert.ok(!JSON.stringify(hooksFor("agent", HOOKS, WF)).includes("repeat_guard"));
 });
 
 test("Mac: cesta pod domovom je v úvodzovkách s $HOME, check.mjs ide z koreňa klonu s --quiet", () => {
@@ -187,6 +202,8 @@ test("isOurs pozná naše príkazy v oboch tvaroch a cudzie nie", () => {
   assert.ok(isOurs("node /opt/x/hooks/unslop.mjs"));
   assert.ok(isOurs('node "$HOME/Work/x/hooks/unslop.mjs"'));
   assert.ok(isOurs('node "$HOME/Work/x/check.mjs" --quiet'));
+  assert.ok(isOurs("node /opt/x/brain/bin/repeat_guard.mjs"));
+  assert.ok(!isOurs("node /x/agentic-brain/bin/repeat_guard.mjs"), "samostatná kópia mozgu nie je naša");
   assert.ok(!isOurs("node /opt/x/hooks/neznamy.mjs"));
   assert.ok(!isOurs("iny"));
   assert.ok(!isOurs("node /x/check.mjs"));
