@@ -6,7 +6,10 @@
 // writing."). PreToolUse pre Write, Edit, MultiEdit a Bash (zapojuje ho
 // adaptér prostredia).
 //
-// Cieľ je CLAUDE.md alebo PERSONA.md v koreni repa agenta: server
+// Cieľ je CLAUDE.md, PERSONA.md alebo RULES.md v koreni repa agenta (tvar D0197:
+// CLAUDE.md importuje RULES.md, prevádzkový text je v RULES.md vedľa PERSONA.md;
+// RULES.md je súbor agenta len s PERSONA.md vedľa seba, inak je to RULES.md
+// projektu alebo repa kódu): server
 // /root/<meno>/ (s PERSONA.md, inak je to projekt), /home/<AGENT_TASKER_USER>/agenti/<meno>/
 // (používateľ behov úloh, bez premennej sa nekontroluje), Mac ~/Work/agent-<meno>/ a ~/Work/agenti/<meno>/; aj worktree
 // .worktrees/<úloha>/. Repo kódu a spoločného mozgu (workflowDir, brainGlobalDir) a projekty hook nechá tak.
@@ -21,7 +24,7 @@
 //
 // Odsek s dátumom chyby (úloha 613): chyba agenta sa zapisuje len do registra
 // skriptom error.sh (stĺpec opravy s mechanizmom), nikdy ako nový odsek "Chyba <deň>. <mesiac>. <rok>"
-// do CLAUDE.md alebo PERSONA.md (ľubovoľný taký súbor, aj v repe kódu). Hook
+// do CLAUDE.md, PERSONA.md alebo RULES.md (ľubovoľný taký súbor, aj v repe kódu). Hook
 // zamietne trvalo, druhý pokus neprejde: Edit a MultiEdit s väčším počtom takých
 // odsekov v new_string než v old_string, Write s väčším počtom než má súbor,
 // Bash s textom odseku a zápisom (presmerovanie >, >>, tee, sed -i, perl -i,
@@ -43,7 +46,7 @@ import { hookEnv } from "../lib/agent_env.mjs";
 import { brainGlobalDir, workflowDir } from "../lib/paths.mjs";
 
 export const GROWTH = 40;
-const FILES = new Set(["CLAUDE.md", "PERSONA.md"]);
+const FILES = new Set(["CLAUDE.md", "PERSONA.md", "RULES.md"]);
 const NOT_AGENT = new Set([basename(workflowDir()), basename(brainGlobalDir()), "rules"]);
 const WT = /\/\.worktrees\/[^/]+$/;
 
@@ -57,8 +60,8 @@ export const POSTUP_CHYBA =
 
 const CHYBA_RE = /\bChyba \d{1,2}\. ?\d{1,2}\. ?\d{4}\b/g;
 const count = (s) => (String(s ?? "").match(CHYBA_RE) || []).length;
-// Cieľový súbor v príkaze: CLAUDE.md alebo PERSONA.md, s cestou alebo bez nej.
-const TARGET = String.raw`(?:[^\s"'|;&<>()]*\/)?(?:CLAUDE|PERSONA)\.md(?=$|[\s"'|;&<>()\\])`;
+// Cieľový súbor v príkaze: CLAUDE.md, PERSONA.md alebo RULES.md, s cestou alebo bez nej.
+const TARGET = String.raw`(?:[^\s"'|;&<>()]*\/)?(?:CLAUDE|PERSONA|RULES)\.md(?=$|[\s"'|;&<>()\\])`;
 const WRITE_TO_TARGET = [
   new RegExp(String.raw`>>?\s*["']?` + TARGET),
   new RegExp(String.raw`\btee\s+(?:-\S+\s+)*["']?` + TARGET),
@@ -79,7 +82,7 @@ const DATUM = /\d{1,2}\. ?\d{1,2}\. ?\d{4}/;
 // spätné lomítko, lomku, zvislú čiaru (oddeľovač sed) alebo kotvu konca riadku. Medzery sa zlúčia.
 const odseky = (cmd) => [...cmd.matchAll(/\bChyba \d{1,2}\. ?\d{1,2}\. ?\d{4}[^\n'"\\/|$]*/g)].map((m) => ws(m[0]));
 
-// Zápis nového odseku s dátumom chyby do CLAUDE.md alebo PERSONA.md: vráti
+// Zápis nového odseku s dátumom chyby do CLAUDE.md, PERSONA.md alebo RULES.md: vráti
 // { file, datum } alebo null.
 export function chybaOdsek(input, read = (f) => { try { return readFileSync(f, "utf8"); } catch { return ""; } }) {
   const ti = input.tool_input || {};
@@ -125,6 +128,8 @@ export function agentRepoOf(file, { home = process.env.HOME || homedir(), exists
     const n = basename(dir);
     return re.test(n) && !NOT_AGENT.has(n) ? n : null;
   };
+  // RULES.md patrí agentovi len s PERSONA.md vedľa seba (inak je to RULES.md projektu).
+  if (basename(p) === "RULES.md" && !exists(join(dir, "PERSONA.md"))) return null;
   if (under(`${h}/Work`, /^agent-.+/) || under(`${h}/Work/agenti`, /^.+/) || (taskerUser && under(`/home/${taskerUser}/agenti`, /^.+/))) return dir;
   if ((dirname(dir) === "/root" || dirname(dir) === h) && !NOT_AGENT.has(basename(dir)) && basename(dir) !== ".claude"
     && (exists(join(dir, "PERSONA.md")) || basename(p) === "PERSONA.md")) return dir;

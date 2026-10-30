@@ -7,7 +7,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, basename } from "node:path";
+import { brainGlobalDir, workflowDir } from "../lib/paths.mjs";
 import { spawnSync } from "node:child_process";
 import { agentRepoOf, check, chybaOdsek, seenBefore } from "../hooks/own_rule_scope.mjs";
 
@@ -281,4 +282,53 @@ test("625 5: odsek zalomený v súbore na viac riadkov, repo pravidiel a cesta e
   const c = `sed -i 's/Chyba 23. 10. 2026: x//' ${join(rules, "env/server/CLAUDE.md")}`;
   assert.equal(check(bashIn("/tmp", c), direct()), null, "mazanie v repe pravidiel prejde");
   assert.match(check(bashIn("/tmp", c.replace("23. 10. 2026: x", "27. 10. 2026: q")), direct()), CHYBA_DOVOD, "pridanie v repe pravidiel ostáva zamietnuté");
+});
+
+// Tvar D0197 (úloha 681): RULES.md vedľa PERSONA.md je súbor repa agenta.
+test("681 a: RULES.md vedľa PERSONA.md v $HOME/adam je repo agenta, Edit s novým odsekom zamietne a druhý rovnaký prejde", () => {
+  const { e } = env();
+  const target = join(e.HOME, "adam/RULES.md");
+  const input = edit(target, "- a", "- a\n- Úlohu zakladám s riešiteľom, ktorý ju po dokončení blokérov zobudí a nechá stopu v histórii.", "r681");
+  const first = run(e, input);
+  assert.equal(first.permissionDecision, "deny");
+  assert.match(first.permissionDecisionReason, /iný agent alebo rola/);
+  assert.equal(run(e, input), null);
+  const chyba = run(e, edit(target, "x", "x\n\nChyba 27. 10. 2026: x", "r681b"));
+  assert.match(chyba.permissionDecisionReason, /Odsek Chyba 27\. 10\. 2026 do .*RULES\.md nejde/);
+});
+
+test("681 b: agentRepoOf pre RULES.md: bez PERSONA.md null vo všetkých vetvách, repo kódu a mozgu null aj s PERSONA.md", () => {
+  const ex = (l) => (p) => l.includes(p);
+  const o = { home: "/Users/m", exists: ex(["/root/adam/PERSONA.md", "/Users/m/Work/agent-cyril/PERSONA.md", "/Users/m/Work/agenti/cyril/PERSONA.md", "/home/tasker-svc/agenti/viktor/PERSONA.md"]), taskerUser: "tasker-svc" };
+  assert.equal(agentRepoOf("/root/adam/RULES.md", o), "/root/adam");
+  assert.equal(agentRepoOf("/root/adam/.worktrees/x/RULES.md", o), "/root/adam");
+  assert.equal(agentRepoOf("/Users/m/Work/agent-cyril/RULES.md", o), "/Users/m/Work/agent-cyril");
+  assert.equal(agentRepoOf("/Users/m/Work/agenti/cyril/RULES.md", o), "/Users/m/Work/agenti/cyril");
+  assert.equal(agentRepoOf("/home/tasker-svc/agenti/viktor/RULES.md", o), "/home/tasker-svc/agenti/viktor");
+  // bez PERSONA.md vedľa
+  assert.equal(agentRepoOf("/root/boris/RULES.md", o), null);
+  assert.equal(agentRepoOf("/Users/m/Work/agent-dana/RULES.md", o), null);
+  assert.equal(agentRepoOf("/Users/m/Work/agenti/dana/RULES.md", o), null);
+  assert.equal(agentRepoOf("/home/tasker-svc/agenti/eva/RULES.md", o), null);
+  // CLAUDE.md a PERSONA.md sa správajú ako dnes
+  assert.equal(agentRepoOf("/Users/m/Work/agent-dana/CLAUDE.md", o), "/Users/m/Work/agent-dana");
+  assert.equal(agentRepoOf("/root/boris/PERSONA.md", o), "/root/boris");
+  assert.equal(agentRepoOf("/root/boris/CLAUDE.md", o), null);
+  // repo kódu a mozgu s PERSONA.md vedľa seba
+  const all = { ...o, exists: () => true };
+  const wf = basename(workflowDir());
+  const br = basename(brainGlobalDir());
+  for (const d of [`/root/${wf}`, `/root/${br}`, `/Users/m/Work/agenti/${wf}`, `/Users/m/Work/agenti/${br}`, `/home/tasker-svc/agenti/${wf}`, workflowDir(), brainGlobalDir()]) {
+    assert.equal(agentRepoOf(`${d}/RULES.md`, all), null, d);
+  }
+});
+
+test("681 c: Bash cat >> RULES.md s odsekom Chyba <dátum> je zamietnutý, bez dátumu a čítanie prejdú", () => {
+  const o = direct();
+  assert.match(check(bash("cat >> /root/adam/RULES.md <<'EOF'\nChyba 1. 1. 2026: x\nEOF", "r1"), o) || "", CHYBA_DOVOD);
+  assert.match(check(bash("cat >> RULES.md <<'EOF'\nChyba 1. 1. 2026: x\nEOF", "r2"), o) || "", CHYBA_DOVOD);
+  assert.match(check(bash("echo 'Chyba 1. 1. 2026: x' | tee -a /root/adam/RULES.md", "r3"), o) || "", CHYBA_DOVOD);
+  assert.match(check(bash("sed -i 's|^## A|Chyba 1. 1. 2026: x\\n## A|' /root/adam/RULES.md", "r4"), o) || "", CHYBA_DOVOD);
+  assert.equal(check(bash("cat >> /root/adam/RULES.md <<'EOF'\n- pravidlo bez dátumu\nEOF", "r5"), o), null);
+  assert.equal(check(bash("grep -n 'Chyba 1. 1. 2026' /root/adam/RULES.md", "r6"), o), null);
 });
