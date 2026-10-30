@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
 # Creates the next decision file decisions/D0001-<slug>.md.
-# Usage: decide.sh "<title>"
+# Usage: decide.sh [<brain folder>] "<title>"
+# Without a folder the decision goes to the brain this script lies in (a standalone
+# copy made by adopt.sh --standalone). With a folder (the root of a repo whose
+# content is the brain, or a code repo with agentic-brain/) the file goes to
+# its decisions/, so one copy of this script serves every repo.
 set -u
 
-if [ "$#" -ne 1 ] || [ -z "${1// /}" ]; then
-  echo "Usage: decide.sh \"<title>\"" >&2
-  exit 2
-fi
+usage() { echo "Usage: decide.sh [<brain folder>] \"<title>\"" >&2; exit 2; }
 
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-BRAIN=$(cd "$SELF_DIR/.." && pwd)
+if [ "$#" -eq 2 ]; then
+  [ -d "$1" ] || { echo "decide.sh: $1 is not a folder" >&2; exit 2; }
+  BRAIN=$(cd "$1" && pwd)
+  if [ -d "$BRAIN/agentic-brain" ] && [ ! -d "$BRAIN/decisions" ]; then BRAIN="$BRAIN/agentic-brain"; fi
+  shift
+elif [ "$#" -eq 1 ]; then
+  BRAIN=$(cd "$SELF_DIR/.." && pwd)
+else
+  usage
+fi
+[ -n "${1// /}" ] || usage
 DIR="$BRAIN/decisions"
 mkdir -p "$DIR"
 

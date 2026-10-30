@@ -8,7 +8,7 @@ All agent data is in one visible folder, `agentic-brain/`.
 - `agentic-brain/skills/<name>/`: a skill, with `SKILL.md` and `scripts/`. Claude Code reads it through the symlink `.claude/skills/<name>`, which `agentic-brain/bin/check.sh` creates.
 - `agentic-brain/artifacts/<name>/`: an approved pattern of work, with `PLAYBOOK.md` and `reference/`.
 - `agentic-brain/errors/REGISTER.md`: the error register. The script `skills/error/scripts/error.sh` adds a row.
-- `agentic-brain/decisions/`: decisions, one file `D0001-<slug>.md` per decision. `decide.sh` creates new ones.
+- `agentic-brain/decisions/`: decisions, one file `D0001-<slug>.md` per decision. `decide.sh [<repo>] "<title>"` creates new ones.
 - `agentic-brain/memory/MEMORY.md`: the memory index. The content is in `memory/<file>.md`.
 - `agentic-brain/scratch/`: working files of a task. Git ignores them, and the folder is empty at the end of a task.
 - `agentic-brain/bin/`: only in a standalone copy (`adopt.sh --standalone`): the check `check.sh`, the installer `install.sh`, the rollout `adopt.sh`, `decide.sh` and the hook `repeat_guard.mjs`. Otherwise these scripts stay in the agent-runtime repo (`brain/bin/`) and serve the repo without a copy: `check.sh <repo>`.

@@ -3,7 +3,7 @@
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd -P)
 
-for t in check.test.sh install.test.sh adopt.test.sh task_end.test.sh; do
+for t in check.test.sh install.test.sh adopt.test.sh task_end.test.sh decide.test.sh; do
   echo "== $t"
   bash "$HERE/$t" || { echo "FAILED: $t" >&2; exit 1; }
 done

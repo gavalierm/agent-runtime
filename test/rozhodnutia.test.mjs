@@ -419,3 +419,29 @@ test("rozhodnutia.mjs a rozhodni.sh bez priečinka decisions/ skončia kódom 2"
     assert.match(b.stderr, /AGENT_BRAIN_GLOBAL/);
   } finally { rmSync(env.HOME, { recursive: true, force: true }); }
 });
+
+test("subor-premenuj: stará cesta v subory sa nahradí novými vo všetkých záznamoch, index sa prepíše, neznáma cesta skončí kódom 1 (úloha 669)", () => {
+  const { root, dir } = fixtura([
+    rec({ id: "D0001", subory: "hooks/a.mjs", kluc: "a.a", alias: "" }),
+    rec({ id: "D0002", subory: "hooks/b.mjs, hooks/a.mjs", kluc: "a.b", alias: "" }),
+    rec({ id: "D0003", subory: "hooks/b.mjs", kluc: "a.c", alias: "" }),
+  ]);
+  try {
+    mkdirSync(join(root, "hooks"));
+    for (const f of ["b.mjs", "n1.mjs", "n2.mjs"]) writeFileSync(join(root, "hooks", f), "// hook\n");
+    let r = cli(dir, "subor-premenuj", "--stary", "hooks/a.mjs", "--novy", "hooks/n1.mjs, hooks/n2.mjs", "--dry-run");
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(readFileSync(join(dir, "D0001.md"), "utf8"), /^subory: hooks\/a\.mjs$/m);
+    r = cli(dir, "subor-premenuj", "--stary", "hooks/a.mjs", "--novy", "hooks/n1.mjs, hooks/n2.mjs");
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout.split("\n")[0], "D0001, D0002");
+    assert.match(r.stdout, /INDEX\.md/);
+    assert.match(readFileSync(join(dir, "D0001.md"), "utf8"), /^subory: hooks\/n1\.mjs, hooks\/n2\.mjs$/m);
+    assert.match(readFileSync(join(dir, "D0002.md"), "utf8"), /^subory: hooks\/b\.mjs, hooks\/n1\.mjs, hooks\/n2\.mjs$/m);
+    assert.match(readFileSync(join(dir, "D0003.md"), "utf8"), /^subory: hooks\/b\.mjs$/m);
+    assert.equal(check(dir).length, 0);
+    r = cli(dir, "subor-premenuj", "--stary", "hooks/nie.mjs", "--novy", "hooks/n1.mjs");
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /žiadny záznam/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

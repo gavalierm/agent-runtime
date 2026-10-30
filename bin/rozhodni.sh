@@ -11,6 +11,8 @@
 #               [--alias R153] [--subory s1,s2] [--zrusene-tvrdenie REGEX] [--z-ulohy N]
 #               [--zapisal správca agentov] [--datum RRRR-MM-DD] [--dry-run]
 #   rozhodni.sh --zrus D0007 --dovod "dôvod" [--dry-run]
+#   rozhodni.sh --premenuj-subor <stará cesta> <nová cesta[, ďalšia]> [--dry-run]
+#     (súbor zo `subory` sa presunul alebo rozdelil: každý záznam dostane nové cesty, INDEX.md sa prepíše)
 # --z-ulohy N doplní --zdroj a --uloha z úlohy Taskera (ROZHODNI_TASKER, inak
 # bin/tk tohto repa), explicitné --zdroj a --uloha majú prednosť.
 # --dry-run vypíše záznam a nezapíše nič, ani git. Rovnaký kľúč ako platný
@@ -41,12 +43,14 @@ fi
 args=()
 dry=0
 zrus=0
+premenuj=0; premenuj_args=()
 zapisal=""
 z_ulohy=""; zdroj_dany=0; uloha_dana=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --dry-run) dry=1 ;;
         --zrus) zrus=1; args+=("$1" "${2:-}"); shift ;;
+        --premenuj-subor) premenuj=1; premenuj_args=(--stary "${2:-}" --novy "${3:-}"); shift 2 ;;
         --zapisal) zapisal="${2:-}"; shift ;;
         --z-ulohy) z_ulohy="${2:-}"; shift ;;
         --zdroj) zdroj_dany=1; args+=("$1" "${2:-}"); shift ;;
@@ -79,9 +83,10 @@ fi
 [ -n "$zapisal" ] && args+=(--zapisal "$zapisal")
 
 telo=""
-if [ "$zrus" = 0 ]; then telo="$(cat)"; fi
+if [ "$zrus" = 0 ] && [ "$premenuj" = 0 ]; then telo="$(cat)"; fi
 node_zapis() {
-    if [ "$zrus" = 1 ]; then node "$lib" zapis --dir "$dir" "$@"
+    if [ "$premenuj" = 1 ]; then node "$lib" subor-premenuj --dir "$dir" "${premenuj_args[@]}" "$@"
+    elif [ "$zrus" = 1 ]; then node "$lib" zapis --dir "$dir" "$@"
     else node "$lib" zapis --dir "$dir" --telo "$telo" "$@"; fi
 }
 
@@ -111,7 +116,8 @@ commit_out() {
     subory=()
     while IFS= read -r f; do [ -n "$f" ] && subory+=("decisions/$f"); done < <(sed -n '3,$p' <<<"$out")
     git_r add -- "${subory[@]}" || return 1
-    if [ "$zrus" = 1 ]; then msg="Rozhodnutie $id zrušené: $nazov"; else msg="Rozhodnutie $id: $nazov"; fi
+    if [ "$premenuj" = 1 ]; then msg="Rozhodnutia $id: súbor $nazov"
+    elif [ "$zrus" = 1 ]; then msg="Rozhodnutie $id zrušené: $nazov"; else msg="Rozhodnutie $id: $nazov"; fi
     if ! git_r -c user.name="$autor_c" commit -q -m "$msg" -- "${subory[@]}"; then
         # Hook pre-commit (check.mjs) commit odmietol: súbory sa nesmú ostať v indexe, ďalší zápis by padol na rebase.
         git_r reset -q -- "${subory[@]}"
