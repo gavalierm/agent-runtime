@@ -2,6 +2,7 @@
 # Test lib/claude_md_guard.sh v dočasnom repe (živé repo sa nedotkne):
 # 201 riadkov zlyhá, 200 prejde, odsek s chybou a dátumom v PERSONA.md zlyhá,
 # značka konfliktu zlyhá, výnimka s dôvodom prejde, čistý commit prejde.
+# RULES.md vedľa PERSONA.md: 201 riadkov a odsek s chybou zlyhá, bez PERSONA.md prejde.
 # Spustenie: bash lib/claude_md_guard.test.sh
 set -u
 
@@ -95,6 +96,40 @@ check "chyba s dátumom v inom súbore prejde" 0 git commit -q -m "poznamka" -- 
 printf 'Pravidlo bez príbehu.\n' > PERSONA.md
 git add PERSONA.md
 check "PERSONA.md bez chyby prejde" 0 git commit -q -m "persona" -- PERSONA.md
+
+# Tvar D0197 (úloha 681): RULES.md vedľa PERSONA.md má kontroly ako CLAUDE.md.
+lines 201 > RULES.md
+git add RULES.md
+check "RULES.md s 201 riadkami vedľa PERSONA.md zlyhá" 1 git commit -q -m "rules 201" -- RULES.md
+contains "hláška menuje RULES.md a počet" "RULES.md má 201 riadkov, strop je 200."
+git reset -q -- RULES.md
+
+lines 200 > RULES.md
+git add RULES.md
+check "RULES.md s 200 riadkami vedľa PERSONA.md prejde" 0 git commit -q -m "rules 200" -- RULES.md
+
+printf 'Pravidlo.\n\n%s 27. 10. 2026: x\n' "$CH" > RULES.md
+git add RULES.md
+check "odsek s chybou a dátumom v RULES.md vedľa PERSONA.md zlyhá" 1 git commit -q -m "rules chyba" -- RULES.md
+contains "hláška menuje RULES.md a riadok" "RULES.md nesie chybu s dátumom (riadok 3)"
+git reset -q -- RULES.md
+git checkout -q -- RULES.md
+
+mkdir -p projekt sub2
+echo '# Agent' > sub2/PERSONA.md
+lines 201 > projekt/RULES.md
+git add projekt/RULES.md
+check "RULES.md s 201 riadkami bez PERSONA.md prejde" 0 git commit -q -m "projekt rules 201" -- projekt/RULES.md
+
+printf 'Pravidlo.\n\n%s 27. 10. 2026: x\n' "$CH" > projekt/RULES.md
+git add projekt/RULES.md
+check "odsek s chybou v RULES.md bez PERSONA.md prejde" 0 git commit -q -m "projekt rules chyba" -- projekt/RULES.md
+
+lines 201 > sub2/RULES.md
+git add sub2/RULES.md sub2/PERSONA.md
+check "RULES.md v podpriečinku s PERSONA.md zlyhá, aj keď je PERSONA.md len v indexe" 1 git commit -q -m "sub2" -- sub2/RULES.md sub2/PERSONA.md
+git reset -q -- sub2/RULES.md sub2/PERSONA.md
+rm -rf sub2
 
 printf 'a\n<<<<<<< HEAD\nb\n=======\nc\n>>>>>>> vetva\n' > konflikt.md
 git add konflikt.md
