@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, copyFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -354,4 +354,44 @@ test("programy z klonu kódu a mozgu podľa AGENT_WORKFLOW a AGENT_BRAIN_GLOBAL 
   assert.ok(prefixes.includes("/srv/mozog-x/"));
   assert.ok(prefixes.includes("/opt/tasker/"));
   assert.ok(!prefixes.includes("/opt/agentic-workflow/"));
+});
+
+// Úloha 679: `check.sh: N errors` je výsledok kontroly ako check.mjs alebo test, nie zlyhanie nástroja.
+const CHECK = "bash /opt/agentic-workflow/brain/bin/check.sh /tmp/x";
+
+test("679: kontrola brain/bin/check.sh s kódom 1 a riadkom `check.sh: N errors` nie je zlyhanie nástroja", () => {
+  const out = "Exit code 1\nERROR memory/a.md: dead link to b\ncheck.sh: 1 errors";
+  assert.equal(unreported([user("x"), ...fail(CHECK, out)]), null);
+  assert.equal(unreported([user("x"), ...fail(CHECK, "Exit code 1\ncheck.sh: 1 error")]), null);
+  assert.equal(unreported([user("x"), ...fail("/opt/agentic-workflow/bin/other.sh", "Exit code 1\nERROR a: b\ncheck.sh: 3 errors\n")]), null);
+  assert.equal(unreported([user("x"), ...fail("cd /opt/agentic-workflow && brain/bin/check.sh /tmp/x", "Exit code 1\ncheck.sh: 12 errors")]), null);
+});
+
+test("679: skutočná porucha check.sh (kód 2, chýbajúci súbor) ostáva zlyhaním", () => {
+  const f = unreported([user("x"), ...fail(CHECK, "Exit code 2\ncheck.sh: target /tmp/x is not a folder")]);
+  assert.equal(f?.code, "2");
+  assert.match(f.tool, /check\.sh$/);
+  assert.ok(unreported([user("x"), ...fail(CHECK, "Exit code 127\nbash: /opt/agentic-workflow/brain/bin/check.sh: No such file or directory")]));
+  assert.ok(unreported([user("x"), ...fail("/opt/agentic-workflow/bin/other.sh", "Exit code 1\ncheck.sh: 1 errors zlyhal\nother.sh: chyba")]));
+});
+
+test("replay 679: skutočný check.sh nad repom s mŕtvym odkazom skončí kódom 1 a hook mlčí", () => {
+  const repo = mkdtempSync(join(tmpdir(), "tfr-check-"));
+  try {
+    const root = join(dirname(HOOK), "..", "brain");
+    mkdirSync(join(repo, "errors"));
+    mkdirSync(join(repo, "memory"));
+    writeFileSync(join(repo, "RULES.md"), "# r\n");
+    copyFileSync(join(root, "errors", "REGISTER.md"), join(repo, "errors", "REGISTER.md"));
+    writeFileSync(join(repo, "memory", "MEMORY.md"), "- [b](b.md) x\n");
+    const r = spawnSync("bash", [join(root, "bin", "check.sh"), repo], { encoding: "utf8", env: { ...process.env, AGENTIC_BRAIN_GLOBAL: "", AGENT_BRAIN_GLOBAL: "" } });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    const out = `Exit code 1\n${r.stdout}${r.stderr}`;
+    assert.match(out, /dead link to b\.md/);
+    assert.equal(hook([user("x"), ...fail(`bash /opt/agentic-workflow/brain/bin/check.sh ${repo}`, out)]), null);
+    // iný nástroj s kódom 1 a bez riadka `check.sh: N errors` ostáva zlyhaním
+    assert.equal(hook([user("x"), ...fail(`/opt/agentic-workflow/bin/other.sh ${repo}`, "Exit code 1\nother.sh: zlyhal")]).decision, "block");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 });

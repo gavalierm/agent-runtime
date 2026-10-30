@@ -34,7 +34,10 @@
 // volajúceho: tk, reply.sh, deny.sh; úloha 608), kód interpretov, ktoré nie sú shell
 // (`python3 -c "..."`, `node -e "..."`, `perl -e`, `ruby -e`): jeho text sa nedelí na
 // príkazy, inak `sys.stdin` po `cd` do spoločného priečinka vyzeral ako skript
-// (úloha 608), testy (`--test`, `*.test.*`, `check.mjs`), čítanie súborov (`cat`, `grep`,
+// (úloha 608), testy (`--test`, `*.test.*`, `check.mjs`, výsledok kontroly
+// `brain/bin/check.sh`: výstup s posledným riadkom `check.sh: N errors` alebo
+// kód 1 programu `brain/bin/check.sh`; kód 2 a ďalšie, napríklad "target ... is not a
+// folder", ostáva zlyhaním skriptu, úloha 679), čítanie súborov (`cat`, `grep`,
 // `ls`, `git -C` nie sú spustený nástroj), hľadanie a syntax (`command -v`,
 // `bash -n`, `node --check`) a signál TERM/KILL (kód 137, 143, 144) v príkaze
 // s `kill`, `pkill` alebo `killall`: príkaz zabil sám seba alebo svoj shell
@@ -61,6 +64,14 @@ const WRAPPERS = new Set([
   "bash", "sh", "dash", "zsh", "node", "python", "python3", "xvfb-run", "setsid", "stdbuf", "!", "{", "if", "then", "else", "do",
 ]);
 const NOT_A_TOOL = new Set(["tk", "tasker"]);
+// Výsledok kontroly, nie porucha nástroja (úloha 679): `check.sh: N errors` je posledný riadok
+// výstupu brain/bin/check.sh, kód 1 znamená "kontrola našla chybu" ako pri check.mjs alebo teste.
+const CHECK_RESULT = /^check\.sh: \d+ errors?$/;
+const CHECK_SH = /(^|\/)brain\/bin\/check\.sh$/;
+export function isCheckResult(output, code, tool) {
+  const last = String(output).split("\n").map((l) => l.trim()).filter(Boolean).pop() || "";
+  return CHECK_RESULT.test(last) || (Number(code) === 1 && CHECK_SH.test(tool || ""));
+}
 const TESTISH = /\.test\.|(^|\/)tests?(\/|$)|(^|\/)test[_-][^/]*$|(^|\/)check\.mjs$/;
 
 function tokens(seg) {
@@ -256,7 +267,7 @@ export function unreported(entries, { sidechain = false } = {}) {
           const code = m ? Number(m[1]) : 0;
           const callerError = /^\s*Správny postup:/m.test(out);
           const tool = code > 0 && !callerError && !(SIGNAL_CODES.has(code) && killsProcesses(cmd)) ? sharedTool(cmd, out) : null;
-          if (tool) fail = { ...tool, pos, code: m[1], command: cmd, output: out.split("\n").slice(1).filter((l) => l.trim()).pop() || "" };
+          if (tool && !isCheckResult(out, code, tool.tool)) fail = { ...tool, pos, code: m[1], command: cmd, output: out.split("\n").slice(1).filter((l) => l.trim()).pop() || "" };
         } else if (isReport(cmd)) {
           report = pos;
         }
