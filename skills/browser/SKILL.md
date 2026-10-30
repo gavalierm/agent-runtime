@@ -42,7 +42,7 @@ Voľby:
   alebo prekryté. Nálezy zapíše do `gaps-<šírka>.txt`, vypíše ich a skončí
   kódom 1.
 - `--steps` sú kroky pred snímkou, súbor JSON alebo pole priamo v príkaze.
-- `--out` je priečinok výstupu, predvolený je `$AGENT_WORKDIR/.scratch/browser/<čas>`.
+- `--out` je priečinok výstupu, predvolený je `$AGENT_WORKDIR/scratch/browser/<čas>`.
 
 ## Kroky
 
@@ -91,4 +91,4 @@ Kód 0 je v poriadku, 1 chyba alebo zlyhaný krok, 2 zlé použitie.
 - Skript spúšťaj pod rootom, inak odmietne.
 - Z `http://127.0.0.1:8801/` len čítaš. Klik na odosielacie tlačidlo
   v živom správcovi úloh (nová úloha) zapíše údaje, tam ho nespúšťaj.
-- Snímky z `.scratch` nie sú v gite. Súbor pre operátora ulož do `docs/`.
+- Snímky z `scratch/` nie sú v gite. Súbor pre operátora ulož do `docs/`.

@@ -771,7 +771,7 @@ beh) a s vlastným skriptom, ktorý otvorí prehliadač cez `browser/session.mjs
 (`openProfile`). Prostredie roota používateľ nedostane, premenné sa odovzdajú len
 cez `--env NAME`. Skúšky sú v `test/browser.test.mjs`.
 
-Predvolený `--out` je `.scratch/browser/<čas>`, skript vypíše cesty
+Predvolený `--out` je `scratch/browser/<čas>`, skript vypíše cesty
 k súborom: `page-<šírka>.png`, `text-<šírka>.txt`, `console.txt`. Kroky
 (`click`, `fill`, `press`, `wait`, `shot`) sú v hlavičke
 `browser/browser.mjs`. Balík `playwright-core` (presná verzia

@@ -15,7 +15,7 @@
 # nález zapíše do gaps-<šírka>.txt, vypíše ho a skončí kódom 1.
 # --file skopíruje aj priečinok súboru (relatívne odkazy), nesmie mať nad
 # 50 MB. Kroky a výstupné súbory opisuje browser/browser.mjs. Predvolený
-# --out je $AGENT_WORKDIR/.scratch/browser/<čas> (bez AGENT_WORKDIR aktuálny priečinok). Vypíše cesty k vzniknutým
+# --out je $AGENT_WORKDIR/scratch/browser/<čas> (bez AGENT_WORKDIR aktuálny priečinok). Vypíše cesty k vzniknutým
 # súborom, kód 0 v poriadku, 1 chyba alebo zlyhaný krok, 2 zlé použitie.
 # Balík playwright-core sa nainštaluje do ~<používateľ>/.cache/agent-browser
 # (npm ci), znova len keď sa zmení hash browser/package-lock.json. Pod
@@ -114,7 +114,7 @@ else
   [ -z "$file" ] || [ -f "$file" ] || die "súbor $file neexistuje" 2
   [ "${#mjs_args[@]}" -gt 0 ] || [ -n "$file" ] || die "chýba --url alebo --file" 2
 fi
-OUT="${OUT:-${AGENT_WORKDIR:-$PWD}/.scratch/browser/$(date +%Y%m%d-%H%M%S)}"
+OUT="${OUT:-${AGENT_WORKDIR:-$PWD}/scratch/browser/$(date +%Y%m%d-%H%M%S)}"
 
 # env -i: prostredie roota (tokeny, cesty) sa nesmie dostať k používateľovi.
 # Pod nerootom beží príkaz priamo pod volajúcim (bez runuser), prostredie je rovnaké.

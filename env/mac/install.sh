@@ -26,7 +26,7 @@
 #   pluginové skilly             disable-model-invocation: true v cache pluginov,
 #                                pluginom z MODEL_PLUGINS ho odoberie
 #
-# Čo nahrádza, zálohuje do $AR_BACKUPS (predvolene .scratch/backups v klone
+# Čo nahrádza, zálohuje do $AR_BACKUPS (predvolene scratch/backups v klone
 # kódu, mimo gitu). Na konci spustí check.mjs (AR_NO_CHECK=1 ho vynechá, test).
 # Premenné AR_BACKUPS a AR_NO_CHECK používa test env/mac/install.test.sh,
 # ostatné cesty idú z HOME a AGENT_BRAIN_GLOBAL.
@@ -36,7 +36,7 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=../../lib/paths.sh
 . "$REPO/lib/paths.sh"
 BRAIN="$(brain_global_dir)"
-BACKUPS="${AR_BACKUPS:-$REPO/.scratch/backups}"
+BACKUPS="${AR_BACKUPS:-$REPO/scratch/backups}"
 TS="$(date +%Y%m%d_%H%M%S)"
 CLAUDE="$HOME/.claude"
 

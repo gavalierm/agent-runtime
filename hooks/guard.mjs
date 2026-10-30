@@ -13,8 +13,8 @@
 //                         PERSONA.md, AGENTS.md, .claude/
 //   ~/Work/agenti/<meno>  repo okrem persony, projekty       ask, aj persona
 //                         z permissions.additionalDirectories
-//   ~/Work/agenti         ~/Work/agenti/.scratch             ask
-//   ~/Work                ~/Work/.scratch                    ask
+//   ~/Work/agenti         ~/Work/agenti/.scratch, scratch    ask
+//   ~/Work                ~/Work/.scratch, scratch           ask
 //   mimo ~/Work           pod cwd                            ask
 //
 // Hook nikdy nevracia deny. Každý zápis mimo voľného územia ide operátorovi
@@ -357,9 +357,9 @@ function decide(p) {
       if (inside(p, cwd)) return "allow";
       return projects().some((d) => inside(p, d)) ? "allow" : "ask";
     case "agenti":
-      return inside(p, resolve(AGENTI, ".scratch")) ? "allow" : "ask";
+      return inside(p, resolve(AGENTI, ".scratch")) || inside(p, resolve(AGENTI, "scratch")) ? "allow" : "ask";
     case "root":
-      return inside(p, resolve(WORK, ".scratch")) ? "allow" : "ask";
+      return inside(p, resolve(WORK, ".scratch")) || inside(p, resolve(WORK, "scratch")) ? "allow" : "ask";
     default:
       return inside(p, cwd) ? "allow" : "ask";
   }
@@ -386,7 +386,7 @@ const reason = agenti
   ? `Relácia v ~/Work/agenti nie je relácia repa kódu a nemá zábranu jednej relácie. Agent beží vo svojom repe ~/Work/agenti/<meno>. Zápis ${tilde(culprit)} potrebuje súhlas operátora.`
   : persona
   ? `${tilde(culprit)} je persona agenta. Mení ju správca agenta, opravu vlastnej chyby agent sám, so súhlasom operátora.`
-  : `${tilde(culprit)} je mimo územia ${where}, zápis potrebuje súhlas operátora. Dočasné súbory patria do <cwd>/.scratch/.`;
+  : `${tilde(culprit)} je mimo územia ${where}, zápis potrebuje súhlas operátora. Dočasné súbory patria do <cwd>/scratch/ alebo .scratch/.`;
 
 process.stdout.write(
   JSON.stringify({
