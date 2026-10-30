@@ -79,7 +79,6 @@ test("git commit --no-verify a -n zamietne", () => {
 test("bežný commit, text a iné voľby pustí", () => {
   for (const c of [
     'git commit -m "x" -- f',
-    "git commit -am x",
     "git commit --amend --no-edit",
     "git commit -m x --author='A <a@b>'",
     "git commit -uno -m x",
@@ -152,10 +151,9 @@ test("git add konkrétneho súboru a text o git add -A pustí", () => {
     "git add -f f.txt",
     "git add -N f.txt",
     "git add -p f.txt",
-    "git add -u hooks/x.mjs",
     "git add .gitignore",
     "git add ./f.txt",
-    "git add ..",
+    "git add ../f.txt",
     "git add --chmod=+x bin/x.sh",
     "git add --pathspec-from-file list.txt",
     "git -C /root/x add f.txt",
@@ -163,7 +161,6 @@ test("git add konkrétneho súboru a text o git add -A pustí", () => {
     "git -c user.name=x add f.txt",
     "git add -n f.txt",
     "git commit -m x -- f",
-    "git commit -am x",
     "git status -A",
     "git log --all",
     "git log -A",
@@ -202,4 +199,53 @@ test("addAll je dostupný pre topic.mjs (Mac)", async () => {
   assert.equal(addAll("git add ."), ".");
   assert.equal(addAll("git add f.txt"), null);
   assert.equal(addAll('git commit -m "git add -A"'), null);
+});
+
+test("addAll: git commit -a, -am, --all (úloha 694, kolo 2)", async () => {
+  const { addAll } = await import("./shared_git.mjs");
+  for (const c of ["git commit -a -m x", "git commit -am x", "git commit --all -m x", "git commit -vam x", "git -C /x commit -a", "cd x && git commit -a -m x"])
+    assert.equal(addAll(c), "commit -a", c);
+  for (const c of ["git commit -m x -- súbor", "git commit --amend", "git commit --amend --no-edit", "git commit -S -m x",
+    'git commit -m "git commit -a"', "git commit -m x -- -a", "git commit -m a", "git commit -F a -m x", "git commit -S -m x -- f"])
+    assert.equal(addAll(c), null, c);
+  assert.equal(addAll("git commit -S -a"), "commit -a");
+});
+
+test("addAll: git add -u, --update (úloha 694, kolo 2)", async () => {
+  const { addAll } = await import("./shared_git.mjs");
+  for (const c of ["git add -u", "git add --update", "git add -fu", "git add -vu", "git -C /x add -u"]) assert.equal(addAll(c), "-u", c);
+  assert.equal(addAll("git add -uA"), "-A");
+});
+
+test("addAll: pathspec :/, :(top), *, .., ../ (úloha 694, kolo 2)", async () => {
+  const { addAll } = await import("./shared_git.mjs");
+  assert.equal(addAll("git add :/"), ":/");
+  assert.equal(addAll('git add ":/"'), ":/");
+  assert.equal(addAll('git add ":(top)"'), ":(top)");
+  assert.equal(addAll("git add ':(top)'"), ":(top)");
+  assert.equal(addAll("git add *"), "*");
+  assert.equal(addAll('git add "*"'), "*");
+  assert.equal(addAll("git add .."), "..");
+  assert.equal(addAll("git add ../"), "../");
+  assert.equal(addAll("git add ../.."), "../..");
+  assert.equal(addAll("git add ../../"), "../../");
+  assert.equal(addAll("git add ./"), ".");
+});
+
+test("addAll: git stage je alias git add (úloha 694, kolo 2)", async () => {
+  const { addAll } = await import("./shared_git.mjs");
+  assert.equal(addAll("git stage ."), ".");
+  assert.equal(addAll("git stage -A"), "-A");
+  assert.equal(addAll("git stage -u"), "-u");
+  assert.equal(addAll("git stage f.txt"), null);
+});
+
+test("addAll: dovolené tvary prejdú (úloha 694, kolo 2)", async () => {
+  const { addAll } = await import("./shared_git.mjs");
+  for (const c of ["git add memory/a.md", 'git add "a b.txt"', "git add .gitignore", "git add .claude/x", "git add ./memory/a.md",
+    "git add -p", "git add -p a", "git add -N a", "git add --chmod=+x a.sh", "git add --chmod +x a.sh", "git add *.md", "git add ../x.txt",
+    "git add :/memory/a.md", "git add ':(top)memory/a.md'", "git add ':(glob)*.md'", "git add a b && git commit -m x",
+    "echo 'git add -A'", "echo 'git commit -a -m x'", "grep -n 'git add -A' README.md", "cat <<E\ngit add -A\ngit commit -a\nE",
+    'git commit -m "git add -u" -- f', "git status --short", "git ls-files -mo | xargs git add"])
+    assert.equal(addAll(c), null, c);
 });

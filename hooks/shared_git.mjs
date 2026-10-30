@@ -8,7 +8,7 @@
 //
 // Od úlohy 621 aj príkazy, ktoré vypnú hooky repa: `git -c core.hooksPath=...`
 // a `--no-verify` (na `git commit` aj `-n`). Pozri `hooksBypass` nižšie.
-// Od úlohy 694 aj plošné `git add -A`, `--all` a `.` (global §6). Pozri `addAll`.
+// Od úlohy 694 aj plošné `git add -A`, `--all`, `-u`, `.`, `git stage` a `git commit -a` (global §6). Pozri `addAll`.
 import { stripHeredocs } from "./no_model_wait.mjs";
 import { cmdStart, stripProse } from "./foreign_git.mjs";
 
@@ -40,15 +40,17 @@ const COMMIT_VAL_SHORT = "mFCcSut";
 const COMMIT_VAL_LONG = new Set(["--message", "--file", "--author", "--date", "--reuse-message", "--reedit-message", "--template", "--cleanup", "--fixup", "--squash"]);
 const unq = (t) => String(t ?? "").replace(/^['"]+|['"]+$/g, "");
 
-// Zhluk krátkych volieb `git commit` (`-anm`) nesie `n` skôr, než voľba s hodnotou.
-function commitShortHasN(t) {
+// Zhluk krátkych volieb `git commit` (`-anm`) nesie písmeno `ch` skôr, než voľba s hodnotou.
+function commitShortHas(t, ch) {
   if (!/^-[A-Za-z]+$/.test(t)) return false;
   for (const c of t.slice(1)) {
-    if (c === "n") return true;
+    if (c === ch) return true;
     if (COMMIT_VAL_SHORT.includes(c)) return false;
   }
   return false;
 }
+const commitShortHasN = (t) => commitShortHas(t, "n");
+const commitShortHasA = (t) => commitShortHas(t, "a");
 
 // Úseky príkazu, v ktorých sa priamo spúšťa git: `tokens` úseku a index `gi` príkazu git.
 // Text v heredoci a v úvodzovkách sa vynechá, `sh -c '...'` sa rozbalí.
@@ -57,7 +59,8 @@ function* gitCalls(raw) {
   const flat = stripProse(norm)
     .replace(/\b(?:ba|da|z)?sh\s+(?:-\S+\s+)*?-\w*c\s+['"]/g, "")
     .replace(/\b(?:su|runuser)\s+(?:-\S+\s+)*\S+\s+-c\s+['"]/g, "");
-  for (const seg of flat.split(/[;&|\n`()]+/)) {
+  // `:(top)` v pathspecu nesmie rozdeliť úsek na zátvorkách.
+  for (const seg of flat.replace(/:\(([\w,-]+)\)/g, ":<$1>").split(/[;&|\n`()]+/)) {
     const tokens = seg.trim().split(/\s+/).filter(Boolean);
     let gi;
     if (AS_USER.test(seg)) gi = tokens.findIndex((t) => IS_GIT.test(t));
@@ -108,37 +111,57 @@ export const HOOKS_BYPASS_POSTUP =
   "`git commit -m \"<správa>\" -- <zoznam vlastných súborov>` bez `-c core.hooksPath` a bez `--no-verify`.";
 
 // --- plošné `git add` (úloha 694) -------------------------------------------
-// Global §6 zakazuje `git add -A`, `git add --all` a `git add .`: do indexu
+// Global §6 zakazuje `git add -A`, `--all`, `-u`, `.` a `git commit -a`: do indexu
 // pribudnú aj súbory inej relácie a tajomstvá. 30. 10. 2026 prešiel `git add -A`
 // v klone bez zásahu hooku. `git add <konkrétny súbor>` prejde. Rozbor príkazu
 // je ten z hooksBypass (gitCalls), text v heredoci a v úvodzovkách hook pustí.
 // Voľby `git add` s hodnotou v ďalšom argumente (tvar `--voľba=hodnota` ju nespotrebuje).
 const ADD_OPT_VAL = new Set(["--pathspec-from-file", "--chmod"]);
 
-// Vráti "-A", "--all" alebo "." podľa toho, čo príkaz `git add` zbiera plošne, inak null.
+// Pathspec, ktorý zoberie celý strom alebo jeho nadradený priečinok: `:/`, `:(top)`, `*`, `..`, `../..`.
+const ADD_WIDE_PATH = /^(?::\/*|:<top>\/*|\*|(?:\.\.\/*)+)$/;
+
+// Vráti dôvod ("-A", "--all", "-u", ".", pathspec, "commit -a"), keď príkaz zbiera zmeny plošne, inak null.
+// `git stage` je alias `git add`. `git commit -a` / `--all` pridá všetky sledované zmeny bez výberu súborov.
 export function addAll(raw) {
   for (const { tokens, gi } of gitCalls(raw)) {
     let i = gi + 1;
     while (i < tokens.length && tokens[i].startsWith("-")) i += GIT_OPT_VAL.has(tokens[i]) ? 2 : 1;
-    if (unq(tokens[i]) !== "add") continue;
+    const sub = unq(tokens[i]);
+    if (sub === "commit") {
+      for (let k = i + 1; k < tokens.length; k++) {
+        const t = unq(tokens[k]);
+        if (t === "--") break;
+        if (t === "--all" || commitShortHasA(t)) return "commit -a";
+        // -S a -u berú hodnotu len v tom istom tokene, ďalší argument nespotrebujú.
+        if (COMMIT_VAL_LONG.has(t) || (/^-[A-Za-z]+$/.test(t) && "mFCct".includes(t[t.length - 1]))) k++;
+      }
+      continue;
+    }
+    if (sub !== "add" && sub !== "stage") continue;
     let paths = false;
     for (let k = i + 1; k < tokens.length; k++) {
       const t = unq(tokens[k]);
       if (!paths && t === "--") paths = true;
       else if (!paths && t.startsWith("-")) {
         if (t === "--all") return "--all";
-        if (/^-[A-Za-z]+$/.test(t) && t.includes("A")) return "-A";
+        if (t === "--update") return "-u";
+        if (/^-[A-Za-z]+$/.test(t)) {
+          if (t.includes("A")) return "-A";
+          if (t.includes("u")) return "-u";
+        }
         if (ADD_OPT_VAL.has(t)) k++;
       } else if (/^\.\/*$/.test(t)) return ".";
+      else if (ADD_WIDE_PATH.test(t)) return t.replace(/<(.*)>/, "($1)");
     }
   }
   return null;
 }
 
 export const ADD_ALL_MESSAGE =
-  "`git add -A`, `git add --all` a `git add .` zoberú do indexu aj rozpracované súbory inej relácie a súbory, " +
-  "ktoré nepatria do commitu (global §6, env/server/CLAUDE.md, Git na serveri). Pridaj len vlastné súbory.";
+  "`git add -A`, `--all`, `-u`, `.`, `*`, `:/`, `..`, `git stage` s týmito voľbami a `git commit -a` zoberú do commitu aj rozpracované súbory " +
+  "inej relácie a súbory, ktoré nepatria do commitu (global §6, env/server/CLAUDE.md, Git na serveri). Pridaj len vlastné súbory.";
 
 export const ADD_ALL_POSTUP =
   "commitni zoznam vlastných súborov: `git commit -m \"<správa>\" -- <zoznam vlastných súborov>`; " +
-  "nový súbor najprv `git add <cesta k súboru>`, bez `-A`, `--all` a `.` (global §6).";
+  "nový súbor najprv `git add <cesta k súboru>`, bez `-A`, `--all`, `-u`, `.`, `git commit -a` (global §6).";
