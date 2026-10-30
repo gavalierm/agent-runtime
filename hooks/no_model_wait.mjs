@@ -14,16 +14,16 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { denyTool } from "../lib/deny.mjs";
+import { stripHeredocs } from "../brain/bin/repeat_guard.mjs";
+
+// Telo heredocu sú dáta príkazu, nie čakanie shellu (chyba 19. 10. 2026:
+// správa s ukážkou príkazu `sleep` bola zamietnutá). Jediná definícia je v
+// brain/bin/repeat_guard.mjs, lebo samostatná kópia mozgu nemá lib/; ostatné
+// hooky ju berú odtiaľto.
+export { stripHeredocs };
 
 const MAX_SLEEP = 10;
 const UNIT = { "": 1, s: 1, m: 60, h: 3600, d: 86400 };
-
-// Telo heredocu sú dáta príkazu (text správy, skript pre python), nie
-// čakanie shellu. Chyba 19. 10. 2026: správa s ukážkou príkazu `sleep`
-// bola zamietnutá.
-export function stripHeredocs(command) {
-  return command.replace(/<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2\s*(?=\n|$)/g, "<<heredoc");
-}
 
 // Reťazec v úvodzovkách je dáta (argument echo, --body), nie čakanie
 // shellu. Ostane reťazec, ktorý shell spustí: za `-c`, `eval`, `ssh

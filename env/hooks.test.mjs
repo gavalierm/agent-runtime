@@ -134,13 +134,32 @@ test("skupiny: Bash hooky rootu sú v jednej skupine, tasker_work s iným timeou
 test("repeat_guard: cesta od koreňa klonu, raz v skupine Bash pre main, runs aj mac, agent ho nemá", () => {
   const want = { main: "node /w/brain/bin/repeat_guard.mjs", runs: "node /w/brain/bin/repeat_guard.mjs", mac: 'node "$HOME/w/brain/bin/repeat_guard.mjs"' };
   for (const [k, cmd] of Object.entries(want)) {
-    const h = hooksFor(k, k === "mac" ? "/Users/x/w/hooks" : HOOKS, k === "mac" ? "/Users/x/w" : WF, { home: "/Users/x" });
+    const h = hooksFor(k, k === "mac" ? "/Users/x/w/hooks" : HOOKS, k === "mac" ? "/Users/x/w" : WF, { home: "/Users/x", brain: "/b" });
     const all = Object.values(h).flatMap((gs) => gs.flatMap((g) => g.hooks.map((x) => x.command)));
     assert.equal(all.filter((c) => c.includes("repeat_guard.mjs")).length, 1, k);
-    assert.ok(all.includes(cmd), k);
+    assert.ok(all.includes(`${cmd} --allow /b/env/${k === "mac" ? "mac" : "server"}/repeat_guard.allow`), k);
     assert.ok(h.PreToolUse.find((g) => g.matcher === "Bash").hooks.some((x) => x.command.includes("repeat_guard.mjs")), `${k}: v skupine Bash`);
   }
   assert.ok(!JSON.stringify(hooksFor("agent", HOOKS, WF)).includes("repeat_guard"));
+});
+
+test("repeat_guard: --allow z mozgu, server pre main a runs, mac pre mac, cesta pod domovom Macu s $HOME", () => {
+  const guard = (k, opts) => hooksFor(k, "/w/hooks", "/w", opts).PreToolUse.find((g) => g.matcher === "Bash").hooks.map((x) => x.command).find((c) => c.includes("repeat_guard.mjs"));
+  assert.equal(guard("main", { brain: "/b" }), "node /w/brain/bin/repeat_guard.mjs --allow /b/env/server/repeat_guard.allow");
+  assert.equal(guard("runs", { brain: "/b" }), "node /w/brain/bin/repeat_guard.mjs --allow /b/env/server/repeat_guard.allow");
+  assert.equal(guard("mac", { brain: "/Users/x/Work/b", home: "/Users/x" }), 'node /w/brain/bin/repeat_guard.mjs --allow "$HOME/Work/b/env/mac/repeat_guard.allow"');
+  assert.equal(guard("mac", { brain: "/opt/b", home: "/Users/x" }), "node /w/brain/bin/repeat_guard.mjs --allow /opt/b/env/mac/repeat_guard.allow");
+});
+
+test("repeat_guard: bez opts je mozog z AGENT_BRAIN_GLOBAL", () => {
+  const old = process.env.AGENT_BRAIN_GLOBAL;
+  process.env.AGENT_BRAIN_GLOBAL = "/mozog";
+  try {
+    const c = hooksFor("main", HOOKS, WF).PreToolUse[0].hooks.map((x) => x.command).find((x) => x.includes("repeat_guard.mjs"));
+    assert.equal(c, "node /w/brain/bin/repeat_guard.mjs --allow /mozog/env/server/repeat_guard.allow");
+  } finally {
+    if (old === undefined) delete process.env.AGENT_BRAIN_GLOBAL; else process.env.AGENT_BRAIN_GLOBAL = old;
+  }
 });
 
 test("Mac: cesta pod domovom je v úvodzovkách s $HOME, check.mjs ide z koreňa klonu s --quiet", () => {

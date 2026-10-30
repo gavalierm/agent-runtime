@@ -606,7 +606,7 @@ text pre model ho berie z `AGENT_OPERATOR_NAME` (bez neho slovo "operátor").
 | `todo_after_comment.mjs` | Stop | úloha agenta s jeho komentárom nesmie ostať v poradí |
 | `done_related.mjs` | Stop | po zavretí úlohy nesmie v jej projekte ostať otázka `needs_human` toho istého riešiteľa bez jeho komentára v ťahu (zruš s dôvodom, alebo napíš, prečo platí; úloha 609 po audite 612, 27. 10. 2026) |
 | `idle_wake.mjs`, `topic_task.mjs` | Stop, PostToolUse | zbytočné zobudenie a úloha vo vlákne témy (časti vyššie) |
-| `brain/bin/repeat_guard.mjs` | PreToolUse Bash | zamietne tretí ručný beh toho istého programu s inými argumentmi v jednej relácii (výnimky `brain/bin/repeat_guard.allow`); jediný hook mimo `hooks/`, v tabuľke `env/hooks.mjs` je cesta od koreňa klonu a beží pre `main`, `runs` aj `mac` (úloha 684) |
+| `brain/bin/repeat_guard.mjs` | PreToolUse Bash | zamietne tretí ručný beh toho istého programu s inými argumentmi v jednej relácii (výnimky `brain/bin/repeat_guard.allow`, k nim `--allow <súbor>` z tabuľky pridá `env/<stroj>/repeat_guard.allow` mozgu s nástrojmi prevádzky, chýbajúci súbor sa preskočí; telo heredocu sa nepočíta); jediný hook mimo `hooks/`, v tabuľke `env/hooks.mjs` je cesta od koreňa klonu a beží pre `main`, `runs` aj `mac` (úloha 684) |
 
 Zapojenie: `node <klon kódu>/hooks/<hook>.mjs` v `settings.json`. Hooky, ich
 udalosti, matchery, časové limity a to, kde bežia (`main` interaktívne relácie na serveri,

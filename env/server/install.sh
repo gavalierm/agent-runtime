@@ -38,6 +38,8 @@ WORKFLOW="$(cd "$HERE/../.." && pwd)"
 # shellcheck source=../../lib/paths.sh
 . "$WORKFLOW/lib/paths.sh"
 BRAIN="$(brain_global_dir)"
+# hooks.mjs berie cestu mozgu pre --allow hooku repeat_guard z tejto premennej
+export AGENT_BRAIN_GLOBAL="$BRAIN"
 CONFIG="$BRAIN/env/server/config.env"
 
 RUNS_USER="" GIT_EMAIL="" ENV_ROOT="" LEGACY_PATHS="" LEGACY_UNITS=""

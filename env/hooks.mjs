@@ -11,7 +11,8 @@
 // kde beží. Meno súboru bez lomky je v hooks/. Cesta s lomkou, napríklad
 // brain/bin/repeat_guard.mjs, je od koreňa klonu a nemá hlavičku requires, lebo
 // ten istý súbor ide aj do samostatnej kópie mozgu; kontrola overí len jeho
-// existenciu. Druhy:
+// existenciu. V args je {brain} cesta spoločného mozgu (AGENT_BRAIN_GLOBAL) a
+// {machine} je server pre main a runs, mac pre mac. Druhy:
 //   main   interaktívne relácie na serveri (root)
 //   runs   behy správcu úloh pod používateľom behov
 //   mac    interaktívne relácie na Macu
@@ -26,6 +27,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { brainGlobalDir } from "../lib/paths.mjs";
 
 export const KINDS = ["main", "runs", "mac", "agent"];
 export const REQUIRES = ["none", "tasker", "t3", "inbox", "mac"];
@@ -69,7 +71,7 @@ export const TABLE = [
   R("sed_line.mjs", "PreToolUse", "Bash", null, ["none"], ["main", "runs", "mac"]),
   R("secret_read.mjs", "PreToolUse", "Bash", null, ["none"], ["main", "runs", "mac"]),
   R("agreement_send.mjs", "PreToolUse", "Bash", null, ["inbox"], ["main", "mac"]),
-  R("brain/bin/repeat_guard.mjs", "PreToolUse", "Bash", null, ["none"], ["main", "runs", "mac"]),
+  R("brain/bin/repeat_guard.mjs", "PreToolUse", "Bash", null, ["none"], ["main", "runs", "mac"], "--allow {brain}/env/{machine}/repeat_guard.allow"),
   R("project_data.mjs", "PreToolUse", "Bash", null, ["mac"], ["agent"]),
   R("server_work.mjs", "PreToolUse", "Bash", null, ["mac"], ["agent"]),
   R("deploy_readonly.mjs", "PreToolUse", BASH_EDIT, null, ["none"], ["main", "runs"]),
@@ -113,22 +115,29 @@ const fromRoot = (file) => file === "check.mjs" || file.includes("/");
 export const rowsFor = (kind) => TABLE.filter((r) => r.where.includes(kind));
 
 // Príkaz hooku. Na Macu s cestou pod domovom `node "$HOME/..."`, inde holá cesta.
-function command(row, kind, hooksDir, workflowDir, home) {
+function pathArg(p, kind, home) {
+  if (kind === "mac" && home && (p === home || p.startsWith(home + "/"))) return `"$HOME${p.slice(home.length)}"`;
+  return /\s/.test(p) ? `"${p}"` : p;
+}
+
+function command(row, kind, hooksDir, workflowDir, home, brain) {
   const script = fromRoot(row.file) ? join(workflowDir, row.file) : join(hooksDir, row.file);
-  let p = script;
-  if (kind === "mac" && home && (p === home || p.startsWith(home + "/"))) p = `"$HOME${p.slice(home.length)}"`;
-  else if (/\s/.test(p)) p = `"${p}"`;
-  return `node ${p}${row.args ? " " + row.args : ""}`;
+  const machine = kind === "mac" ? "mac" : "server";
+  const args = row.args
+    .split(" ")
+    .map((w) => (/\{(brain|machine)\}/.test(w) ? pathArg(w.replaceAll("{brain}", brain).replaceAll("{machine}", machine), kind, home) : w))
+    .join(" ");
+  return `node ${pathArg(script, kind, home)}${args ? " " + args : ""}`;
 }
 
 // Objekt `hooks` pre druh: skupiny { matcher?, hooks: [{ type, command, timeout? }] }
 // podľa poradia tabuľky.
-export function hooksFor(kind, hooksDir, workflowDir, { home = homedir() } = {}) {
+export function hooksFor(kind, hooksDir, workflowDir, { home = homedir(), brain = brainGlobalDir() } = {}) {
   const out = {};
   let prev = null;
   for (const r of rowsFor(kind)) {
     const list = (out[r.event] ??= []);
-    const h = { type: "command", command: command(r, kind, hooksDir, workflowDir, home) };
+    const h = { type: "command", command: command(r, kind, hooksDir, workflowDir, home, brain) };
     if (r.timeout != null) h.timeout = r.timeout;
     const last = list[list.length - 1];
     if (last && prev && prev.event === r.event && prev.matcher === r.matcher) last.hooks.push(h);

@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,13 +16,13 @@ function newSession() {
   return `test-${process.pid}-${++counter}`;
 }
 
-function run(session, command) {
+function run(session, command, args = []) {
   const input = JSON.stringify({ session_id: session, tool_input: { command } });
-  return runRaw(input);
+  return runRaw(input, args);
 }
 
-function runRaw(input) {
-  const r = spawnSync("node", [GUARD], { input, encoding: "utf8", env: { ...process.env, TMPDIR: SANDBOX } });
+function runRaw(input, args = []) {
+  const r = spawnSync("node", [GUARD, ...args], { input, encoding: "utf8", env: { ...process.env, TMPDIR: SANDBOX } });
   return { code: r.status, stderr: r.stderr };
 }
 
@@ -111,6 +111,52 @@ test("JSON without a command passes with exit code 0", () => {
   assert.equal(runRaw(JSON.stringify({ session_id: "x" })).code, 0);
   assert.equal(runRaw(JSON.stringify({ session_id: "x", tool_input: { command: 5 } })).code, 0);
   assert.equal(runRaw(JSON.stringify({ tool_input: { command: "" } })).code, 0);
+});
+
+test("the body of a heredoc is data: lines starting with #, a number or a word count as nothing", () => {
+  const s = newSession();
+  const note = (n) => `cat >> note.md <<'EOF'\n# heading ${n}\n30. 10. 16:00: step ${n}\nrepa other ${n}\npersona ${n}\nEOF`;
+  for (const n of [1, 2, 3, 4]) assert.equal(run(s, note(n)).code, 0);
+  const state = JSON.parse(readFileSync(join(SANDBOX, `agentic-brain-repeat-${s}.json`), "utf8"));
+  assert.deepEqual(Object.keys(state), []);
+  assert.equal(run(s, "curl a").code, 0);
+  assert.equal(run(s, "curl b").code, 0);
+  assert.equal(run(s, "curl c").code, 2);
+});
+
+test("a program before a heredoc still counts", () => {
+  const s = newSession();
+  assert.equal(run(s, "curl a <<EOF\nx\nEOF").code, 0);
+  assert.equal(run(s, "curl b <<EOF\nx\nEOF").code, 0);
+  assert.equal(run(s, "curl c <<EOF\nx\nEOF").code, 2);
+});
+
+test("--allow file lets three different runs of its program pass, the built-in list still works", () => {
+  const dir = mkdtempSync(join(SANDBOX, "allow-"));
+  const file = join(dir, "extra.allow");
+  writeFileSync(file, "# extra\ntk\n");
+  const s = newSession();
+  for (const a of ["task list", "run list", "show 5", "done 6"]) assert.equal(run(s, `tk ${a}`, ["--allow", file]).code, 0);
+  assert.equal(run(s, "git status", ["--allow", file]).code, 0);
+  assert.equal(run(s, "curl a", ["--allow", file]).code, 0);
+  assert.equal(run(s, "curl b", ["--allow", file]).code, 0);
+  assert.equal(run(s, "curl c", ["--allow", file]).code, 2);
+});
+
+test("without --allow the program tk is counted", () => {
+  const s = newSession();
+  run(s, "tk a");
+  run(s, "tk b");
+  assert.equal(run(s, "tk c").code, 2);
+});
+
+test("a missing --allow file changes nothing and does not block", () => {
+  const missing = join(SANDBOX, "does-not-exist.allow");
+  const s = newSession();
+  assert.equal(run(s, "curl a", ["--allow", missing]).code, 0);
+  assert.equal(run(s, "curl b", ["--allow", missing]).code, 0);
+  assert.equal(run(s, "curl c", ["--allow", missing]).code, 2);
+  assert.equal(run(s, "git log", ["--allow", missing, "--allow"]).code, 0);
 });
 
 test("the state is in tmpdir under the session name", () => {

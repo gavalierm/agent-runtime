@@ -6,6 +6,9 @@
 // Exit code 0 allows the command, exit code 2 rejects it and the agent gets stderr.
 // On any error (bad input, unreadable state) it exits with code 0,
 // so the hook never blocks a command by mistake.
+// Besides its own repeat_guard.allow it reads every file given as `--allow <file>`
+// (repeatable, a missing file is skipped): tools with operator names go there
+// from the shared brain, not into this public copy.
 import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -15,6 +18,13 @@ const LIMIT = 3;
 const KEYWORDS_SKIP_SEGMENT = new Set(["for", "case", "function", "done", "fi", "esac", "select"]);
 const KEYWORDS_STRIP = new Set(["do", "then", "else", "elif", "if", "while", "until", "!", "{", "(", "time"]);
 const EXEMPT = [/(^|\/)agentic-brain\/bin\//, /(^|\/)skills\/[^/]+\/scripts\//];
+
+// The body of a heredoc is data of the command (a note, a script for python), not
+// a program the shell runs. Failure 30. 10. 2026: the lines `30. 10. 16:00: ...`
+// and `EOF` of a note counted as programs.
+export function stripHeredocs(command) {
+  return command.replace(/<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2\s*(?=\n|$)/g, "<<heredoc");
+}
 
 // Splits a command into segments at unquoted &&, ||, ;, |, & and newlines.
 export function splitSegments(cmd) {
@@ -100,7 +110,7 @@ export function loadAllow(file) {
 export function evaluate(command, state, allow) {
   const next = {};
   for (const [k, v] of Object.entries(state)) next[k] = [...v];
-  for (const seg of splitSegments(command)) {
+  for (const seg of splitSegments(stripHeredocs(command))) {
     const p = parseSegment(seg);
     if (!p || p.exempt || allow.has(p.program)) continue;
     const seen = (next[p.program] ||= []);
@@ -109,6 +119,16 @@ export function evaluate(command, state, allow) {
     seen.push(p.args);
   }
   return { blocked: null, state: next };
+}
+
+// Files named by `--allow <file>` or `--allow=<file>` in the hook arguments.
+export function allowArgs(argv) {
+  const out = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--allow" && argv[i + 1]) out.push(argv[++i]);
+    else if (argv[i].startsWith("--allow=")) out.push(argv[i].slice(8));
+  }
+  return out;
 }
 
 function main() {
@@ -126,6 +146,9 @@ function main() {
   try { state = JSON.parse(readFileSync(stateFile, "utf8")); } catch { state = {}; }
   if (!state || typeof state !== "object" || Array.isArray(state)) state = {};
   const allow = loadAllow(fileURLToPath(new URL("./repeat_guard.allow", import.meta.url)));
+  for (const file of allowArgs(process.argv.slice(2))) {
+    try { for (const program of loadAllow(file)) allow.add(program); } catch { /* a missing extra file is skipped */ }
+  }
   const res = evaluate(command, state, allow);
   if (res.blocked) {
     console.error(

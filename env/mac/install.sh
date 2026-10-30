@@ -36,6 +36,8 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=../../lib/paths.sh
 . "$REPO/lib/paths.sh"
 BRAIN="$(brain_global_dir)"
+# hooks.mjs berie cestu mozgu pre --allow hooku repeat_guard z tejto premennej
+export AGENT_BRAIN_GLOBAL="$BRAIN"
 BACKUPS="${AR_BACKUPS:-$REPO/scratch/backups}"
 TS="$(date +%Y%m%d_%H%M%S)"
 CLAUDE="$HOME/.claude"
