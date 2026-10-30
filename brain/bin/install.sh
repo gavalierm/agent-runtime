@@ -5,7 +5,7 @@
 #                          check.sh <target> creates the skill symlinks in .claude/skills,
 #                          check.sh --install-hook <target> installs the pre-commit hook
 #   install.sh --global    this repo is a clone of the global brain (~/agentic-brain), for an
-#                          operator who has no clone of the agent-runtime repo: adds an import
+#                          operator who has no clone of the agentic-workflow repo: adds an import
 #                          of RULES.md to ~/.claude/CLAUDE.md and puts symlinks to the
 #                          skills in ~/.claude/skills
 #

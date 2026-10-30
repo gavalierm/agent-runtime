@@ -121,6 +121,12 @@ expect "memory file in the index passes" 0 "^check.sh: ok$"
 fresh; printf '\n[dead](missing.md)\n' >> "$W/agentic-brain/decisions/README.md"; run_check
 expect "dead link" 1 "ERROR agentic-brain/decisions/README.md: dead link to missing.md"
 
+fresh; mkdir -p "$W/agentic-brain/.claude/worktrees/x/memory" "$W/agentic-brain/.worktrees/y"
+printf '\n[dead](missing.md)\n' > "$W/agentic-brain/.claude/worktrees/x/memory/a.md"
+printf '\n[dead](missing.md)\n' > "$W/agentic-brain/.worktrees/y/b.md"
+run_check
+expect "dead link in worktree copies (.claude/worktrees, .worktrees) is not checked" 0 "^check.sh: ok$"
+
 fresh; printf '\nExample `[x](missing.md)` in code.\n' >> "$W/agentic-brain/decisions/README.md"; run_check
 expect "link in code is not checked" 0 "^check.sh: ok$"
 

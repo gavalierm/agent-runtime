@@ -318,7 +318,7 @@ check_scratch() {
   [ -d "$BRAIN/scratch" ] || return 0
   while IFS= read -r p; do
     err "$(rel "$p")" "scratch is not empty, delete the file or turn it into a skill"
-  done < <(find "$BRAIN/scratch" -mindepth 1 ! -name '.gitkeep' | sort)
+  done < <(find "$BRAIN/scratch" -mindepth 1 ! -name '.gitkeep' ! -path '*/.worktrees/*' ! -path '*/.claude/worktrees/*' | sort)
 }
 
 # 8. memory
@@ -349,7 +349,7 @@ check_md_links() {
       [ -n "$path" ] || continue
       [ -e "$dir/$path" ] || err "$(rel "$f")" "dead link to $path"
     done < <(strip_code "$f" | grep -o '\[[^]]*\]([^)]*)' | sed 's/^\[[^]]*\](\(.*\))$/\1/')
-  done < <(find "$BRAIN" -name '*.md' ! -path "$BRAIN/scratch/*" ! -path '*/.git/*' | sort)
+  done < <(find "$BRAIN" -name '*.md' ! -path "$BRAIN/scratch/*" ! -path '*/.git/*' ! -path '*/.worktrees/*' ! -path '*/.claude/worktrees/*' | sort)
 }
 
 # 10. items with scope: shared that are in neither the global nor the project layer
