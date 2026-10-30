@@ -232,7 +232,7 @@ cmd_rozhodnutie() {
 # Dočasný worktree sa vždy odstráni.
 pub_merge() {
     local ciel="$1" start="$2" co="$3" sprava="$4" tmp i=0 rc=1
-    tmp="$(mktemp -d /tmp/dokonci-wt-XXXXXX)" || return 1
+    tmp="$(mktemp -d "${TMPDIR:-/tmp}/dokonci-wt-XXXXXX")" || return 1
     if ! g worktree add -q --detach "$tmp" "$start" >/dev/null 2>&1; then
         rm -rf "$tmp"; return 1
     fi

@@ -1,13 +1,18 @@
 // Most: komentár operátora (operator) po needs_human ide Adamovi ako čakám
 // "zapíš rozhodnutie"; otázka, ktorú Adam položil sám (tasker ask), ho nebudí.
 // Len DB a schránky v tmp, agents sa predáva explicitne, živá cesta sa nečíta.
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { tick, bridgeTick } from "../tasker_events.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "adam-dec-"));

@@ -1,9 +1,14 @@
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, utimesSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, utimesSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { classify } from "../driver.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 // Správa Taskera, na ktorej úlohe agent po jej zápise sám zapísal nečinnú
 // udalosť, nebudí (chyba 24. 10. 2026, úloha 499). Všetko beží nad dočasnými

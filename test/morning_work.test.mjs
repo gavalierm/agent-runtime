@@ -1,13 +1,18 @@
 // Ranný súhrn: rozloženie práce za 24 h (úloha 513). DB je dočasná v mkdtemp, git je zástupná
 // funkcia, nič sa nečíta zo živej DB ani zo živých repí.
 import "../lib/git_isolate.mjs";
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { workSection } from "../morning.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 const NOW = 1_800_000_000_000;
 const H = 3600_000;

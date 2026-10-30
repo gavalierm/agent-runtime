@@ -1,12 +1,17 @@
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { tick, render, topicFor } from "../tasker_events.mjs";
 import { setTopic } from "../route.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 // Všetko v dočasnom priečinku a dočasnej DB, živý /var/lib/adam ani Tasker sa nečítajú.
 function setup() {

@@ -1,13 +1,18 @@
 // rules_delta.mjs: prvý prompt len zapíše HEAD, zmena sledovanej cesty
 // (RULES.md, env/<prostredie>/) ide do kontextu raz, zmena inde nie, dlhý diff sa skráti.
 import "../lib/git_isolate.mjs";
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { delta, MAX_BYTES } from "../hooks/rules_delta.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 function repo() {
   const root = mkdtempSync(join(tmpdir(), "rd-"));

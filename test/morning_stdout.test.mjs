@@ -2,13 +2,18 @@
 // držaná správa na vedomie sa presunie do processed ako pri zápise do schránky. Všetko v mkdtemp,
 // tasker je stub, cesty ukazujú len do dočasného priečinka.
 import "../lib/git_isolate.mjs";
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, chmodSync, existsSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, readdirSync, chmodSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "..", "morning.mjs");
 

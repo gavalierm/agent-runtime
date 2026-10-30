@@ -1,12 +1,17 @@
 // context_warning.mjs: pod hranicou mlčí, nad ňou mimo T3 oznámenie,
 // vo vlákne T3 pokyn ukončiť odpoveď riadkom z kontext.sh.
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), "context_warning.mjs");
 

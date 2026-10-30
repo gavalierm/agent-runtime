@@ -1,13 +1,18 @@
 // Budič zapíše do Taskera trasu doručenej správy k úlohe (`tasker route`, úloha 486).
 // Príkaz je falošný skript v tmp, žiadny test nesiaha na živý Tasker ani T3.
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, utimesSync, chmodSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, readFileSync, existsSync, utimesSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFakeT3 } from "./fake_t3.mjs";
 import { T3Client } from "../lib.mjs";
 import { tick, recordRoute } from "../driver.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 async function setup(t, { routeCmd = true, topics = null } = {}) {
   const t3 = await startFakeT3();

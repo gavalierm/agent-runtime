@@ -1,6 +1,6 @@
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, existsSync, utimesSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, readdirSync, existsSync, utimesSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFakeT3 } from "./fake_t3.mjs";
@@ -8,6 +8,11 @@ import { T3Client, inboxConfig } from "../lib.mjs";
 import { heldDue, tick } from "../driver.mjs";
 import { rememberRoute } from "../route.mjs";
 import { sweepHeld } from "../morning.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 // Doručenie správ na vedomie po behu alebo po lehote (úloha 518). Všetko
 // v mkdtemp a vo falošnom T3, cfg nesie len dočasné cesty.

@@ -1,13 +1,18 @@
 // Most: úloha bez riešiteľa, ktorú Tasker sám presunul blocked -> unassigned, ide
 // zakladateľovi, ak je to agent s mostom (chyba 23. 10. 2026, úloha 427).
 // Len DB a schránky v tmp, agents sa predáva explicitne, živá cesta sa nečíta.
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { bridgeTick } from "../tasker_events.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 process.env.TASKER_WEB_URL = "https://tasker.example.ts.net:8801";
 

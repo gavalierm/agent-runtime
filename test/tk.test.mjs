@@ -1,11 +1,16 @@
 // Test obalu tk: --verify s vetou namiesto príkazu odmietne (chyba 25. 10. 2026).
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, chmodSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir, userInfo } from "node:os";
 import { fileURLToPath } from "node:url";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 const TK = process.env.TK_BIN || join(dirname(fileURLToPath(import.meta.url)), "..", "bin", "tk");
 const dir = mkdtempSync(join(tmpdir(), "tk-test-"));

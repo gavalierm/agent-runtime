@@ -1,12 +1,17 @@
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, existsSync, readFileSync, utimesSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, readdirSync, existsSync, readFileSync, utimesSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFakeT3 } from "./fake_t3.mjs";
 import { T3Client, threadBusy } from "../lib.mjs";
 import { tick } from "../driver.mjs";
 import { rememberRoute } from "../route.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 function setup(t3) {
   const root = mkdtempSync(join(tmpdir(), "adam-driver-"));

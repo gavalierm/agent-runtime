@@ -6,9 +6,9 @@
 // CLAUDE_PROJECT_DIR v tmp. Živá DB ani klon sa nepoužijú: TASKER_DB ukazuje
 // vždy na tmp a fetchTasks pri neexistujúcej výslovnej DB hodí chybu.
 import "../lib/git_isolate.mjs";
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -17,6 +17,11 @@ import { applySettings } from "../env/hooks.mjs";
 import { bashTarget, reason as guardReason, ZMRAZENE } from "./rozhodnutia_guard.mjs";
 import { memoryProblems } from "../lib/memory_claims.mjs";
 import { formatRecord } from "../lib/rozhodnutia.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 const HOOKS = new URL(".", import.meta.url).pathname;
 const tmp = () => mkdtempSync(join(tmpdir(), "roz-"));

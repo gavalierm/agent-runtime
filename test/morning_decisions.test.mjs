@@ -1,13 +1,18 @@
 // Ranný súhrn: nové rozhodnutia za 24 h a výstup kontroly (úloha 470, replay S9).
 // Git repo je dočasné v mkdtemp, kontrola je zástupná funkcia, nič sa nezapisuje.
 import "../lib/git_isolate.mjs";
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build, decisionsSection } from "../morning.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 const zaznam = (id, o = {}) => `---\nid: ${id}\nnazov: ${o.nazov ?? "Názov " + id}\nstav: platí\nkluc: ${o.kluc ?? "a." + id}\nrozsah: server\nagenti: *\nrozhodol: ${o.rozhodol ?? "Adam"}\nmoc: ${o.moc ?? "zastupca-v-plnej-moci"}\nzapisal: ${o.zapisal ?? "Adam"}\ndatum: 2026-10-24\nzdroj: vlákno\n---\nTelo.\n`;
 

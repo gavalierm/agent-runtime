@@ -1,6 +1,6 @@
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync, existsSync, statSync } from "node:fs";
+import { chmodSync, mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, readdirSync, readFileSync, existsSync, statSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,11 @@ import { startFakeT3 } from "./fake_t3.mjs";
 import { T3Client } from "../lib.mjs";
 import { routeKey, rememberRoute, routeFor, threadForSession, sessionIds, waitingFor, setTopic, removeTopic, readTopics, topicsPath, messageTopic } from "../route.mjs";
 import { tick, classify, renderMessage } from "../driver.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 // Telo odpovede nesie povinné riadky Výsledok, Dôkaz a Otvorené (reply.sh).
 const TRI = "Výsledok: v\nDôkaz: d\nOtvorené: nič\n";

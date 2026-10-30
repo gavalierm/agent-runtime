@@ -142,6 +142,7 @@ precisluj_lokalne() {
     shas="$(git_r log --reverse --format=%H origin/main..HEAD)"
     [ -n "$shas" ] || return 1
     tmpd="$(mktemp -d)"
+    trap "rm -rf '$tmpd'" EXIT
     for sha in $shas; do
         git_r log -1 --format=%s "$sha" | grep -q '^Rozhodnutie D[0-9]\{4\}: ' || { rm -rf "$tmpd"; return 1; }
         st="$(git_r diff-tree --no-commit-id --name-status -r "$sha" -- decisions | grep -E $'^A\tdecisions/D[0-9]{4}\.md$' || true)"

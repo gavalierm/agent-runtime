@@ -1,13 +1,18 @@
 // Odovzdanie agentovi vlákna T3 (úloha 496, D0168): most po zápise správy zapíše doručenie do Taskera
 // (`tasker delivered`) a poistka handoff_stale pošle riešiteľovi správu znova. Len DB a schránky v tmp,
 // príkaz Taskera je skript v tmp, ktorý zapíše argumenty.
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, chmodSync, existsSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, readdirSync, readFileSync, writeFileSync, chmodSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { bridgeTick, recordDelivered } from "../tasker_events.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "bridge-handoff-"));

@@ -1,12 +1,17 @@
 // sonnet_delegation.mjs: pripomienka po N zápisových krokoch Opusu bez sub-agenta implementator.
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync } from "node:fs";
+import { writeFileSync, mkdtempSync as mkdtempRaw, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { reminder, countWrites, bashWrites, N } from "./sonnet_delegation.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), "sonnet_delegation.mjs");
 

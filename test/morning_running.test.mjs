@@ -1,13 +1,18 @@
 // Ranný súhrn: časť Beží, úlohy in_progress s časom vstupu a otvorenou prácou (úloha 662). Všetky DB a priečinky
 // sú dočasné v mkdtemp, nič sa nečíta zo živých. Mená sú vymyslené.
 import "../lib/git_isolate.mjs";
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { mkdtempSync, mkdirSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runningSection, build } from "../morning.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 const NOW = Date.parse("2026-10-26T06:00:07Z");
 const H = 3600_000;

@@ -1,13 +1,18 @@
 // Úloha 560: správa mosta o úlohe, ktorej bloker alebo predok patrí téme, ide do vlákna témy.
 // Prípad z 25. 10. 2026: nadväzujúca úloha (blokér = úloha témy) prešla po done blokéra do handoff
 // a správa šla do hlavného vlákna, hoci vlákno témy blokér viedlo. Len DB, schránky a zoznam tém v tmp.
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, readdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { bridgeTick, topicFor } from "../tasker_events.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "bridge-blocker-topic-"));

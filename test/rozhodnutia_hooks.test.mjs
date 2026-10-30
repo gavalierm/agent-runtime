@@ -6,9 +6,9 @@
 // TASKER_DB ukazuje vždy na tmp a fetchTasks pri neexistujúcej výslovnej DB
 // hodí chybu.
 import "../lib/git_isolate.mjs";
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +17,11 @@ import { DatabaseSync } from "node:sqlite";
 import { waitingProblem, decisionProblem, waitingUnits } from "../hooks/reply_guard.mjs";
 import { fetchTasks } from "../lib/tasker_read.mjs";
 import { delta } from "../hooks/rules_delta.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 const HOOKS = join(dirname(fileURLToPath(import.meta.url)), "../hooks");
 const tmp = () => mkdtempSync(join(tmpdir(), "roz-"));

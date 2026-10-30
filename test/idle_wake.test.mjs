@@ -3,15 +3,20 @@
 // ani schránka sa nedotknú. Replay: zobudenia 24. 10. 2026
 // tasker-20261024-215628-486.md a tasker-20261024-215807-1927321-350064f5.md.
 import "../lib/git_isolate.mjs";
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, chmodSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, writeFileSync, readFileSync, existsSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readOnlyCommand, detect, inboxMessages } from "../hooks/idle_wake.mjs";
 import { bridgeTrigger } from "../tasker_events.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), "../hooks/idle_wake.mjs");
 const M1 = "tasker-20261024-215628-486.md";

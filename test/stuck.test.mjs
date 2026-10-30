@@ -1,9 +1,9 @@
 // Dozor visiacej požiadavky na schválenie (stuck.mjs, úloha 562) proti falošnému
 // T3 serveru. Správa do schránky ide falošným skriptom z cfg.stuckAskCmd, žiadny
 // test nesiaha na živý T3, schránky ani bin/ask_agent.sh z repa pravidiel.
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync as mkdtempRaw, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFakeT3 } from "./fake_t3.mjs";
@@ -11,6 +11,11 @@ import { config, stuckConfig, T3Client } from "../lib.mjs";
 import { tick } from "../driver.mjs";
 import { watchStep } from "../clear_watch.mjs";
 import { stuckRecipient } from "../stuck.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 const MIN = 60_000;
 const LIVE_ASK = "/opt/agentic-workflow/bin/ask_agent.sh";

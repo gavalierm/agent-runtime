@@ -1,8 +1,8 @@
 // Opravy 23. 10. 2026: most a vlákno témy, most a dispečer, osirelé úlohy,
 // dávka v tick(), pretek sledovača /clear, mutex. Všetko v tmp, bez živých služieb.
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync, utimesSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, readdirSync, readFileSync, utimesSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -13,6 +13,11 @@ import { tick as taskerTick, bridgeTick } from "../tasker_events.mjs";
 import { tick as driverTick } from "../driver.mjs";
 import { watchStep } from "../clear_watch.mjs";
 import { setTopic } from "../route.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 function boxes(...names) {
   const root = mkdtempSync(join(tmpdir(), "adam-fix-"));

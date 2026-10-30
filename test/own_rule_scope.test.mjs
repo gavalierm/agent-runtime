@@ -3,14 +3,19 @@
 // sa nemenia: hook cieľové súbory len číta. Replay chyby 23. 10. 2026: Edit
 // z prepisu vlákna agenta (relácia d7cf1c50, záznam 20:43:42) do CLAUDE.md jeho repa,
 // vstup je skopírovaný sem (cesta v domovskom priečinku skúšky), prepis sa môže rotovať.
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join, resolve, basename } from "node:path";
 import { brainGlobalDir, workflowDir } from "../lib/paths.mjs";
 import { spawnSync } from "node:child_process";
 import { agentRepoOf, check, chybaOdsek, seenBefore } from "../hooks/own_rule_scope.mjs";
+
+// Dočasné priečinky testu sa na konci zmažú (úloha 701).
+const tmpDirs = [];
+const mkdtempSync = (prefix) => { const d = mkdtempRaw(prefix); tmpDirs.push(d); return d; };
+after(() => { for (const d of tmpDirs) rmSync(d, { recursive: true, force: true }); });
 
 const HOOK = new URL("../hooks/own_rule_scope.mjs", import.meta.url).pathname;
 const RULES = resolve(HOOK, "../..");
