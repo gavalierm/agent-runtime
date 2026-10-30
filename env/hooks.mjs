@@ -54,7 +54,6 @@ export const TABLE = [
   R("tasker_work.mjs", "UserPromptSubmit", null, null, ["tasker"], ["main"]),
   R("agent_inbox.mjs", "UserPromptSubmit", null, null, ["mac"], ["agent"]),
   // PreToolUse
-  R("guard.mjs", "PreToolUse", BASH_WRITE, null, ["mac"], ["mac"]),
   R("topic.mjs", "PreToolUse", ".*", null, ["mac"], ["agent"], "check"),
   R("no_model_wait.mjs", "PreToolUse", "Bash", null, ["none"], ["main", "mac"]),
   R("foreign_git.mjs", "PreToolUse", "Bash", null, ["none"], ["main"]),

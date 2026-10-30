@@ -8,9 +8,8 @@
 // zapísaný a commitnutý priamo v /opt/tasker pod menom root. Pravidlo v persone
 // nestačilo (global §4), preto hook. Úloha 621.
 //
-// Je to samostatný hook a nie rozšírenie hooks/guard.mjs: guard.mjs je zábrana
-// územia pre Mac (~/Work, vždy len `ask`, na serveri nie je zapojený), zákaz pre
-// každého agenta na serveri musí byť hook, ktorý zapína env/server/install.sh.
+// Zákaz platí pre každého agenta na serveri, preto je to hook, ktorý zapína
+// env/server/install.sh.
 //
 // PreToolUse pre Edit, Write, MultiEdit, NotebookEdit a Bash. Zamietne zápis súboru
 // s cestou pod /opt/tasker/ alebo pod nasadenými klonmi (cesta sa rozloží cez `..`

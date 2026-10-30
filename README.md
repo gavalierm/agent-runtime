@@ -946,7 +946,7 @@ v spoločnom mozgu (`AGENT_BRAIN_GLOBAL`). Cesty v tabuľkách sú relatívne ku
 | cesta | čo to je |
 |---|---|
 | `hooks/<hook>.mjs` | hook relácie claude; druhý riadok `// requires:` hovorí, čo hook potrebuje (`none`, `tasker`, `t3`, `inbox`, `mac`) |
-| `hooks/*.test.mjs`, `hooks/guard.replay.mjs` | testy hookov a replay chyby |
+| `hooks/*.test.mjs` | testy hookov |
 | `env/hooks.mjs` | jediná tabuľka hookov: udalosť, matcher, timeout, requires a kde beží (`main`, `runs`, `mac`, `agent`); z nej píšu `settings.json` oba `install.sh` |
 | `env/hooks.test.mjs` | test tabuľky: hook existuje, `requires` sedí s hlavičkou, každý hook je v tabuľke alebo v `lib/dead_code_allow.txt` |
 | `git-hooks/global/` | globálne git hooky (`core.hooksPath` rootu a Macu), spúšťajú lokálny hook repa |

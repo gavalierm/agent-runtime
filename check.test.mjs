@@ -55,10 +55,10 @@ console.log(failsAsExpected ? "check.mjs na kópii bez model: sonnet zlyhá: v p
 
 // Hook bez riadku requires a nový súbor kódu, ktorý nikto nemenuje, musia zhodiť check.
 const noRequires = runCheck((dir) => {
-  const f = join(dir, "hooks", "guard.mjs");
+  const f = join(dir, "hooks", "no_model_wait.mjs");
   writeFileSync(f, readFileSync(f, "utf8").replace(/^\/\/ requires: .*\n/m, ""));
 });
-const requiresFails = noRequires.code === 1 && /hooks\/guard\.mjs: druhý riadok nie je `\/\/ requires:/.test(noRequires.out);
+const requiresFails = noRequires.code === 1 && /hooks\/no_model_wait\.mjs: druhý riadok nie je `\/\/ requires:/.test(noRequires.out);
 if (!requiresFails) console.log(noRequires.out);
 console.log(requiresFails ? "check.mjs na hooku bez requires zlyhá: v poriadku" : "✗ check.mjs na hooku bez requires nezlyhal");
 

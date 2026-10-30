@@ -57,6 +57,7 @@ jq_() { python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); print(js
 # cmds súbor: všetky príkazy hookov súboru, čiarkou oddelené
 cmds() { jq_ "$1" '",".join(h["command"] for ev in d["hooks"].values() for g in ev for h in g["hooks"])'; }
 
+RO_BEFORE=$(git -C "$WF" config --type=bool --get agentic.readonly 2>/dev/null || echo unset)
 check "nainštaluje" 0 "$S"
 contains "hlási nasadenie" "Nasadené: kód $WF, mozog $BR"
 # CLAUDE.md
@@ -130,7 +131,8 @@ for f in "$AR_CLAUDE_DIR/settings.json" "$AR_RUNS_HOME/.claude/settings.json"; d
     contains "compact: $f" '[false, "operator"]'
 done
 # Git
-check "git: test (AR_*) neoznačí klon kódu agentic.readonly" 1 git -C "$WF" config --type=bool --get agentic.readonly
+RO_AFTER=$(git -C "$WF" config --type=bool --get agentic.readonly 2>/dev/null || echo unset)
+check "git: test (AR_*) nezmení agentic.readonly klonu kódu" 0 test "$RO_AFTER" = "$RO_BEFORE"
 check "git: e-mail z konfigurácie" 0 git config --global user.email
 contains "git: e-mail" "agent@example.org"
 check "git: globálny hooksPath klonu kódu" 0 git config --global core.hooksPath

@@ -87,7 +87,6 @@ PreCompact||3|compact_block.mjs`.split("\n");
 const MAC = `SessionStart|||check.mjs
 SessionStart|||unslop.mjs
 SessionStart|||rozhodnutia_context.mjs
-PreToolUse|^(Write|Edit|MultiEdit|NotebookEdit|Bash)$||guard.mjs
 PreToolUse|Bash||no_model_wait.mjs
 PreToolUse|Bash||git_pull.mjs
 PreToolUse|Bash||sed_line.mjs
@@ -117,9 +116,9 @@ test("runs: dnešných 15 hookov používateľa behov", () => {
   assert.deepEqual(byEvent(got), byEvent(RUNS));
 });
 
-test("mac: dnešných 20 hookov Macu", () => {
+test("mac: dnešných 19 hookov Macu", () => {
   const got = flat(hooksFor("mac", HOOKS, WF, { home: "/Users/x" }));
-  assert.equal(got.length, 20);
+  assert.equal(got.length, 19);
   assert.deepEqual(byEvent(got), byEvent(MAC));
 });
 
