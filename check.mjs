@@ -61,7 +61,7 @@ const BUILTIN = [
   "workflow-authoring", "claude-in-chrome", "dataviz", "artifact-design",
   "artifact-diagramming", "artifact-capabilities",
 ];
-const SKIP = new Set(["node_modules", "vendor", ".git", ".svelte-kit", "build", "dist", ".scratch", "archiv"]);
+const SKIP = new Set(["node_modules", "vendor", ".git", ".svelte-kit", "build", "dist", "scratch", "archiv"]);
 
 const problems = [];
 // Repá agentov: na Macu ~/Work/agenti/<meno>, na serveri /root/<meno>.

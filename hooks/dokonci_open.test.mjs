@@ -11,6 +11,8 @@ import { fileURLToPath } from "node:url";
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), "dokonci_open.mjs");
 const TMPS = [];
+const HOME0 = mkdtempSync(join(tmpdir(), "dokonci-open-home-"));
+TMPS.push(HOME0);
 after(() => { for (const t of TMPS) rmSync(t, { recursive: true, force: true }); });
 
 const tmp = () => { const t = mkdtempSync(join(tmpdir(), "dokonci-open-")); TMPS.push(t); return t; };
@@ -22,6 +24,9 @@ function run(input, env = {}) {
   const clean = { ...process.env };
   delete clean.TASKER_TASK_ID;
   delete clean.DOKONCI_LEDGER_DIR;
+  delete clean.XDG_STATE_HOME;
+  // Stavový priečinok nikdy nie je skutočný ~/.local/state.
+  clean.HOME = HOME0;
   const r = spawnSync("node", [HOOK], { input: JSON.stringify(input), env: { ...clean, ...env }, encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);
   return r.stdout ? JSON.parse(r.stdout) : null;
@@ -33,13 +38,12 @@ function ledgerIn(content, task = 90623) {
   return dir;
 }
 
-function repoWithScratch(content) {
-  const repo = tmp();
-  spawnSync("git", ["init", "-q", repo]);
-  mkdirSync(join(repo, ".scratch"));
-  mkdirSync(join(repo, "src", "hlboko"), { recursive: true });
-  writeFileSync(join(repo, ".scratch", "dokonci-90623.md"), content);
-  return repo;
+// Ledger v stavovom priečinku: XDG_STATE_HOME, inak HOME0/.local/state.
+function stateLedger(content, xdg) {
+  const base = xdg || join(HOME0, ".local", "state");
+  mkdirSync(join(base, "agentic-workflow"), { recursive: true });
+  writeFileSync(join(base, "agentic-workflow", "dokonci-90623.md"), content);
+  return base;
 }
 
 test("bez TASKER_TASK_ID hook mlčí", () => {
@@ -91,17 +95,25 @@ test("ledger chýba: mlčí; ledger inej úlohy sa nepočíta", () => {
   assert.equal(run({ cwd: "/tmp" }, { TASKER_TASK_ID: "90623", DOKONCI_LEDGER_DIR: other }), null);
 });
 
-test("DOKONCI_LEDGER_DIR má prednosť pred .scratch repa", () => {
-  const repo = repoWithScratch(START); // otvorený
+test("DOKONCI_LEDGER_DIR má prednosť pred stavovým priečinkom", () => {
+  stateLedger(START); // otvorený
   const dir = ledgerIn(START + L("koniec", "vysledok=x")); // uzavretý
-  assert.equal(run({ cwd: repo }, { TASKER_TASK_ID: "90623", DOKONCI_LEDGER_DIR: dir }), null);
+  assert.equal(run({ cwd: "/tmp" }, { TASKER_TASK_ID: "90623", DOKONCI_LEDGER_DIR: dir }), null);
 });
 
-test("ledger v .scratch git toplevelu, keď cwd je podpriečinok repa", () => {
-  const repo = repoWithScratch(START);
-  const r = run({ cwd: join(repo, "src", "hlboko") }, { TASKER_TASK_ID: "90623" });
+test("ledger v stavovom priečinku pod HOME, cwd nehrá rolu", () => {
+  stateLedger(START);
+  const r = run({ cwd: "/tmp" }, { TASKER_TASK_ID: "90623" });
   assert.equal(r.decision, "block");
-  assert.ok(r.reason.includes(join(repo, ".scratch", "dokonci-90623.md")));
+  assert.ok(r.reason.includes(join(HOME0, ".local", "state", "agentic-workflow", "dokonci-90623.md")));
+});
+
+test("XDG_STATE_HOME má prednosť pred HOME", () => {
+  const xdg = tmp();
+  stateLedger(START, xdg);
+  const r = run({ cwd: "/tmp" }, { TASKER_TASK_ID: "90623", XDG_STATE_HOME: xdg });
+  assert.equal(r.decision, "block");
+  assert.ok(r.reason.includes(join(xdg, "agentic-workflow", "dokonci-90623.md")));
 });
 
 test("pokazený vstup nezhodí hook", () => {

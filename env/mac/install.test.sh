@@ -12,7 +12,7 @@ BR="$T/brain"
 H="$T/home"
 OLD="$T/old"
 mkdir -p "$WF" "$H"
-tar -C "$REPO" --exclude=./.git --exclude=./.scratch --exclude=node_modules -cf - . | tar -C "$WF" -xf -
+tar -C "$REPO" --exclude=./.git --exclude=./scratch --exclude=node_modules -cf - . | tar -C "$WF" -xf -
 git -C "$WF" init -q
 S="$WF/env/mac/install.sh"
 

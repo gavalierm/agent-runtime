@@ -11,7 +11,7 @@ git -C "$T" init -q
 a="$(printf cGFwZXJjbGlw | base64 -d)"
 b="$(printf S2xpcA== | base64 -d)"
 printf 'Úlohy čítam v %se.\n' "$a" > "$T/PERSONA.md"
-printf 'const KEY = ".scratch/%s_key";\n' "$a" > "$T/hook.mjs"
+printf 'const KEY = "cache/%s_key";\n' "$a" > "$T/hook.mjs"
 printf 'Téma je úloha v %se.\n' "$b" > "$T/CLAUDE.md"
 printf 'clipboard, eklipsa, PAGAV-1, mpc_api\n' > "$T/ok.md"
 git -C "$T" add -A

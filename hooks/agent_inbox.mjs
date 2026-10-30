@@ -5,7 +5,7 @@
 // pokyn prečítať ju pred odpoveďou. 15. 10. 2026 čakala správa o zastavenej
 // migrácii agenta 70 minút a ten agent medzitým nebežal.
 //
-// UserPromptSubmit z .claude/settings.json repa agenta. SSH ide cez .scratch/bin/ssh repa agenta
+// UserPromptSubmit z .claude/settings.json repa agenta. SSH ide cez scratch/bin/ssh repa agenta
 // s vlastným kľúčom agenta. Nedostupný server po 6 s preskočí a povie to.
 // Bez AGENT_INBOX_HOSTS hook nerobí nič.
 //
@@ -24,7 +24,7 @@ import { AGENT_REPO } from "./agent_repo.mjs";
 
 // Repo agenta, nie repo kódu (hooks/agent_repo.mjs).
 const REPO = AGENT_REPO;
-const SSH = join(REPO, ".scratch/bin/ssh");
+const SSH = join(REPO, "scratch/bin/ssh");
 // Účet a adresy servera (`účet@adresa`, cez čiarku, vyskúšajú sa po poradí) a schránka
 // agenta na serveri. Bez AGENT_INBOX_HOSTS hook mlčí, schránka je predvolene
 // /var/lib/<AGENT_NAME>/inbox.

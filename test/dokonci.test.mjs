@@ -229,24 +229,47 @@ test("repo mimo /projekty/ bez dev má politiku main a koniec pushne main", () =
   assert.match(readFileSync(s.log, "utf8"), /ARG<<result>>\nARG<<done>>/);
 });
 
-test("ledger predvolene v .scratch, keď ho git ignoruje, inak v /tmp/dokonci", () => {
-  const s = setup(false);
-  const env = { ...s.env };
+// Prostredie bez DOKONCI_LEDGER_DIR, HOME a XDG_STATE_HOME v dočasnom priečinku
+// (nikdy skutočný ~/.local/state).
+function stateEnv(s, xdg) {
+  const env = { ...s.env, HOME: join(s.tmp, "home") };
   delete env.DOKONCI_LEDGER_DIR;
-  const run = (id) => spawnSync("bash", [SCRIPT, "start", id], { cwd: s.clone, env, encoding: "utf8" });
-  const id1 = String(900000 + (process.pid % 1000));
-  const r1 = run(id1);
-  assert.equal(r1.status, 0, r1.stderr);
-  assert.match(r1.stdout, new RegExp(`ledger: /tmp/dokonci/dokonci-${id1}\\.md`));
-  rmSync(`/tmp/dokonci/dokonci-${id1}.md`, { force: true });
-  writeFileSync(join(s.clone, ".gitignore"), ".scratch/\n");
-  git(s.clone, "add", ".gitignore");
-  git(s.clone, "commit", "-q", "-m", "ignore");
-  git(s.clone, "push", "-q", "origin", "main");
-  const r2 = run("617");
-  assert.equal(r2.status, 0, r2.stderr);
-  assert.ok(existsSync(join(s.clone, ".scratch", "dokonci-617.md")));
+  delete env.XDG_STATE_HOME;
+  if (xdg) env.XDG_STATE_HOME = xdg;
+  return env;
+}
+
+test("ledger predvolene v stavovom priečinku, repo zostane čisté", () => {
+  const s = setup(false);
+  const env = stateEnv(s);
+  const r = spawnSync("bash", [SCRIPT, "start", "617"], { cwd: s.clone, env, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const ledger = join(s.tmp, "home", ".local", "state", "agentic-workflow", "dokonci-617.md");
+  assert.ok(r.stdout.includes(`ledger: ${ledger}`), r.stdout);
+  assert.ok(existsSync(ledger));
   assert.equal(git(s.clone, "status", "--short"), "");
+});
+
+test("XDG_STATE_HOME má prednosť pred HOME", () => {
+  const s = setup(false);
+  const xdg = join(s.tmp, "xdg");
+  const r = spawnSync("bash", [SCRIPT, "start", "617"], { cwd: s.clone, env: stateEnv(s, xdg), encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(existsSync(join(xdg, "agentic-workflow", "dokonci-617.md")));
+  assert.ok(!existsSync(join(s.tmp, "home", ".local")));
+});
+
+test("dokonci.sh start a hook dokonci_open.mjs ukazujú na ten istý súbor", () => {
+  const s = setup(false);
+  const env = stateEnv(s);
+  const st = spawnSync("bash", [SCRIPT, "start", "617"], { cwd: s.clone, env, encoding: "utf8" });
+  assert.equal(st.status, 0, st.stderr);
+  const hook = join(dirname(SCRIPT), "..", "..", "..", "hooks", "dokonci_open.mjs");
+  const h = spawnSync("node", [hook], { input: JSON.stringify({ cwd: "/tmp" }), env: { ...env, TASKER_TASK_ID: "617" }, encoding: "utf8" });
+  assert.equal(h.status, 0, h.stderr);
+  const ledger = st.stdout.match(/ledger: (\S+)/)[1];
+  assert.equal(JSON.parse(h.stdout).decision, "block");
+  assert.ok(JSON.parse(h.stdout).reason.includes(ledger), h.stdout);
 });
 
 // Repo, kde vetvu dev drží druhý worktree a beh pracuje v treťom worktree z origin/main

@@ -39,7 +39,7 @@ test("Edit, Write, MultiEdit a NotebookEdit v /opt/tasker a /opt/agentic-workflo
 });
 
 test("zápis inde a podobné cesty pustí", () => {
-  for (const f of ["/root/tasker/src/a.js", "/root/agentic-workflow/RULES.md", "/opt/tasker-copy/a", "/opt/agentic-workflow2/a", "/opt/other/a", "/tmp/opt/tasker/a", "/root/adam/.scratch/x"]) {
+  for (const f of ["/root/tasker/src/a.js", "/root/agentic-workflow/RULES.md", "/opt/tasker-copy/a", "/opt/agentic-workflow2/a", "/opt/other/a", "/tmp/opt/tasker/a", "/root/adam/scratch/x"]) {
     assert.equal(write("Write", f), null, f);
   }
   assert.equal(write("Write", "a.js", "/root/tasker"), null);

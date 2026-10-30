@@ -5,7 +5,7 @@
 process.env.SERVER_WORK_AGENTS = "adam,boris";
 const { verdict } = await import("./server_work.mjs");
 
-const S = `PATH="$PWD/.scratch/bin:$PATH" ssh root@example.org`;
+const S = `PATH="$PWD/scratch/bin:$PATH" ssh root@example.org`;
 const cases = [
   [`${S} 'su - appdev -c "cd ~/app && git pull -q && XDG_RUNTIME_DIR=/run/user/\\$(id -u) systemctl --user start app-loop.service"'`, true],
   [`${S} 'systemctl restart nginx'`, true],

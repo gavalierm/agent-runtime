@@ -10,29 +10,24 @@
 // Len Stop, nie SubagentStop: sub-agent posudku končí pri otvorenom ledgeri
 // a nesmie byť blokovaný. Hook sa pustí len v behu Taskera (TASKER_TASK_ID),
 // hlavné vlákna bez behu nerieši. Ledger `dokonci-<úloha>.md` hľadá v poradí
-// $DOKONCI_LEDGER_DIR, `.scratch` koreňa repa z `cwd` hooku, `/tmp/dokonci`
-// (rovnako ako dokonci.sh). Relácia je od posledného `@start`. Ak obsahuje
-// `@koniec` alebo `@otazka`, beh je uzavretý a hook mlčí, inak zastaví
-// ukončenie (decision block). Pri `stop_hook_active` mlčí, aby nezacyklil.
+// $DOKONCI_LEDGER_DIR, stavovom priečinku
+// `${XDG_STATE_HOME:-$HOME/.local/state}/agentic-workflow` (rovnako ako
+// dokonci.sh). Relácia je od posledného `@start`. Ak obsahuje `@koniec` alebo
+// `@otazka`, beh je uzavretý a hook mlčí, inak zastaví ukončenie (decision block). Pri `stop_hook_active` mlčí, aby nezacyklil.
 
 import { readFileSync, existsSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { blockStop } from "../lib/deny.mjs";
 
 // Cesty, kde môže ledger úlohy ležať, v poradí hľadania.
-export function ledgerCandidates(task, cwd, env = process.env) {
+export function ledgerCandidates(task, env = process.env) {
   const name = `dokonci-${task}.md`;
   const out = [];
   if (env.DOKONCI_LEDGER_DIR) out.push(join(env.DOKONCI_LEDGER_DIR, name));
-  if (cwd && cwd.startsWith("/")) {
-    try {
-      const top = execFileSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-      if (top) out.push(join(top, ".scratch", name));
-    } catch {}
-  }
-  out.push(join("/tmp/dokonci", name));
+  const state = env.XDG_STATE_HOME || join(env.HOME || homedir(), ".local", "state");
+  out.push(join(state, "agentic-workflow", name));
   return out;
 }
 
@@ -56,10 +51,10 @@ export function postup(task) {
 }
 
 // Vráti { task, ledger } pre otvorený ledger, inak null.
-export function openLedger(input, env = process.env) {
+export function openLedger(env = process.env) {
   const task = env.TASKER_TASK_ID;
   if (!task || !/^\d+$/.test(task)) return null;
-  const ledger = ledgerCandidates(task, typeof input.cwd === "string" ? input.cwd : null, env).find((p) => existsSync(p));
+  const ledger = ledgerCandidates(task, env).find((p) => existsSync(p));
   if (!ledger) return null;
   let text;
   try { text = readFileSync(ledger, "utf8"); } catch { return null; }
@@ -70,6 +65,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let input = {};
   try { input = JSON.parse(readFileSync(0, "utf8")); } catch {}
   if (input.stop_hook_active) process.exit(0);
-  const o = openLedger(input);
+  const o = openLedger();
   if (o) blockStop(message(o.task, o.ledger), postup(o.task));
 }

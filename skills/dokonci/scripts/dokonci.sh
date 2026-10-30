@@ -8,8 +8,8 @@
 #   dokonci.sh otazka <úloha> --summary "<otázka s ?, možnosti A) B) a odporúčanie>"
 # Premenné: DOKONCI_TASKER (príkaz Taskera, pod rootom predvolene
 # bin/tk tohto repa, inak tasker), DOKONCI_LEDGER_DIR (priečinok
-# ledgera, predvolene .scratch v koreni repa, keď ho git ignoruje, inak
-# /tmp/dokonci). Každé zlyhanie: kód 1 a riadok "Správny postup:".
+# ledgera, predvolene ${XDG_STATE_HOME:-$HOME/.local/state}/agentic-workflow).
+# Každé zlyhanie: kód 1 a riadok "Správny postup:".
 set -u
 PROG="dokonci.sh"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -41,14 +41,7 @@ setup() {
     ULOHA="${1:-}"
     [[ "$ULOHA" =~ ^[0-9]+$ ]] || fail "číslo úlohy chýba alebo nie je číslo: '$ULOHA'" "dokonci.sh <podpríkaz> <číslo úlohy> ..."
     ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || fail "aktuálny priečinok nie je git repo" "cd do repa, v ktorom pracuješ, a spusti znova"
-    local dir
-    if [ -n "${DOKONCI_LEDGER_DIR:-}" ]; then
-        dir="$DOKONCI_LEDGER_DIR"
-    elif git -C "$ROOT" check-ignore -q .scratch/dokonci 2>/dev/null; then
-        dir="$ROOT/.scratch"
-    else
-        dir=/tmp/dokonci
-    fi
+    local dir="${DOKONCI_LEDGER_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/agentic-workflow}"
     mkdir -p "$dir" || fail "ledger priečinok $dir sa nedá vytvoriť" "DOKONCI_LEDGER_DIR=<zapisovateľný priečinok>"
     LEDGER="$dir/dokonci-$ULOHA.md"
     if [ -n "${DOKONCI_TASKER:-}" ]; then

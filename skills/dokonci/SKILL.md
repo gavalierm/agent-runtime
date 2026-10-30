@@ -63,5 +63,5 @@ v dočasnom worktree z origin, a pushne ich.
 
 `DOKONCI_TASKER` (príkaz Taskera, pod rootom predvolene `bin/tk`; môže byť
 príkaz s argumentmi, napríklad `node /opt/tasker/bin/tasker`),
-`DOKONCI_LEDGER_DIR` (predvolene `.scratch` repa, ak ho git ignoruje, inak
-`/tmp/dokonci`). Test: `node --test test/dokonci.test.mjs` v klone kódu.
+`DOKONCI_LEDGER_DIR` (predvolene
+`${XDG_STATE_HOME:-$HOME/.local/state}/agentic-workflow`). Test: `node --test test/dokonci.test.mjs` v klone kódu.
