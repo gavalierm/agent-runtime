@@ -110,9 +110,13 @@ test("reply_guard: adresa webu Taskera a rozhodnutie operátora z runtime.env", 
   const link = JSON.parse(hook("reply_guard.mjs", { last_assistant_message: "Hotová je úloha 380." }).stdout);
   assert.match(link.reason, /\[úloha 380\]\(https:\/\/host\.example\.ts\.net:8801\/tasks\/380\)/);
   assert.match(link.reason, /\(tvar `\[úloha N\]\(https:\/\/host\.example\.ts\.net:8801\/tasks\/N\)`\)/);
-  const local = JSON.parse(hook("reply_guard.mjs", { last_assistant_message: "Pozri http://127.0.0.1:8801/x." }).stdout);
-  assert.match(local.reason, /napríklad https:\/\/host\.example\.ts\.net:8801\./);
-  assert.match(local.reason, /: https:\/\/host\.example\.ts\.net:<port>$/);
+  // localLinks na Macu (darwin) localhost pustí, operátor ho tam má vlastný.
+  const local = hook("reply_guard.mjs", { last_assistant_message: "Pozri http://127.0.0.1:8801/x." }).stdout;
+  if (process.platform === "darwin") assert.equal(local, "");
+  else {
+    assert.match(JSON.parse(local).reason, /napríklad https:\/\/host\.example\.ts\.net:8801\./);
+    assert.match(JSON.parse(local).reason, /: https:\/\/host\.example\.ts\.net:<port>$/);
+  }
   const tr = join(HOME, "t.jsonl");
   const ev = (type, content) => JSON.stringify({ type, message: { content } });
   writeFileSync(tr, [ev("user", "ahoj"), ev("assistant", [{ type: "text", text: "Oskar schválil plán." }])].join("\n"));
