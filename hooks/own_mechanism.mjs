@@ -11,6 +11,10 @@
 // chybu asistenta načítať na štarte každej relácie. Je to nový mechanizmus načítania
 // a nepomenúva existujúci (zoznam skillov, ktorý aplikácia ukazuje v každej relácii,
 // to už robí). Hook `rozhodni.sh` neposudzoval a slová o štarte relácie nemal.
+// Dňa 31. 10. 2026 (úloha 714, kontrola správcu servera) dva nálezy: hlásenie
+// `tk comment 1 --body "Nová kontrola disku prešla bez chyby."` hook zamietol, hoci je to
+// opis stavu, nie zadanie, a veta "Register chýb sa načíta na začiatku každej relácie."
+// v `rozhodni.sh` prešla, lebo vzor poznal len štart relácie.
 //
 // PreToolUse pre Bash. Posudzuje len príkazy, ktoré zadávajú prácu:
 //  - `tk`/`tasker` `task add` (text je --title a --body), `comment` a `task comment`
@@ -18,7 +22,12 @@
 //  - `ask_agent.sh` (text je telo heredocu na stdin, `< súbor` a --dopad),
 //  - `rozhodni.sh` (text je telo heredocu, `< súbor`, `cat súbor | ... rozhodni.sh`
 //    a hodnota --nazov; --dry-run sa posudzuje rovnako).
-// Text, ktorý nesie slovo z MECHANISM, sa zamietne. Prejde, keď niektorý text príkazu
+// Text, ktorý nesie slovo z MECHANISM, sa zamietne. Slová triedy návrhu (značka
+// "zadanie": načítanie na štarte relácie, nový hook, nová kontrola, vlastný mechanizmus)
+// sa posudzujú len v texte, ktorý zadáva alebo rozhoduje (`task add`, `ask_agent.sh`,
+// `rozhodni.sh`), v `comment` a `task comment` nie: komentár opisuje stav a "nová kontrola
+// disku prešla" nie je návrh. Slová infraštruktúry (systemd, timer, cron, ...) platia
+// všade (D0178). Prejde, keď niektorý text príkazu
 // nesie riadok `Nástroj overený: <príkaz a výstup>` alebo vetu `existujúci mechanizmus
 // X to nerobí, lebo Y` (global §6, D0189: nový mechanizmus vzniká, len keď žiadny
 // existujúci jeho účel nenesie). Ostatné príkazy (echo, grep, cat so zmienkou systemd)
@@ -40,6 +49,9 @@ import { inlineSubstitutions } from "./human_question.mjs";
 // Slovo za `.`, `-`, `/` alebo `@` je časť mena jednotky či cesty (`agent-morning.timer`,
 // `/etc/cron.d`) a nie návrh mechanizmu (chyba 26. 10. 2026, úloha 622: komentár
 // s výstupom `systemctl disable --now agent-morning.timer` zamietnutý).
+// Tretí prvok "zadanie" znamená slovo triedy návrhu: posudzuje sa len v texte, ktorý
+// zadáva alebo rozhoduje, nie v komentári (kind === "comment", úloha 714). Záznam bez
+// tretieho prvku platí všade.
 const W = String.raw`[\p{L}\p{N}_]`;
 const word = (src) => new RegExp(String.raw`(?<![\p{L}\p{N}_.\-/@])(?:${src})(?!${W})`, "iu");
 export const MECHANISM = [
@@ -61,11 +73,14 @@ export const MECHANISM = [
   // Načítanie na štarte relácie je mechanizmus: zoznam skillov v aplikácii to robí
   // v každej relácii (chyba 31. 10. 2026, úloha 707, rozhodnutie D0207). Zmienka v
   // negácii sa neposudzuje, rozhoduje riadok `Nástroj overený:` alebo veta EXISTING.
-  ["načítanie na štarte relácie", new RegExp(String.raw`(?<![\p{L}\p{N}_])(?:(?:na|pri)\s+[šs]tarte\s+(?:každej\s+|novej\s+|tejto\s+)?rel[áa]cie|SessionStart)(?!${W})`, "iu")],
-  ["nový hook", word(String.raw`nov\p{L}{0,4}\s+hook\p{L}*`)],
-  ["nová kontrola", word(String.raw`nov\p{L}{0,4}\s+kontrol\p{L}*`)],
+  // Vzor pozná aj "na začiatku relácie" a "pri otvorení relácie", aj bez diakritiky
+  // (úloha 714: "Register chýb sa načíta na začiatku každej relácie." prešlo).
+  // Slová triedy návrhu (ďalšie tri záznamy) platia len v zadaní a rozhodnutí.
+  ["načítanie na štarte relácie", new RegExp(String.raw`(?<![\p{L}\p{N}_])(?:(?:(?:na|pri)\s+[šs]tarte|na\s+za[čc]iatku|pri\s+otvoren[íi])\s+(?:každej\s+|novej\s+|tejto\s+)?rel[áa]cie|SessionStart)(?!${W})`, "iu"), "zadanie"],
+  ["nový hook", word(String.raw`nov\p{L}{0,4}\s+hook\p{L}*`), "zadanie"],
+  ["nová kontrola", word(String.raw`nov\p{L}{0,4}\s+kontrol\p{L}*`), "zadanie"],
   // Jednotné číslo ("vlastný install.sh"), množné ("vlastné skripty správ") nie.
-  ["vlastný mechanizmus", word(String.raw`vlastn(?:ý|ú|ým|ého|ou|á)\s+(?:hook|skript|mechaniz|kontrol|install)\p{L}*`)],
+  ["vlastný mechanizmus", word(String.raw`vlastn(?:ý|ú|ým|ého|ou|á)\s+(?:hook|skript|mechaniz|kontrol|install)\p{L}*`), "zadanie"],
 ];
 
 // Riadok, ktorým zadávateľ ukáže, že existujúci nástroj mechanizmus nemá.
@@ -134,24 +149,26 @@ const scriptOf = (words) => {
 // `cat súbor | ...`: [1-3] je súbor (v apostrofoch, v úvodzovkách, holý), [4] zvyšok riadku.
 const CAT_PIPE = /(?:^|[\n;&|(])[ \t]*cat[ \t]+(?:'([^'\n]+)'|"([^"$`\n]+)"|([^\s"'$`;|&<>()\\]+))[ \t]*\|[ \t]*([^\n]*)/g;
 
-// Texty zadaní v príkaze: [{ what, text }].
+// Texty v príkaze: [{ what, kind, text }]. kind je "assignment" (zadáva alebo rozhoduje:
+// `task add`, `ask_agent.sh`, `rozhodni.sh`) alebo "comment" (`comment`, `task comment`).
 export function assignmentTexts(raw, read = readText) {
   const src = inlineSubstitutions(raw, read);
   const out = [];
   for (const { rest } of taskerCommands(src)) {
     let flags;
     let what;
-    if (rest[0] === "task" && rest[1] === "add") { flags = ["title", "body"]; what = "úloha `task add`"; }
-    else if (rest[0] === "comment" || (rest[0] === "task" && rest[1] === "comment")) { flags = ["body"]; what = "komentár"; }
+    let kind;
+    if (rest[0] === "task" && rest[1] === "add") { flags = ["title", "body"]; what = "úloha `task add`"; kind = "assignment"; }
+    else if (rest[0] === "comment" || (rest[0] === "task" && rest[1] === "comment")) { flags = ["body"]; what = "komentár"; kind = "comment"; }
     else continue;
     const args = rest.slice(1);
     for (const f of flags) {
       const v = flagValue(args, f);
-      if (v !== undefined) out.push({ what, text: withFiles(v, read) });
+      if (v !== undefined) out.push({ what, kind, text: withFiles(v, read) });
     }
     const file = flagValue(args, "body-file");
     const t = file === undefined ? null : read(file);
-    if (t !== null) out.push({ what, text: t });
+    if (t !== null) out.push({ what, kind, text: t });
   }
   // ask_agent.sh a rozhodni.sh: heredoc na riadku s príkazom, `< súbor`, vlastná voľba
   // (--dopad, --nazov) a pri rozhodni.sh rúra `cat súbor | ... rozhodni.sh`.
@@ -159,21 +176,21 @@ export function assignmentTexts(raw, read = readText) {
     const start = src.lastIndexOf("\n", m.index) + 1;
     const line = src.slice(start, m.index + m[0].indexOf("\n"));
     const s = commands(line).map(scriptOf).find(Boolean);
-    if (s) out.push({ what: s.what, text: m[3] });
+    if (s) out.push({ what: s.what, kind: "assignment", text: m[3] });
   }
   for (const words of commands(src)) {
     const s = scriptOf(words);
     if (!s) continue;
     const v = flagValue(words.slice(s.i + 1), s.flag);
-    if (v !== undefined) out.push({ what: s.what, text: v });
+    if (v !== undefined) out.push({ what: s.what, kind: "assignment", text: v });
     const lt = words.indexOf("<");
     const t = lt >= 0 && words[lt + 1] ? read(words[lt + 1]) : null;
-    if (t !== null) out.push({ what: s.what, text: t });
+    if (t !== null) out.push({ what: s.what, kind: "assignment", text: t });
   }
   for (const m of src.matchAll(CAT_PIPE)) {
     const s = scriptOf(commands(m[4])[0] ?? []);
     const t = s?.pipe ? read(m[1] ?? m[2] ?? m[3]) : null;
-    if (t !== null && t !== undefined) out.push({ what: s.what, text: t });
+    if (t !== null && t !== undefined) out.push({ what: s.what, kind: "assignment", text: t });
   }
   return out;
 }
@@ -184,8 +201,9 @@ export function ownMechanismReason(raw, { read = readText, mechanism = MECHANISM
   // Riadok `Nástroj overený:` alebo veta EXISTING v ktoromkoľvek texte príkazu (nadpis, telo, dopad) kryje celý príkaz.
   if (texts.some(({ text }) => VERIFIED.test(text) || EXISTING.test(text))) return null;
   const hits = [];
-  for (const { what, text } of texts) {
-    const found = mechanism.filter(([, re]) => re.test(text)).map(([name]) => name);
+  for (const { what, kind, text } of texts) {
+    // Slová triedy návrhu (značka "zadanie") sa v komentári neposudzujú.
+    const found = mechanism.filter(([, re, scope]) => !(kind === "comment" && scope === "zadanie") && re.test(text)).map(([name]) => name);
     if (found.length) hits.push(`${what} nesie mechanizmus (${found.join(", ")})`);
   }
   return hits.length ? hits[0] : null;

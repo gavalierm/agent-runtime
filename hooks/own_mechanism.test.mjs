@@ -210,8 +210,9 @@ test("rozhodni.sh: rozhodnutie bez slov mechanizmu prejde", () => {
 });
 
 test("nové slová: načítanie na štarte relácie, nový hook, nová kontrola, vlastný mechanizmus", () => {
-  const c = (t) => chk(`tk comment 1 --body ${sq(t)}`);
-  assert.match(c("nová kontrola X zastaví chybu"), /komentár nesie mechanizmus \(nová kontrola\)/);
+  // Slová triedy návrhu platia v zadaní (`task add`), v komentári nie (úloha 714, test nižšie).
+  const c = (t) => chk(`tk task add --project p --body ${sq(t)}`);
+  assert.match(c("nová kontrola X zastaví chybu"), /úloha `task add` nesie mechanizmus \(nová kontrola\)/);
   assert.equal(c("kontrola prešla"), null);
   assert.equal(c("jeho vlastné skripty správ"), null);
   assert.equal(c("vlastné kontroly a hooky"), null);
@@ -236,4 +237,57 @@ test("echo a grep so slovom o štarte relácie nie sú zadanie", () => {
   assert.equal(chk(`git commit -m "nový hook na štarte relácie" -- x`), null);
   assert.equal(run(`echo "na štarte relácie"`), null);
   assert.equal(run("grep SessionStart hooks/*.mjs"), null);
+});
+
+// Úloha 714, nález 1: slová triedy návrhu platia v zadaní a rozhodnutí, v komentári nie.
+test("komentár: opis stavu so slovami triedy návrhu prejde, infraštruktúra v komentári sa zamietne", () => {
+  assert.equal(chk(`tk comment 1 --body "Nová kontrola disku prešla bez chyby."`), null);
+  assert.equal(chk(`tk comment 1 --body "hook identity beží na štarte relácie"`), null);
+  assert.equal(chk(`${TK} task comment 1 --body "nový hook prešiel, vlastný mechanizmus nepotrebujem"`), null);
+  assert.equal(run(`tk comment 1 --body "Nová kontrola disku prešla bez chyby."`), null);
+  // Súbor v --body-file je tiež komentár.
+  assert.equal(chk(`tk comment 1 --body-file /tmp/k.md`, { read: () => "nový hook na štarte relácie" }), null);
+  // Infraštruktúra platí v komentári ako doteraz (D0178), aj spolu so slovom triedy návrhu.
+  assert.ok(chk(`tk comment 1 --body "pridaj cron"`));
+  assert.ok(chk(`tk comment 1 --body "Nová kontrola disku prešla, pridaj timer."`));
+  assert.ok(chk(`tk task comment 1 --body "systemd"`));
+  assert.equal(run(`tk comment 1 --body "pridaj cron"`).permissionDecision, "deny");
+});
+
+test("zadanie: nová kontrola v task add, nový hook v ask_agent.sh a rozhodni.sh sa zamietne", () => {
+  assert.match(chk(`tk task add --project p --title "Nová kontrola disku" --body "x"`), /úloha `task add` nesie mechanizmus \(nová kontrola\)/);
+  assert.ok(chk(`tk task add --project p --title "x" --body "Nový hook na štarte relácie"`));
+  assert.match(chk(`ask_agent.sh boris t <<'EOF'\nnavrhujem nový hook pre budík\nEOF`), /správa `ask_agent\.sh` nesie mechanizmus \(nový hook\)/);
+  assert.equal(run(`ask_agent.sh boris t <<'EOF'\nnavrhujem nový hook pre budík\nEOF`).permissionDecision, "deny");
+  assert.match(chk(heredoc("Treba vlastný mechanizmus na zber chýb.")), /rozhodnutie `rozhodni\.sh` nesie mechanizmus \(vlastný mechanizmus\)/);
+  // Komentár s tým istým textom prejde, zadanie nie.
+  const t = "Nová kontrola disku prešla bez chyby.";
+  assert.equal(chk(`tk comment 1 --body ${sq(t)}`), null);
+  assert.ok(chk(`tk task add --project p --body ${sq(t)}`));
+});
+
+test("MECHANISM: štyri slová triedy návrhu nesú značku zadanie, pôvodné slová infraštruktúry nie", () => {
+  const scope = (n) => MECHANISM.find(([name]) => name === n)?.[2];
+  for (const n of ["načítanie na štarte relácie", "nový hook", "nová kontrola", "vlastný mechanizmus"]) assert.equal(scope(n), "zadanie", n);
+  for (const n of ["systemd", "timer", "cron", "slučka", "daemon", "watcher", "polling", "nová služba", "nový skript", "sudo", "authorized_keys"]) assert.equal(scope(n), undefined, n);
+});
+
+// Úloha 714, nález 2: na začiatku relácie, pri otvorení relácie.
+test("rozhodni.sh: na začiatku a pri otvorení relácie sa zamietne, veta nerobí, lebo kryje", () => {
+  const re = /rozhodnutie `rozhodni\.sh` nesie mechanizmus \(načítanie na štarte relácie\)/;
+  assert.match(chk(heredoc("Register chýb sa načíta na začiatku každej relácie.")), re);
+  assert.match(chk(heredoc("Register chýb sa načíta pri otvorení relácie.")), re);
+  assert.equal(run(heredoc("Register chýb sa načíta na začiatku každej relácie.")).permissionDecision, "deny");
+  for (const t of ["na začiatku relácie", "Na začiatku každej relácie", "na začiatku novej relácie", "na začiatku tejto relácie", "na zaciatku relacie", "pri otvorení relácie", "pri otvorení každej relácie", "pri otvorení novej relácie", "pri otvorení tejto relácie", "pri otvoreni relacie", "na\nzačiatku relácie"]) {
+    assert.ok(chk(heredoc(`Register chýb sa načíta ${t}.`)), t);
+    assert.ok(chk(`tk task add --project p --body ${sq(`načítaj ${t}`)}`), t);
+  }
+  for (const t of ["na začiatku roka", "na začiatku týždňa", "pri otvorení súboru", "pri otvorení okna", "otvorenie relácie", "začiatok relácie"]) {
+    assert.equal(chk(heredoc(`Register chýb sa načíta ${t}.`)), null, t);
+  }
+  assert.equal(chk(heredoc(`Register chýb sa načíta na začiatku každej relácie. ${NEROBI}`)), null);
+  assert.equal(chk(heredoc(`Register chýb sa načíta pri otvorení relácie.\n${OVERENY}`)), null);
+  // Veta z úlohy 714: existujúci mechanizmus nerobí, lebo.
+  assert.equal(chk(heredoc("Existujúci mechanizmus zoznam skillov to nerobí, lebo ukazuje len opisy.")), null);
+  assert.equal(chk(heredoc("Register chýb sa načíta pri otvorení relácie. Existujúci mechanizmus zoznam skillov to nerobí, lebo ukazuje len opisy.")), null);
 });

@@ -30,7 +30,10 @@ pre úlohu s viac krokmi.
   nová kontrola, načítanie na štarte relácie) nesie riadok `Nástroj overený:
   <príkaz a výstup>` alebo vetu `Existujúci mechanizmus X to nerobí, lebo Y`.
   Hook posudzuje `task add`, `comment`, `ask_agent.sh` a text rozhodnutia pre
-  `rozhodni.sh` (`own_mechanism.mjs`).
+  `rozhodni.sh` (`own_mechanism.mjs`). Slová návrhu (nový hook, nová kontrola,
+  načítanie na štarte relácie, vlastný mechanizmus) platia pre zadanie a
+  rozhodnutie, nie pre komentár. Slová infraštruktúry (systemd, timer, cron,
+  slučka, nový skript) platia aj v komentári.
 - Agentovi, ktorý v tom istom projekte už má bežiaci beh, zakladaj úlohu
   s `--blocked-by` a `--reason`, inak ju dispečer spustí súbežne v tom istom
   klone. Vedomé súbežné zadanie je `TK_PARALLEL=1` pred príkazom
