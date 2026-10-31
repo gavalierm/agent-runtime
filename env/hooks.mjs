@@ -58,6 +58,7 @@ export const TABLE = [
   R("topic.mjs", "PreToolUse", ".*", null, ["mac"], ["agent"], "check"),
   R("no_model_wait.mjs", "PreToolUse", "Bash", null, ["none"], ["main", "mac"]),
   R("foreign_git.mjs", "PreToolUse", "Bash", null, ["none"], ["main"]),
+  R("foreign_worktree.mjs", "PreToolUse", "Bash", null, ["none"], ["main", "runs"]),
   R("git_pull.mjs", "PreToolUse", "Bash", null, ["none"], ["main", "mac"]),
   R("tasker_root.mjs", "PreToolUse", "Bash", null, ["tasker"], ["main"]),
   R("web_review.mjs", "PreToolUse", "Bash", null, ["tasker"], ["main"]),
@@ -85,6 +86,7 @@ export const TABLE = [
   R("tasker_work.mjs", "PreToolUse", BASH_ALL, 10, ["tasker"], ["main"]),
   // PostToolUse a PostToolUseFailure
   R("topic_task.mjs", "PostToolUse", "Bash", null, ["tasker", "t3"], ["agent"]),
+  R("foreign_worktree.mjs", "PostToolUse", "Bash", null, ["none"], ["main", "runs"]),
   R("tool_failure_log.mjs", "PostToolUseFailure", "Bash", 5, ["none"], ["main", "runs"]),
   // SubagentStop
   R("tasker_work.mjs", "SubagentStop", null, 3, ["tasker"], ["main", "mac"]),

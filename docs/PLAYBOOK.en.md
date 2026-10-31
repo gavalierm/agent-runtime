@@ -648,7 +648,7 @@ The events we use:
 |---|---|---|
 | SessionStart | start, resume, `/clear`, compaction | `unslop.mjs` inserts the core of the writing rules, `identity.mjs` announces the identity and inserts the roles, `clear_bridge.mjs` performs the session start after `/clear`, `rozhodnutia_context.mjs` inserts changes of decisions |
 | UserPromptSubmit | on every prompt | `context_warning.mjs` warns about the context limit, `rules_delta.mjs` inserts a change of rules, `tasker_work.mjs` announces work on a task |
-| PreToolUse | before a tool is used | `no_model_wait.mjs` rejects a wait in the foreground, `foreign_git.mjs` and `git_pull.mjs` dangerous git, `tasker_root.mjs` a direct task manager command under root, `web_review.mjs` a web task without a review, `rozhodnutia_guard.mjs` a write of a decision outside the script, `own_rule_scope.mjs` a rule at the wrong level |
+| PreToolUse | before a tool is used | `no_model_wait.mjs` rejects a wait in the foreground, `foreign_git.mjs` and `git_pull.mjs` dangerous git, `foreign_worktree.mjs` checkout, switch and reset in another agent's worktree, `tasker_root.mjs` a direct task manager command under root, `web_review.mjs` a web task without a review, `rozhodnutia_guard.mjs` a write of a decision outside the script, `own_rule_scope.mjs` a rule at the wrong level |
 | SubagentStop | end of a sub-agent | `tasker_work.mjs` ends the work record |
 | Stop | before the end of a reply | `reply_guard.mjs` the cap and links in the reply, `todo_after_comment.mjs` a task after a comment, `objection_fix.mjs` an acknowledged mistake without a fix |
 

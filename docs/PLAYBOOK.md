@@ -621,7 +621,7 @@ Udalosti, ktoré používame:
 |---|---|---|
 | SessionStart | štart, obnovenie, `/clear`, kompakcia | `unslop.mjs` vloží jadro pravidiel písania, `identity.mjs` ohlási identitu a vloží roly, `clear_bridge.mjs` urobí štart relácie po `/clear`, `rozhodnutia_context.mjs` vloží zmeny rozhodnutí |
 | UserPromptSubmit | pri každom prompte | `context_warning.mjs` upozorní na hranicu kontextu, `rules_delta.mjs` vloží zmenu pravidiel, `tasker_work.mjs` ohlási prácu na úlohe |
-| PreToolUse | pred použitím nástroja | `no_model_wait.mjs` zamietne čakanie v popredí, `foreign_git.mjs` a `git_pull.mjs` nebezpečný git, `tasker_root.mjs` priamy príkaz správcu úloh pod rootom, `web_review.mjs` úlohu webu bez posudku, `rozhodnutia_guard.mjs` zápis rozhodnutia mimo skriptu, `own_rule_scope.mjs` pravidlo na zlej úrovni |
+| PreToolUse | pred použitím nástroja | `no_model_wait.mjs` zamietne čakanie v popredí, `foreign_git.mjs` a `git_pull.mjs` nebezpečný git, `foreign_worktree.mjs` checkout, switch a reset v cudzom worktree, `tasker_root.mjs` priamy príkaz správcu úloh pod rootom, `web_review.mjs` úlohu webu bez posudku, `rozhodnutia_guard.mjs` zápis rozhodnutia mimo skriptu, `own_rule_scope.mjs` pravidlo na zlej úrovni |
 | SubagentStop | koniec sub-agenta | `tasker_work.mjs` ukončí záznam práce |
 | Stop | pred koncom odpovede | `reply_guard.mjs` strop a odkazy v odpovedi, `todo_after_comment.mjs` úlohu po komentári, `objection_fix.mjs` uznanú chybu bez opravy |
 

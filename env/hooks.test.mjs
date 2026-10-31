@@ -34,6 +34,7 @@ UserPromptSubmit|||rules_delta.mjs
 UserPromptSubmit|||tasker_work.mjs
 PreToolUse|Bash||no_model_wait.mjs
 PreToolUse|Bash||foreign_git.mjs
+PreToolUse|Bash||foreign_worktree.mjs
 PreToolUse|Bash||git_pull.mjs
 PreToolUse|Bash||tasker_root.mjs
 PreToolUse|Bash||web_review.mjs
@@ -65,12 +66,14 @@ Stop||10|tool_failure_report.mjs
 Stop||5|dokonci_open.mjs
 SubagentStop||3|tasker_work.mjs
 SubagentStop||10|tool_failure_report.mjs
+PostToolUse|Bash||foreign_worktree.mjs
 PostToolUseFailure|Bash|5|tool_failure_log.mjs
 PreCompact||3|compact_block.mjs`.split("\n");
 
 const RUNS = `Stop||10|tool_failure_report.mjs
 Stop||5|dokonci_open.mjs
 SubagentStop||10|tool_failure_report.mjs
+PreToolUse|Bash||foreign_worktree.mjs
 PreToolUse|Bash||own_mechanism.mjs
 PreToolUse|Bash||task_title.mjs
 PreToolUse|Bash||task_concurrency.mjs
@@ -81,6 +84,7 @@ PreToolUse|Bash||sed_line.mjs
 PreToolUse|Bash||secret_read.mjs
 PreToolUse|Bash||repeat_guard.mjs
 PreToolUse|^(Edit|Write|MultiEdit|NotebookEdit|Bash)$||deploy_readonly.mjs
+PostToolUse|Bash||foreign_worktree.mjs
 PostToolUseFailure|Bash|5|tool_failure_log.mjs
 PreCompact||3|compact_block.mjs`.split("\n");
 
@@ -105,15 +109,15 @@ UserPromptSubmit|||agreement_scope.mjs
 UserPromptSubmit|||rules_delta.mjs
 PreCompact||3|compact_block.mjs`.split("\n");
 
-test("main: dnešných 44 hookov rootu, po udalostiach v dnešnom poradí", () => {
+test("main: dnešných 46 hookov rootu, po udalostiach v dnešnom poradí", () => {
   const got = flat(hooksFor("main", HOOKS, WF));
-  assert.equal(got.length, 44);
+  assert.equal(got.length, 46);
   assert.deepEqual(byEvent(got), byEvent(MAIN));
 });
 
-test("runs: dnešných 15 hookov používateľa behov", () => {
+test("runs: dnešných 17 hookov používateľa behov", () => {
   const got = flat(hooksFor("runs", HOOKS, WF));
-  assert.equal(got.length, 15);
+  assert.equal(got.length, 17);
   assert.deepEqual(byEvent(got), byEvent(RUNS));
 });
 
@@ -126,7 +130,7 @@ test("mac: dnešných 20 hookov Macu", () => {
 test("skupiny: Bash hooky rootu sú v jednej skupine, tasker_work s iným timeoutom v inej", () => {
   const pre = hooksFor("main", HOOKS, WF).PreToolUse;
   assert.equal(pre[0].matcher, "Bash");
-  assert.equal(pre[0].hooks.length, 16);
+  assert.equal(pre[0].hooks.length, 17);
   const tw = pre.filter((g) => g.hooks.some((h) => h.command.endsWith("/tasker_work.mjs")));
   assert.deepEqual(tw.map((g) => [g.matcher, g.hooks.find((h) => h.command.endsWith("/tasker_work.mjs")).timeout]), [["^(Agent|Task)$", 3], ["^(Bash|Edit|Write|MultiEdit|NotebookEdit)$", 10]]);
 });
