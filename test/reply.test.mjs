@@ -40,6 +40,21 @@ test("reply.sh: riadok Hotovo: je výsledok, odpoveď na vedomie bez prepínača
   assert.equal(readFileSync(join(box, "outbox", files[0]), "utf8").split("\n")[0], "odpoveď: na vedomie");
 });
 
+test("reply.sh: neexistujúca pôvodná správa je kód 1 a nič sa nezapíše (úloha 709, nález 2 úlohy 710)", () => {
+  const { box, env } = prostredie();
+  const r = reply(env, ["boris-agentic_brain-20261031-000000-1.md"], "Hotovo: x\n" + TRI);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /Pôvodná správa boris-agentic_brain-20261031-000000-1\.md nie je v \S+\/processed ani inbox, odpovedať sa dá len na prijatú správu\./);
+  assert.deepEqual(readdirSync(join(box, "outbox")), []);
+  // Správa bez hlavičky `téma:` ostáva: téma sa odvodí z mena, súbor existuje.
+  writeFileSync(join(box, "processed", "boris-siet-20261031-000000-2.md"), "odpoveď: čakám\nPokyn\n");
+  const ok = reply(env, ["boris-siet-20261031-000000-2.md"], "Hotovo: x\n" + TRI);
+  assert.equal(ok.status, 0, ok.stderr);
+  const files = readdirSync(join(box, "outbox"));
+  assert.equal(files.length, 1);
+  assert.match(readFileSync(join(box, "outbox", files[0]), "utf8"), /\ntéma: siet\n/);
+});
+
 test("reply.sh: riadok Úloha bez prepínača je pokyn a zápis sa odmietne", () => {
   const { box, env } = prostredie();
   const r = reply(env, [NAME], "Úloha: x\n" + TRI);

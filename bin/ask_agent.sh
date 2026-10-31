@@ -51,6 +51,13 @@
 # ju vedie (route.mjs topic send, D0211: nová téma dostane nové vlákno T3,
 # chyba 28. 10. 2026). Odosielateľ bez zoznamu sa nekontroluje. Odpoveď s --k
 # tému v zozname nekontroluje, trasu odpovede obnoví budič adresáta z `k:`.
+# Zato --k vyžaduje pôvodnú správu v schránke odosielateľa
+# ($AGENT_BOX/processed/<id>, inbox/<id> alebo processed/<id>.* z --replies),
+# inak kód 1 a nič sa neodošle (úloha 709, D0211). Odpoveď nesie tému
+# pôvodnej správy: iná zadaná téma je kód 1, pôvodná správa bez témy nechá
+# platiť zadanú tému a tá prejde kontrolou ako pri novej správe. Hranica:
+# bez priečinka schránky odosielateľa ($AGENT_BOX, inak /var/lib/<odosielateľ>,
+# Mac) sa kontrola --k preskočí, rovnako ako odosielateľ bez topics.json.
 # Do hlavného vlákna adresáta ide správa s --hlavne, bez témy.
 #
 # Na serveri zapíše trasu (route.mjs remember z koreňa tohto repa,
@@ -232,7 +239,35 @@ fi
 # Riadok témy v topics.json je ` "<téma>": {` (route.mjs).
 topics_file="$(dirname "$inbox")/topics.json"
 check=""
-if [ -n "$topic" ] && [ -z "$k" ]; then
+# Odpoveď (--k) patrí len na správu, ktorú odosielateľ prijal: pôvodná správa
+# leží v jeho processed alebo inboxe (budič --replies ju uloží ako
+# <id>.HHMMSS.pid.reply). Téma odpovede je téma pôvodnej správy, takže ju
+# zoznam tém nekontroluje. Pôvodná správa bez témy zadanú tému nechá platiť
+# a tá prejde kontrolou nižšie ako pri novej správe.
+check_topic=0
+if [ -z "$k" ]; then
+    check_topic=1
+else
+    sbox="${AGENT_BOX:-$VARLIB/$FROM}"
+    if [ -d "$sbox" ]; then
+        orig=""
+        for f in "$sbox/processed/$k" "$sbox/inbox/$k" "$sbox/processed/$k".*; do
+            [ -f "$f" ] && { orig="$f"; break; }
+        done
+        if [ -z "$orig" ]; then
+            echo "Správa $k nie je v $sbox/processed ani inbox, odpoveď s --k patrí len na prijatú správu. Nič som neposlal." >&2
+            exit 1
+        fi
+        orig_topic="$(sed -n 's/^téma: *//p;/^$/q' "$orig" | head -n1)"
+        if [ -z "$orig_topic" ]; then
+            check_topic=1
+        elif [ "$orig_topic" != "$topic" ]; then
+            echo "Správa $k má tému $orig_topic, zadaná téma ${topic:-žiadna}, odpoveď nesie tému pôvodnej správy. Nič som neposlal." >&2
+            exit 1
+        fi
+    fi
+fi
+if [ -n "$topic" ] && [ "$check_topic" = 1 ]; then
     # Zoznam tém odosielateľa a vlákno, z ktorého píše (route.mjs). Chýbajúci
     # route.mjs kontrolu preskočí, rovnako ako zápis trasy nižšie.
     WORKFLOW="${ASK_WORKFLOW:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"

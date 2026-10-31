@@ -34,6 +34,10 @@
 # hodnotou (v každom režime, aj s `Hotovo:`), inak kód 1 s riadkom
 # `Správny postup:` a príkladom.
 #
+# Odpovedať sa dá len na prijatú správu: súbor <meno správy> musí ležať v
+# $AGENT_BOX/processed alebo inbox, inak kód 1 a nič sa nezapíše (úloha 709).
+# Téma odpovede je z hlavičky `téma:` pôvodnej správy, bez nej z jej mena.
+#
 # Použitie: reply.sh [--cakam|--necakam] <meno správy> < odpoved.md
 # Kód 0 zapísané, 1 chyba.
 set -euo pipefail
@@ -94,26 +98,26 @@ if [ "${#missing[@]}" -gt 0 ]; then
     } >&2
     exit 1
 fi
-# Prvý riadok pôvodnej správy, budič ho presunul do processed.
-original=""
+# Pôvodná správa leží v processed (budič ju tam presunul) alebo v inboxe.
+# Odpovedať sa dá len na prijatú správu.
+orig_file=""
 for f in "$BOX/processed/$name" "$BOX/inbox/$name"; do
-    [ -f "$f" ] || continue
-    original="$(sed -n '1{s/^odpoveď: *//p}' "$f")"
-    break
+    [ -f "$f" ] && { orig_file="$f"; break; }
 done
+if [ -z "$orig_file" ]; then
+    echo "Pôvodná správa $name nie je v $BOX/processed ani inbox, odpovedať sa dá len na prijatú správu." >&2
+    exit 1
+fi
+# Prvý riadok pôvodnej správy.
+original="$(sed -n '1{s/^odpoveď: *//p}' "$orig_file")"
 head="odpoveď: $mode"
 case "$original" in
     "čakám"|"nečakám"|"na vedomie") head="$head"$'\n'"k správe: $original" ;;
 esac
 # Hlavička s id a `k:` (id pôvodnej správy): budič odosielateľa páruje
 # odpoveď podľa nej, nie podľa mena súboru. Téma z hlavičky pôvodnej správy,
-# inak z jej mena.
-orig_topic=""
-for f in "$BOX/processed/$name" "$BOX/inbox/$name"; do
-    [ -f "$f" ] || continue
-    orig_topic="$(sed -n 's/^téma: *//p' "$f" | head -n1)"
-    break
-done
+# bez nej ako záloha z jej mena.
+orig_topic="$(sed -n 's/^téma: *//p' "$orig_file" | head -n1)"
 if [ -z "$orig_topic" ]; then
     rest="${name#*-}"
     [[ "$rest" =~ ^([a-z][a-z0-9_]*)-[0-9] ]] && orig_topic="${BASH_REMATCH[1]}"

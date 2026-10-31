@@ -215,7 +215,8 @@ test("reply.sh: odpoveď odosielateľovi z AGENT_INBOX_ONLY ide len do jeho schr
   assert.match(guard.stderr, /--cakam alebo --necakam/);
   assert.equal(readdirSync(cyrilInbox).length, 2, "nič sa nezapísalo");
   assert.equal(spawnSync(join(RUNTIME, "reply.sh"), ["--necakam", name], { env, input: "Úloha: pozri disk.\n" + TRI }).status, 0);
-  // Pôvodná správa bez riadku: odpoveď má len prvý riadok.
+  // Pôvodná správa bez riadku `odpoveď:` a bez témy: odpoveď má len prvý riadok. Odpovedať sa dá len na prijatú správu (úloha 709).
+  for (const n of ["boris-20261018-120000-1.md", "boris-adam-boris-adam-tema-20261018-120000.md"]) writeFileSync(join(box, "processed", n), "Pokyn bez hlavičky\n");
   execFileSync(join(RUNTIME, "reply.sh"), ["boris-20261018-120000-1.md"], { env: { ...env, AGENT_REPLY_ROUTE_boris: borisInbox }, input: "Bez pôvodu.\n" + TRI });
   assert.equal(readFileSync(join(borisInbox, "boris-20261018-120000-1.md".replace(/^boris-/, "adam-boris-")), "utf8"), "odpoveď: na vedomie\nid: boris-20261018-120000-1.md\nod: adam\nkomu: boris\ntéma: \nk: boris-20261018-120000-1.md\nBez pôvodu.\n" + TRI);
   rmSync(join(borisInbox, "adam-boris-20261018-120000-1.md"));
@@ -237,6 +238,8 @@ test("reply.sh pre iného agenta: AGENT_NAME určí schránku, env súbor a pred
   // Ako v nasadení: cesty len v runtime.env agenta, vlákno T3 ich nededí.
   writeFileSync(join(home, ".config/boris/runtime.env"), `AGENT_BOX=${box}\nAGENT_REPLY_ROUTE_adam=${adamInbox}\n`);
   const env = { PATH: process.env.PATH, HOME: home, AGENT_NAME: "boris", CLAUDE_PID: "" };
+  // Pôvodné správy prijal Boris, ležia v jeho processed (úloha 709).
+  for (const n of ["adam-20261018-120000-1.md", "adam-boris-adam-boris-tema-20261018-120000.md"]) writeFileSync(join(box, "processed", n), "Pokyn bez hlavičky\n");
   execFileSync(join(RUNTIME, "reply.sh"), ["adam-20261018-120000-1.md"], { env, input: "Od Borisa.\n" + TRI });
   assert.deepEqual(readdirSync(join(box, "outbox")), ["adam-20261018-120000-1.md"]);
   assert.deepEqual(readdirSync(adamInbox), ["boris-adam-20261018-120000-1.md"]);
@@ -257,6 +260,7 @@ test("reply.sh bez AGENT_NAME odvodí meno z PERSONA.md: predpona a runtime.env 
   mkdirSync(cwd);
   writeFileSync(join(cwd, "PERSONA.md"), "# Delta\n");
   const env = { PATH: process.env.PATH, HOME: home, CLAUDE_PID: "" };
+  writeFileSync(join(box, "processed", "adam-20261018-120000-1.md"), "Pokyn bez hlavičky\n");
   const r = spawnSync(join(RUNTIME, "reply.sh"), ["adam-20261018-120000-1.md"], { env, cwd, input: "Od Delty.\n" + TRI, encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(readdirSync(join(box, "outbox")), ["adam-20261018-120000-1.md"]);

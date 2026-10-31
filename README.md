@@ -280,7 +280,12 @@ klonov (úloha 2 v Taskeri, 19. 10. 2026).
    Holý projekt to nie je, aby téma nepresmerovala správy všetkých úloh projektu.
 3. `ask_agent.sh <adresát> <téma>` pošle správu, len keď je téma
    v zozname tém odosielateľa (bod 2) a v zozname tém adresáta (`topics.json` vedľa jeho inboxu). Inak vypíše
-   platné témy a nič neodošle, odpoveď s `--k` zoznam nekontroluje. Adresát bez zoznamu (cyril) prijme každú tému.
+   platné témy a nič neodošle. Odpoveď s `--k` zoznam tém nekontroluje, ale patrí len na prijatú správu: pôvodná
+   správa musí ležať v `processed` alebo `inbox` odosielateľa (aj ako `<id>.*` z `--replies`), inak kód 1 a nič
+   sa neodošle. Odpoveď nesie tému z hlavičky pôvodnej správy, iná zadaná téma je kód 1, pôvodná správa bez témy
+   nechá platiť zadanú tému a tá prejde kontrolou zoznamu. Bez priečinka schránky odosielateľa (Mac) sa kontrola
+   `--k` preskočí. `reply.sh` rovnako odmietne meno správy, ktoré nie je v `processed` ani `inbox` (kód 1), tému
+   zo mena odvodí len ako zálohu, keď súbor existuje a hlavičku `téma:` nemá. Adresát bez zoznamu (cyril) prijme každú tému.
    Z Macu kontroluje zoznam Adama rovnako (ssh).
    Správa do hlavného vlákna adresáta ide s `--hlavne`, meno nemá tému
    (`<ja>-<čas>-<pid>.md`).

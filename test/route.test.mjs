@@ -232,7 +232,8 @@ test("ask_agent.sh a reply.sh: správa do schránky adresáta a trasa z vlákna 
   assert.equal(routeFor(cfg, `boris-${name}`, name).thread, "thread:project:p1:tema");
   assert.equal(waitingFor(cfg, `boris-${name}`, Date.now(), name), true, "ask_agent.sh predvolene čaká");
   assert.equal(routeFor(cfg, "boris-pravidla-20261019-120000.md"), null, "nová správa bez k: trasu nemá");
-  // Odpoveď Borisovi z hlavného vlákna: trasu zruší.
+  // Odpoveď Borisovi z hlavného vlákna: trasu zruší. Odpovedať sa dá len na prijatú správu (úloha 709).
+  writeFileSync(join(box, "processed", `boris-${name}`), `odpoveď: čakám\nid: boris-${name}\nod: boris\nkomu: adam\ntéma: pravidla\nPokyn\n`);
   r = await runIn("reply.sh", [`boris-${name}`], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-main" } }, "Ďakujem.\n" + TRI);
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stderr, /hlavné vlákno, bez trasy/);
@@ -258,12 +259,14 @@ test("ask_agent.sh a reply.sh: správa do schránky adresáta a trasa z vlákna 
     assert.match(r.stderr, /^Správa na vedomie bez --dopad: .* Nič som neposlal\.\n$/);
   }
   assert.equal(readdirSync(borisInbox).length, cnt, "bez --dopad sa nič nezapísalo");
+  writeFileSync(join(box, "processed", "boris-odpoved-20261019-100000-1.md"), "odpoveď: čakám\nid: boris-odpoved-20261019-100000-1.md\nod: boris\nkomu: adam\ntéma: pravidla\nPokyn\n");
   r = await run("ask_agent.sh", ["--vedomie", "--k", "boris-odpoved-20261019-100000-1.md", "boris", "pravidla", "Odpoveď bez dopadu"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "" } });
   assert.equal(r.status, 0, r.stderr);
   const rf = readdirSync(borisInbox).find((x) => readFileSync(join(borisInbox, x), "utf8").includes("Odpoveď bez dopadu"));
   assert.ok(!/dopad:/.test(readFileSync(join(borisInbox, rf), "utf8")), "odpoveď s --k dopad nenesie");
   assert.equal(waitingFor(cfg, `boris-${f}`, Date.now(), f), false, "sent sa zapíše aj bez relácie");
   // Odpoveď Cyrilovi z vlákna témy: ďalšia správa Cyrila s tou témou ide do témy.
+  writeFileSync(join(box, "processed", "cyril-kanon-20261019-100000-7.md"), "odpoveď: čakám\nid: cyril-kanon-20261019-100000-7.md\nod: cyril\nkomu: adam\ntéma: kanon\nPokyn\n");
   r = await runIn("reply.sh", ["cyril-kanon-20261019-100000-7.md"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-tema" } }, "Hotovo: x\n" + TRI);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(routeFor(cfg, "cyril-kanon-20261019-110000-8.md", "cyril-kanon-20261019-100000-7.md").thread, "thread:project:p1:tema");
@@ -564,9 +567,38 @@ test("ask_agent.sh: nová správa s témou mimo zoznamu odosielateľa alebo z cu
   r = await runIn("ask_agent.sh", ["boris", "agenti_9e4abe"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-main" } }, "Test\n");
   assert.equal(r.status, 0, r.stderr);
   assert.equal(readdirSync(recvInbox).length, 2);
-  // Odpoveď s --k zoznam odosielateľa nekontroluje, správa --hlavne tému nemá.
-  r = await run("ask_agent.sh", ["--vedomie", "--k", "boris-adam-20261028-100000-1.md", "boris", "agentic_brain", "Odpoveď"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-A" } });
+  // Odpoveď s --k patrí len na prijatú správu (úloha 709, nález 1 úlohy 710). Vymyslené id
+  // s témou mimo oboch zoznamov: kód 1, nič v inboxe adresáta.
+  const pred = readdirSync(recvInbox).length;
+  const kEnv = { ...env, CLAUDE_CODE_SESSION_ID: "sid-A" };
+  r = await run("ask_agent.sh", ["--vedomie", "--k", "boris-adam-20261028-100000-1.md", "boris", "agentic_brain", "Odpoveď"], { env: kEnv });
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /Správa boris-adam-20261028-100000-1\.md nie je v \S+\/processed ani inbox, odpoveď s --k patrí len na prijatú správu\. Nič som neposlal\./);
+  assert.equal(readdirSync(recvInbox).length, pred, "nič v inboxe adresáta");
+  // Téma agentic_brain je mimo zoznamu odosielateľa (má len agenti_9e4abe) aj adresáta (len siet); prijatá správa ju nesie.
+  writeFileSync(join(root, "boris", "topics.json"), JSON.stringify({ siet: { thread: "thr-r", at: "2026-10-28T00:00:00Z" } }, null, 1) + "\n");
+  const prijata = (n, tema) => writeFileSync(join(box, "processed", n), `odpoveď: čakám\nid: ${n}\nod: boris\nkomu: adam\ntéma: ${tema}\nPokyn\n`);
+  prijata("boris-adam-20261031-000000-1.md", "agentic_brain");
+  r = await run("ask_agent.sh", ["--vedomie", "--k", "boris-adam-20261031-000000-1.md", "boris", "agentic_brain", "Odpoveď"], { env: kEnv });
   assert.equal(r.status, 0, r.stderr);
+  assert.equal(readdirSync(recvInbox).length, pred + 1, "odpoveď na prijatú správu odišla");
+  // Zadaná téma sa líši od témy prijatej správy: kód 1.
+  r = await run("ask_agent.sh", ["--vedomie", "--k", "boris-adam-20261031-000000-1.md", "boris", "agenti_9e4abe", "Odpoveď"], { env: kEnv });
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /Správa boris-adam-20261031-000000-1\.md má tému agentic_brain, zadaná téma agenti_9e4abe, odpoveď nesie tému pôvodnej správy\. Nič som neposlal\./);
+  assert.equal(readdirSync(recvInbox).length, pred + 1);
+  // Správa z --replies leží v processed ako <id>.HHMMSS.pid.reply, aj taká stačí.
+  writeFileSync(join(box, "processed", "boris-adam-20261031-000001-2.md.000102.77.reply"), "odpoveď: na vedomie\nid: x\ntéma: agentic_brain\nOdpoveď\n");
+  r = await run("ask_agent.sh", ["--vedomie", "--k", "boris-adam-20261031-000001-2.md", "boris", "agentic_brain", "Odpoveď na odpoveď"], { env: kEnv });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readdirSync(recvInbox).length, pred + 2);
+  // Prijatá správa bez témy v hlavičke: zadaná téma platí a prejde kontrolou zoznamu ako nová správa.
+  writeFileSync(join(box, "processed", "boris-adam-20261031-000002-3.md"), "odpoveď: čakám\nid: boris-adam-20261031-000002-3.md\nod: boris\nkomu: adam\ntéma: \nPokyn\n");
+  r = await run("ask_agent.sh", ["--vedomie", "--k", "boris-adam-20261031-000002-3.md", "boris", "agentic_brain", "Odpoveď"], { env: kEnv });
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /Téma 'agentic_brain' nie je v zozname tém odosielateľa/);
+  assert.equal(readdirSync(recvInbox).length, pred + 2);
+  // Správa --hlavne tému nemá.
   r = await run("ask_agent.sh", ["--hlavne", "--vedomie", "--dopad", "Mení sa X", "boris", "Do hlavného"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-A" } });
   assert.equal(r.status, 0, r.stderr);
 });
