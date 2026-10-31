@@ -12,7 +12,7 @@
 //  - `--body "$(< súbor)"` a `$(cat súbor)` aj `<<'EOF'` posúdi z textu súboru (súbor len číta).
 // Text je posudok, keď nesie slovo `posudok` (aj tvar `posudku`). Posudok sa zamietne, keď:
 //  - nesie tvrdenie o účinku: sloveso zmaže, odstráni, vyhodí, prepíše, nahradí, ponechá,
-//    zachová, ostane, zachytí, pustí alebo zamietne (aj iný tvar, kmeň + koncovka),
+//    zachová, ostane, zachytí, pustí alebo zamietne v určitom tvare (zmaže, zmažú),
 //  - a nenesie dôkaz prehrania: `replay`, `prehral`, `prehranie`, `prehrané` alebo `na kópii`.
 // Hranice slov sú pre unicode (\p{L}): `zmaže` sa nehľadá v `nazmažený` a `ostane` sa nehľadá
 // v `prostane`. Slovo za `.`, `-`, `/` alebo `@` (názov súboru `replay.sh`) dôkaz nie je a ani
@@ -31,19 +31,22 @@ const E = String.raw`(?![\p{L}\p{N}_])`;
 const re = (src) => new RegExp(`${B}(?:${src})${E}`, "iu");
 
 export const POSUDOK = re(String.raw`posud(?:ok|k\p{L}*)`);
+// Len určitý tvar slovesa (3. osoba prítomného alebo budúceho času) je tvrdenie o účinku.
+// Príčastie a podstatné meno (zmazaný, odstránenie, nahradené, zamietnutie) opisuje stav alebo
+// nález, prehranie v posudkoch z Taskera 31. 10. 2026 pri nich dávalo falošné zamietnutia.
 export const EFFECT = re(
   [
-    String.raw`zma[žz]\p{L}*`, // zmaže, zmažú, zmazať, zmazanie
-    String.raw`odstr[aá]n\p{L}*|odstr[aá]\p{L}*`, // odstráni, odstránia, odstrániť
-    String.raw`vyhod\p{L}*|vyhadz\p{L}*`, // vyhodí, vyhodil, vyhadzuje
-    String.raw`prep[íi]š\p{L}*|prepis\p{L}*`, // prepíše, prepisuje
-    String.raw`nahr[aá]d\p{L}*|nahrad\p{L}*`, // nahradí, nahrádza
-    String.raw`ponech\p{L}*`, // ponechá
-    String.raw`zachov\p{L}*`, // zachová
-    String.raw`ostan\p{L}*`, // ostane, ostanú
-    String.raw`zachyt\p{L}*`, // zachytí
-    String.raw`pust[íi]\p{L}*|pusť\p{L}*`, // pustí, pustia
-    String.raw`zamietn\p{L}*`, // zamietne, zamietnu
+    String.raw`zma[žz](?:e|ú)`,
+    String.raw`odstr[aá]ni(?:a)?`,
+    String.raw`vyhod(?:í|ia)|vyhadzuj(?:e|ú)`,
+    String.raw`prep[íi]š(?:e|u)|prepisuj(?:e|ú)`,
+    String.raw`nahrad(?:í|ia)|nahrádz(?:a|ajú)`,
+    String.raw`ponech(?:á|ajú)`,
+    String.raw`zachov(?:á|ajú)`,
+    String.raw`ostan(?:e|ú)`,
+    String.raw`zachyt(?:í|ia)`,
+    String.raw`pust(?:í|ia)`,
+    String.raw`zamietn(?:e|u)`,
   ].join("|"),
 );
 export const REPLAY = re(String.raw`replay\p{L}*|prehr[aá]l\p{L}*|prehran\p{L}*|na\s+kópii`);

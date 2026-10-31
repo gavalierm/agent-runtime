@@ -75,3 +75,8 @@ test("hranice slov: ostanú v inom slove a meno súboru replay.sh nie je dôkaz 
   assert.equal(reviewReplayReason(`${TK} comment 5 --body "Posudok: prostanok, nazmažený"`), null);
   assert.match(reviewReplayReason(`${TK} comment 5 --body "Posudok: zmaže, pozri bin/replay.sh"`), /zmaže/);
 });
+
+test("príčastie a podstatné meno nie sú tvrdenie o účinku", () => {
+  for (const w of ["odstránenie CONFIG", "pravidlo je nahradené", "falošné zamietnutie", "bod zmazaný", "allow ostalo"])
+    assert.equal(reviewReplayReason(`${TK} comment 5 --body "Posudok u704: ${w}"`), null, w);
+});
