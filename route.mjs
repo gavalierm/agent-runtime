@@ -27,22 +27,30 @@
 // mimo gitu, skupina schránky ho číta) mapuje meno témy na vlákno T3, ktoré
 // ju vedie. Novú správu k téme (<odosielateľ>-<téma>-<čas>) bez trasy
 // budič doručí do toho vlákna, bin/ask_agent.sh (repo pravidiel) tému mimo zoznamu
-// adresáta neodošlú. Zápis robí `topic set` z vlákna témy a `remember`
-// z vlákna témy pre tému, ktorá v zozname ešte nie je. Hlavné vlákno tému
-// nevedie. Formát je plochý objekt s odsadením jednej medzery,
+// adresáta ani odosielateľa neodošle. Téma je presná a vlákno vedie jednu
+// tému (D0211, chyba 28. 10. 2026: `remember` zapísal novú tému
+// agentic_brain bežiacemu vláknu iného zadania). Zápis robí len výslovné
+// `topic set` z vlákna témy: odmietne hlavné vlákno, holý názov projektu
+// Taskera a vlákno, ktoré už vedie inú tému (bez `--force "<dôvod>"`).
+// `remember` tému nezapisuje, pre tému mimo zoznamu vypíše, že treba nové
+// vlákno T3. Nová téma dostane nové vlákno, `hooks/topic_task.mjs` ho dá
+// vláknu bez témy pri prvej založenej úlohe. Formát je plochý objekt
+// s odsadením jednej medzery,
 // `{ "<téma>": { "thread": ..., "at": ... } }`, bin/ask_agent.sh hľadá riadok
 // ` "<téma>": {` cez grep.
 //
 // Použitie: route.mjs remember <meno správy> [--thread <id vlákna>] [--peer <agent>] [--mode čakám|nečakám|vedomie]
 //           route.mjs show <meno správy>
 //           route.mjs waiting <meno správy>   (kód 0, keď agent na odpoveď čaká)
-//           route.mjs topic set <téma> [--thread <id vlákna>]
+//           route.mjs topic set <téma> [--thread <id vlákna>] [--force "<dôvod>"]   (--force dovolí druhú tému vlákna)
+//           route.mjs topic send <téma>   (kontrola odosielateľa pre ask_agent.sh: téma v jeho zozname a vedie ju vlákno, z ktorého píše)
 //           route.mjs topic rm <téma>
 //           route.mjs topic tasks <téma> <id>...   (pridá koreňové úlohy; správy úlohy a jej podúloh idú do vlákna témy)
 //           route.mjs topic list [--file <topics.json>]
 //           route.mjs topic check <téma> [--file <topics.json>]   (kód 0, keď je téma v zozname alebo zoznam nie je)
 import { chownSync, existsSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fetchTasks } from "./lib/tasker_read.mjs";
 import { config, normalizeMode, parseName, readJson, T3Client, writeJsonAtomic, ensureDir } from "./lib.mjs";
 
 export const MAX_AGE_MS = 30 * 24 * 3600 * 1000;
@@ -71,15 +79,30 @@ function writeTopics(path, topics) {
   renameSync(tmp, path);
 }
 
-// Zapíše tému vláknu. onlyIfAbsent nechá tému, ktorú už vedie iné vlákno.
-export function setTopic(cfg, topic, thread, { onlyIfAbsent = false, now = Date.now() } = {}) {
+// Zapíše tému vláknu. Volá ju len výslovné `topic set` a hook topic_task.mjs
+// pre vlákno bez témy, `remember` ju nevolá (D0211).
+export function setTopic(cfg, topic, thread, { now = Date.now() } = {}) {
   if (!TOPIC_RE.test(topic)) throw new Error(`téma '${topic}' nie je snake_case`);
   const path = topicsPath(cfg);
   const topics = readTopics(path);
-  if (onlyIfAbsent && topics[topic]) return false;
   topics[topic] = { thread, at: new Date(now).toISOString() };
   writeTopics(path, topics);
   return true;
+}
+
+// Témy, ktoré vlákno vedie podľa zoznamu.
+export function topicsOfThread(topics, thread) {
+  return Object.entries(topics).filter(([, v]) => v?.thread === thread).map(([k]) => k);
+}
+
+const normProject = (p) => String(p).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+
+// Názvy projektov Taskera (v tvare témy), alebo null, keď sa zoznam nedá
+// prečítať (bez Taskera, chyba čítania): kontrola vtedy mlčí.
+export async function projectNames() {
+  try {
+    return new Set((await fetchTasks()).map((t) => t.project).filter(Boolean).map(normProject));
+  } catch { return null; }
 }
 
 export function removeTopic(cfg, topic) {
@@ -153,13 +176,12 @@ export function rememberRoute(cfg, { name, thread, peer, mode = null, now = Date
   const m = normalizeMode(mode);
   if (m) data.sent[key] = { id: name, cakam: m === "čakám", mode: m, at: new Date(now).toISOString() };
   writeRoutes(cfg, data, now);
-  // Vlákno témy, ktoré o téme píše, ju dostane do zoznamu, keď ju nevedie iné.
+  // Tému správy remember do zoznamu nezapíše (D0211). Keď zoznam existuje
+  // a téma v ňom nie je, volajúci vypíše, že treba nové vlákno T3.
   const t = messageTopic(name, me);
-  let topicSet = false;
-  if (!isMain && t && TOPIC_RE.test(t) && cfg.box) {
-    try { topicSet = setTopic(cfg, t, thread, { onlyIfAbsent: true, now }); } catch {}
-  }
-  return { key, thread: isMain ? null : thread, main: isMain, mode: m, topic: topicSet ? t : null };
+  let unlisted = null;
+  if (!isMain && t && TOPIC_RE.test(t) && cfg.box && existsSync(topicsPath(cfg)) && !readTopics(topicsPath(cfg))[t]) unlisted = t;
+  return { key, thread: isMain ? null : thread, main: isMain, mode: m, unlisted };
 }
 
 // Záznam, ktorý patrí správe s id `k` z hlavičky (`k: <id pôvodnej správy>`).
@@ -223,6 +245,28 @@ async function callerThread(cfg) {
   } catch (e) { return { fail: e.message }; }
 }
 
+// Kontrola odosielateľa pre ask_agent.sh (nová správa, nie odpoveď): téma
+// musí byť v zozname tém odosielateľa a z vlákna témy ju smie poslať len
+// vlákno, ktoré ju vedie. Bez zoznamu odosielateľa, z hlavného vlákna a keď sa
+// vlákno nedá zistiť, kontrola vlákna mlčí (D0211).
+async function sendCheck(cfg, topic, file) {
+  if (!existsSync(file)) return 0;
+  const topics = readTopics(file);
+  const names = Object.keys(topics);
+  if (!topics[topic]) {
+    process.stderr.write(`Téma '${topic}' nie je v zozname tém odosielateľa (${file}). Platné témy: ${names.length ? names.join(", ") : "žiadna"}. Správny postup: tému ${topic} nemá žiadne vlákno, založ pre ňu nové vlákno T3 a z neho spusti route.mjs topic set ${topic} (D0211).\n`);
+    return 1;
+  }
+  const c = await callerThread(cfg);
+  if (c.fail) return 0;
+  let main = "";
+  try { main = readFileSync(join(cfg.state, "thread_id"), "utf8").trim(); } catch {}
+  if (c.thread === main || topics[topic].thread === c.thread) return 0;
+  const mine = topicsOfThread(topics, c.thread);
+  process.stderr.write(`Vlákno ${c.thread} ${mine.length ? `vedie tému ${mine.join(", ")}` : "nevedie žiadnu tému"}, tému '${topic}' vedie vlákno ${topics[topic].thread}. Správny postup: o téme ${topic} píš z jej vlákna ${topics[topic].thread}${mine.length ? `, z tohto vlákna len o ${mine.join(", ")}` : ""}, novú tému začni v novom vlákne T3 a z neho spusti route.mjs topic set <téma> (D0211).\n`);
+  return 1;
+}
+
 async function topicCmd(cfg, sub, args) {
   const topic = args[0]?.startsWith("--") ? undefined : args[0];
   const rest = topic === undefined ? args : args.slice(1);
@@ -255,6 +299,7 @@ async function topicCmd(cfg, sub, args) {
     process.stdout.write(`route: téma ${topic} má úlohy ${topics[topic].tasks.join(", ")}\n`);
     return 0;
   }
+  if (sub === "send") return sendCheck(cfg, topic, file);
   if (sub !== "set") return null;
   let thread = opt("--thread");
   if (!thread) {
@@ -265,8 +310,21 @@ async function topicCmd(cfg, sub, args) {
   let main = "";
   try { main = readFileSync(join(cfg.state, "thread_id"), "utf8").trim(); } catch {}
   if (thread === main) { process.stderr.write(`route: hlavné vlákno tému nevedie, tému ${topic} som nezapísal\n`); return 1; }
+  const projects = await projectNames();
+  if (projects?.has(normProject(topic))) {
+    process.stderr.write(`route: téma ${topic} je holý názov projektu Taskera, tému som nezapísal. Správny postup: tému pomenuj podľa práce vlákna (napríklad ${topic}_<predmet>), holý projekt by presmeroval správy všetkých jeho úloh do jedného vlákna (D0211).\n`);
+    return 1;
+  }
+  const led = topicsOfThread(readTopics(file), thread).filter((x) => x !== topic);
+  const force = rest.includes("--force");
+  if (force && !String(opt("--force") ?? "").trim()) { process.stderr.write(`route: --force chce dôvod: --force "<dôvod>"\n`); return 2; }
+  if (led.length && !force) {
+    process.stderr.write(`route: vlákno ${thread} už vedie tému ${led.join(", ")}, tému ${topic} som nezapísal. Správny postup: založ pre tému ${topic} nové vlákno T3 a z neho spusti route.mjs topic set ${topic}; výnimku s dôvodom dovolí --force "<dôvod>" (D0211).\n`);
+    return 1;
+  }
   setTopic(cfg, topic, thread);
   process.stdout.write(`route: téma ${topic} -> ${thread}\n`);
+  if (led.length) process.stdout.write(`route: vlákno ${thread} teraz vedie témy ${[...led, topic].join(", ")} (--force: ${opt("--force")})\n`);
   return 0;
 }
 
@@ -289,7 +347,7 @@ async function main() {
     process.exit(w ? 0 : 1);
   }
   if (cmd !== "remember" || !name) {
-    process.stderr.write("Použitie: route.mjs remember <meno správy> [--thread <id>] [--peer <agent>] [--mode čakám|nečakám|vedomie] | show <meno správy> | waiting <meno správy> | topic set|rm|list|check <téma>\n");
+    process.stderr.write("Použitie: route.mjs remember <meno správy> [--thread <id>] [--peer <agent>] [--mode čakám|nečakám|vedomie] | show <meno správy> | waiting <meno správy> | topic set|rm|list|check|send <téma>\n");
     process.exit(2);
   }
   const opt = (k) => { const i = rest.indexOf(k); return i >= 0 ? rest[i + 1] : ""; };
@@ -306,7 +364,8 @@ async function main() {
     else thread = c.thread;
   }
   const r = rememberRoute(cfg, { name, thread: thread || null, peer, mode });
-  const tail = (r.mode ? ` (odpoveď: ${r.mode})` : "") + (r.topic ? `, téma ${r.topic} do zoznamu tém` : "");
+  const tail = r.mode ? ` (odpoveď: ${r.mode})` : "";
+  if (r.unlisted) process.stderr.write(`route: téma ${r.unlisted} v zozname tém nie je, založ pre ňu nové vlákno T3 a z neho spusti route.mjs topic set ${r.unlisted} (D0211)\n`);
   if (fail) { process.stderr.write(fail + tail + "\n"); process.exit(fail.includes("bez CLAUDE_CODE_SESSION_ID") ? 0 : 1); }
   process.stdout.write(r.main ? `route: hlavné vlákno, bez trasy (${r.key})${tail}\n` : `route: ${r.key} -> ${r.thread}${tail}\n`);
 }

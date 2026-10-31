@@ -244,11 +244,24 @@ klonov (úloha 2 v Taskeri, 19. 10. 2026).
    Práva 640 so skupinou schránky, Cyril ho číta cez SSH, iný agent na
    serveri priamo. Formát je plochý objekt s odsadením jednej medzery,
    `bin/ask_agent.sh` hľadá riadok ` "<téma>": {`.
-2. Zápis robí vlákno témy, ručne nikto. `route.mjs topic set <téma>` nájde
-   vlákno ako trasa (`CLAUDE_CODE_SESSION_ID`) a tému mu zapíše, aj keď ju
-   doteraz viedlo iné. Z hlavného vlákna zápis odmietne, hlavné vlákno
-   tému nevedie. `route.mjs remember` (`ask_agent.sh`, `reply.sh`) z vlákna
-   témy zapíše tému správy, len keď v zozname ešte nie je. `topic list`
+2. Téma je presná, vlákno vedie jednu tému a téma má jedno vlákno (D0211).
+   Nová téma dostane nové vlákno T3, nikdy sa nepriradí bežiacemu vláknu
+   a holý názov projektu nie je téma. Chyba 28. 10. 2026: vlákno
+   "workflow alignment" poslalo `ask_agent.sh <adresát> agentic_brain` a
+   `route.mjs remember` mu tému agentic_brain zapísal, 26. 10. to isté
+   vlákno zapísalo `topic set agenti` s holým názvom projektu. Zápis preto
+   robí len výslovné `route.mjs topic set <téma>` z vlákna témy: nájde vlákno
+   ako trasa (`CLAUDE_CODE_SESSION_ID`) a odmietne kódom 1 hlavné vlákno
+   (tému nevedie), tému, ktorá je holým názvom projektu Taskera (zoznam
+   projektov z `lib/tasker_read.mjs`, bez Taskera alebo pri chybe čítania
+   kontrola mlčí), a vlákno, ktoré už vedie inú tému, bez `--force "<dôvod>"`.
+   Správa odmietnutia nesie riadok "Správny postup:". `route.mjs remember`
+   (`ask_agent.sh`, `reply.sh`) tému nezapisuje, zapíše len trasu správy,
+   a keď téma v zozname nie je, vypíše, že pre ňu treba nové vlákno T3.
+   `ask_agent.sh` pri novej správe kontroluje aj zoznam odosielateľa
+   (`route.mjs topic send <téma>`): téma musí byť v jeho `topics.json`
+   a z vlákna témy ju smie poslať len vlákno, ktoré ju vedie, inak nič
+   neodošle. `topic list`
    vypíše zoznam, `topic rm <téma>` tému zmaže. `topic tasks <téma> <id>...`
    pridá k téme koreňové úlohy (pole `tasks`): správy tasker mostu o takej úlohe,
    všetkých jej podúlohách (reťaz `parent_id`) a o úlohe, ktorú takáto úloha blokuje
@@ -264,7 +277,7 @@ klonov (úloha 2 v Taskeri, 19. 10. 2026).
    (úloha 492, vlákno Tasker #7 tému nemalo a správy o úlohe 486 šli do hlavného vlákna).
    Holý projekt to nie je, aby téma nepresmerovala správy všetkých úloh projektu.
 3. `ask_agent.sh <adresát> <téma>` pošle správu, len keď je téma
-   v zozname tém adresáta (`topics.json` vedľa jeho inboxu). Inak vypíše
+   v zozname tém odosielateľa (bod 2) a v zozname tém adresáta (`topics.json` vedľa jeho inboxu). Inak vypíše
    platné témy a nič neodošle, odpoveď s `--k` zoznam nekontroluje. Adresát bez zoznamu (cyril) prijme každú tému.
    Z Macu kontroluje zoznam Adama rovnako (ssh).
    Správa do hlavného vlákna adresáta ide s `--hlavne`, meno nemá tému

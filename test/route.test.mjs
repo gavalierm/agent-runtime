@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 import { startFakeT3 } from "./fake_t3.mjs";
 import { T3Client } from "../lib.mjs";
@@ -218,7 +219,7 @@ test("ask_agent.sh a reply.sh: správa do schránky adresáta a trasa z vlákna 
   const tokenFile = join(root, "t3_token");
   writeFileSync(tokenFile, t3.token);
   const env = { PATH: process.env.PATH, HOME: root, AGENT_NAME: "adam", AGENT_INBOX_ONLY: "cyril", AGENT_BOX: box, AGENT_STATE: state, AGENT_ENV_FILE: "/nie/je",
-    T3_URL: t3.url, T3_TOKEN_FILE: tokenFile, AGENT_SEND_boris: borisInbox, CLAUDE_PID: "",
+    T3_URL: t3.url, T3_TOKEN_FILE: tokenFile, AGENT_SEND_boris: borisInbox, CLAUDE_PID: "", TASKER_DB: join(root, "nie.db"),
     ASK_VAR_LIB: join(root, "var"), AGENT_SEND_cyril: join(root, "var/cyril/inbox") };
   mkdirSync(join(root, "var/cyril/inbox"), { recursive: true });
   // Z vlákna témy.
@@ -286,11 +287,10 @@ test("ask_agent.sh a reply.sh: správa do schránky adresáta a trasa z vlákna 
   assert.equal((await run("ask_agent.sh", ["nikto", "tema", "x"], { env: { ...env, PATH: `${fbin}:${env.PATH}`, ASK_HOST: "x" } })).status, 1);
 });
 
-test("zoznam tém: zápis, onlyIfAbsent, mazanie, práva 640, téma novej správy", () => {
+test("zoznam tém: zápis, mazanie, práva 640, téma novej správy, remember tému nezapisuje (D0211)", () => {
   const { cfg, box } = setup();
   assert.equal(topicsPath(cfg), join(box, "topics.json"), "zoznam leží v schránke, nie v stave");
   assert.equal(setTopic(cfg, "pravidla", "thr-a"), true);
-  assert.equal(setTopic(cfg, "pravidla", "thr-b", { onlyIfAbsent: true }), false, "tému vedie iné vlákno");
   assert.equal(readTopics(topicsPath(cfg)).pravidla.thread, "thr-a");
   assert.equal(statSync(topicsPath(cfg)).mode & 0o777, 0o640);
   assert.match(readFileSync(topicsPath(cfg), "utf8"), /^ "pravidla": \{$/m, "riadok, ktorý hľadá ask_agent.sh");
@@ -304,13 +304,17 @@ test("zoznam tém: zápis, onlyIfAbsent, mazanie, práva 640, téma novej správ
   assert.equal(messageTopic("tasker-20261019-100000-1-abcd.md", "adam"), null);
   assert.equal(messageTopic("tasker-projekt_b-20261019-100000-1-abcd.md", "adam"), "projekt_b", "tasker správa k téme projektu");
   assert.equal(messageTopic("ranny-20261019-100000-1.md", "adam"), null);
-  // remember z vlákna témy zapíše tému, z hlavného nie, cudziu tému neprepíše.
-  rememberRoute(cfg, { name: "adam-kanon-20261019-100000-1.md", thread: "thr-adam", peer: "boris" });
-  assert.equal(readTopics(topicsPath(cfg)).kanon, undefined);
+  // Zmena správania D0211 (28. 10. 2026): remember tému správy do zoznamu nezapíše ani
+  // z vlákna témy, zapíše len trasu a pri téme mimo zoznamu vráti `unlisted`.
+  // Starý test tu čakal zápis témy kanon.
+  setTopic(cfg, "pravidla", "thr-a");
+  assert.equal(rememberRoute(cfg, { name: "adam-kanon-20261019-100000-1.md", thread: "thr-adam", peer: "boris" }).unlisted, null, "hlavné vlákno");
   const r = rememberRoute(cfg, { name: "adam-kanon-20261019-100000-2.md", thread: "thr-tema", peer: "boris" });
-  assert.equal(r.topic, "kanon");
-  rememberRoute(cfg, { name: "cyril-kanon-20261019-100000-3.md", thread: "thr-ina" });
-  assert.equal(readTopics(topicsPath(cfg)).kanon.thread, "thr-tema");
+  assert.equal(r.unlisted, "kanon");
+  assert.equal(r.thread, "thr-tema", "trasa sa zapíše");
+  assert.equal(readTopics(topicsPath(cfg)).kanon, undefined);
+  assert.equal(rememberRoute(cfg, { name: "cyril-pravidla-20261019-100000-3.md", thread: "thr-ina" }).unlisted, null, "téma v zozname");
+  assert.equal(readTopics(topicsPath(cfg)).pravidla.thread, "thr-a");
 });
 
 test("budič: správa tasker-<téma> ide do vlákna témy", async (t) => {
@@ -376,7 +380,7 @@ test("route.mjs topic a ask_agent.sh: téma zo zoznamu adresáta, neznáma odmie
   const tokenFile = join(root, "t3_token");
   writeFileSync(tokenFile, t3.token);
   const env = { PATH: process.env.PATH, HOME: root, AGENT_BOX: box, AGENT_STATE: state, AGENT_ENV_FILE: "/nie/je",
-    T3_URL: t3.url, T3_TOKEN_FILE: tokenFile, CLAUDE_PID: "" };
+    T3_URL: t3.url, T3_TOKEN_FILE: tokenFile, CLAUDE_PID: "", TASKER_DB: join(root, "nie.db") };
   // topic set z vlákna témy áno, z hlavného nie.
   let r = await run("route.mjs", ["topic", "set", "pravidla"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-tema" } });
   assert.equal(r.status, 0, r.stderr);
@@ -439,4 +443,119 @@ test("k: odpoveď z Macu s novým menom sa páruje podľa id pôvodnej správy, 
   // Vlákno v T3: render nezobrazí hlavičku modelu.
   assert.doesNotMatch(renderMessage(box, reply), /^id:|^k: /m);
   assert.match(renderMessage(box, reply), /Token: x/);
+});
+
+// Tasker s úlohami projektov (fixtúra v tmp, nie živý Tasker).
+function taskerFixture(root, projects) {
+  const db = join(root, "tasker.db");
+  const d = new DatabaseSync(db);
+  d.exec("CREATE TABLE tasks (id INTEGER PRIMARY KEY, title TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued', assignee TEXT, project TEXT)");
+  projects.forEach((p, i) => d.prepare("INSERT INTO tasks (id, title, project) VALUES (?,?,?)").run(i + 1, "u", p));
+  d.close();
+  return db;
+}
+
+test("chyba 28. 10. 2026: remember správy s novou témou bežiacemu vláknu tému nezapíše, trasu áno, vypíše nové vlákno", async (t) => {
+  const t3 = await startFakeT3();
+  t.after(() => t3.close());
+  t3.addThread("thr-A", { _providerThreads: [{ nativeThreadRef: { nativeId: "sid-A" } }] });
+  const { root, cfg, box, state } = setup(t3);
+  const tokenFile = join(root, "t3_token");
+  writeFileSync(tokenFile, t3.token);
+  const env = { PATH: process.env.PATH, HOME: root, AGENT_NAME: "adam", AGENT_BOX: box, AGENT_STATE: state, AGENT_ENV_FILE: "/nie/je",
+    T3_URL: t3.url, T3_TOKEN_FILE: tokenFile, CLAUDE_PID: "", TASKER_DB: join(root, "nie.db"), CLAUDE_CODE_SESSION_ID: "sid-A" };
+  setTopic(cfg, "agenti_9e4abe", "thr-A");
+  const before = readFileSync(topicsPath(cfg), "utf8");
+  const name = "boris-agentic_brain-20261028-231412.md";
+  const r = await run("route.mjs", ["remember", name, "--peer", "boris"], { env });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readFileSync(topicsPath(cfg), "utf8"), before, "zoznam tém sa nezmenil");
+  assert.match(r.stderr, /route: téma agentic_brain v zozname tém nie je, založ pre ňu nové vlákno T3 a z neho spusti route\.mjs topic set agentic_brain \(D0211\)/);
+  assert.equal(routeFor(cfg, name, name).thread, "thr-A", "trasa správy je zapísaná");
+});
+
+test("route.mjs topic set: holý projekt Taskera, druhá téma vlákna bez --force a s --force (D0211)", async (t) => {
+  const t3 = await startFakeT3();
+  t.after(() => t3.close());
+  t3.addThread("thr-A", { _providerThreads: [{ nativeThreadRef: { nativeId: "sid-A" } }] });
+  const { root, cfg, box, state } = setup(t3);
+  const tokenFile = join(root, "t3_token");
+  writeFileSync(tokenFile, t3.token);
+  const db = taskerFixture(root, ["agenti", "agenti", "iny_projekt"]);
+  const env = { PATH: process.env.PATH, HOME: root, AGENT_NAME: "adam", AGENT_BOX: box, AGENT_STATE: state, AGENT_ENV_FILE: "/nie/je",
+    T3_URL: t3.url, T3_TOKEN_FILE: tokenFile, CLAUDE_PID: "", TASKER_DB: db, CLAUDE_CODE_SESSION_ID: "sid-A" };
+  const noTasker = { ...env, TASKER_DB: join(root, "nie.db") };
+  // (b) holý názov projektu.
+  let r = await run("route.mjs", ["topic", "set", "agenti"], { env });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /holý názov projektu Taskera.*Správny postup:/);
+  assert.equal(existsSync(topicsPath(cfg)), false, "nič sa nezapísalo");
+  // Bez čitateľného Taskera kontrola mlčí a tému pustí.
+  r = await run("route.mjs", ["topic", "set", "agenti"], { env: noTasker });
+  assert.equal(r.status, 0, r.stderr);
+  r = await run("route.mjs", ["topic", "rm", "agenti"], { env });
+  assert.equal(r.status, 0);
+  // Pomenovaná téma prejde.
+  r = await run("route.mjs", ["topic", "set", "agenti_9e4abe"], { env });
+  assert.equal(r.status, 0, r.stderr);
+  // (c) druhá téma toho istého vlákna.
+  r = await run("route.mjs", ["topic", "set", "agentic_brain"], { env });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /vlákno thr-A už vedie tému agenti_9e4abe.*Správny postup: založ pre tému agentic_brain nové vlákno T3/);
+  assert.equal(readTopics(topicsPath(cfg)).agentic_brain, undefined);
+  r = await run("route.mjs", ["topic", "set", "agentic_brain", "--force"], { env });
+  assert.equal(r.status, 2, "--force bez dôvodu");
+  r = await run("route.mjs", ["topic", "set", "agentic_brain", "--force", "dve témy jednej práce"], { env });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /vlákno thr-A teraz vedie témy agenti_9e4abe, agentic_brain/);
+  assert.equal(readTopics(topicsPath(cfg)).agentic_brain.thread, "thr-A");
+  // Tá istá téma tomu istému vláknu znova je v poriadku, tretia téma bez --force nie.
+  r = await run("route.mjs", ["topic", "set", "agentic_brain"], { env: noTasker });
+  assert.equal(r.status, 1, "vlákno vedie už aj agenti_9e4abe");
+  r = await run("route.mjs", ["topic", "set", "tretia_tema"], { env: noTasker });
+  assert.equal(r.status, 1);
+});
+
+test("ask_agent.sh: nová správa s témou mimo zoznamu odosielateľa alebo z cudzieho vlákna sa neodošle (chyba 28. 10. 2026, D0211)", { skip: SKIP_ASK }, async (t) => {
+  const t3 = await startFakeT3();
+  t.after(() => t3.close());
+  t3.addThread("thr-main", { _providerThreads: [{ nativeThreadRef: { nativeId: "sid-main" } }] });
+  t3.addThread("thr-A", { _providerThreads: [{ nativeThreadRef: { nativeId: "sid-A" } }] });
+  t3.addThread("thr-B", { _providerThreads: [{ nativeThreadRef: { nativeId: "sid-B" } }] });
+  const { root, cfg, box, state } = setup(t3);
+  writeFileSync(join(state, "thread_id"), "thr-main\n");
+  const tokenFile = join(root, "t3_token");
+  writeFileSync(tokenFile, t3.token);
+  // Odosielateľ adam: tému agenti_9e4abe vedie vlákno A. Adresát boris má v zozname obe témy.
+  setTopic(cfg, "agenti_9e4abe", "thr-A");
+  const recvInbox = join(root, "boris", "inbox");
+  mkdirSync(recvInbox, { recursive: true });
+  const recvList = {};
+  for (const x of ["agentic_brain", "agenti_9e4abe"]) recvList[x] = { thread: "thr-r", at: "2026-10-28T00:00:00Z" };
+  writeFileSync(join(root, "boris", "topics.json"), JSON.stringify(recvList, null, 1) + "\n");
+  const env = { PATH: process.env.PATH, HOME: root, AGENT_NAME: "adam", AGENT_BOX: box, AGENT_STATE: state, AGENT_ENV_FILE: "/nie/je",
+    T3_URL: t3.url, T3_TOKEN_FILE: tokenFile, AGENT_SEND_boris: recvInbox, CLAUDE_PID: "", TASKER_DB: join(root, "nie.db") };
+  // Prehratie chyby: nová téma agentic_brain z vlákna témy agenti_9e4abe.
+  let r = await runIn("ask_agent.sh", ["boris", "agentic_brain"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-A" } }, "Test\n");
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /Platné témy: agenti_9e4abe\./);
+  assert.match(r.stderr, /Správny postup: tému agentic_brain nemá žiadne vlákno, založ pre ňu nové vlákno T3 a z neho spusti route\.mjs topic set agentic_brain \(D0211\)/);
+  assert.equal(readdirSync(recvInbox).length, 0, "nič v inboxe adresáta");
+  assert.equal(existsSync(join(state, "routes.json")), false, "trasa sa nezapísala");
+  // Téma zo zoznamu, ale z cudzieho vlákna: odmietnutá.
+  r = await runIn("ask_agent.sh", ["boris", "agenti_9e4abe"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-B" } }, "Test\n");
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /Vlákno thr-B nevedie žiadnu tému, tému 'agenti_9e4abe' vedie vlákno thr-A\. Správny postup:/);
+  assert.equal(readdirSync(recvInbox).length, 0);
+  // Vlákno, ktoré tému vedie, ju pošle. Hlavné vlákno tiež (téma je v zozname).
+  r = await runIn("ask_agent.sh", ["boris", "agenti_9e4abe"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-A" } }, "Test\n");
+  assert.equal(r.status, 0, r.stderr);
+  r = await runIn("ask_agent.sh", ["boris", "agenti_9e4abe"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-main" } }, "Test\n");
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readdirSync(recvInbox).length, 2);
+  // Odpoveď s --k zoznam odosielateľa nekontroluje, správa --hlavne tému nemá.
+  r = await run("ask_agent.sh", ["--vedomie", "--k", "boris-adam-20261028-100000-1.md", "boris", "agentic_brain", "Odpoveď"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-A" } });
+  assert.equal(r.status, 0, r.stderr);
+  r = await run("ask_agent.sh", ["--hlavne", "--vedomie", "--dopad", "Mení sa X", "boris", "Do hlavného"], { env: { ...env, CLAUDE_CODE_SESSION_ID: "sid-A" } });
+  assert.equal(r.status, 0, r.stderr);
 });

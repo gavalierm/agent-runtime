@@ -46,9 +46,12 @@
 #
 # Nová správa: téma musí byť v zozname tém adresáta (topics.json vedľa jeho
 # inboxu, route.mjs), inak skript vypíše platné témy a nič neodošle. Adresát
-# bez zoznamu prijme každú tému. Odpoveď s --k tému v zozname
-# nekontroluje, trasu odpovede obnoví budič adresáta z `k:`. Do hlavného
-# vlákna adresáta ide správa s --hlavne, bez témy.
+# bez zoznamu prijme každú tému. Téma musí byť aj v zozname tém odosielateľa
+# ($AGENT_BOX/topics.json) a z vlákna témy ju smie poslať len vlákno, ktoré
+# ju vedie (route.mjs topic send, D0211: nová téma dostane nové vlákno T3,
+# chyba 28. 10. 2026). Odosielateľ bez zoznamu sa nekontroluje. Odpoveď s --k
+# tému v zozname nekontroluje, trasu odpovede obnoví budič adresáta z `k:`.
+# Do hlavného vlákna adresáta ide správa s --hlavne, bez témy.
 #
 # Na serveri zapíše trasu (route.mjs remember z koreňa tohto repa,
 # ASK_WORKFLOW), budič potom odpoveď pošle do vlákna témy, z ktorého píšem.
@@ -230,6 +233,13 @@ fi
 topics_file="$(dirname "$inbox")/topics.json"
 check=""
 if [ -n "$topic" ] && [ -z "$k" ]; then
+    # Zoznam tém odosielateľa a vlákno, z ktorého píše (route.mjs). Chýbajúci
+    # route.mjs kontrolu preskočí, rovnako ako zápis trasy nižšie.
+    WORKFLOW="${ASK_WORKFLOW:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
+    if [ -f "$WORKFLOW/route.mjs" ] && ! AGENT_NAME="$FROM" node "$WORKFLOW/route.mjs" topic send "$topic" >&2; then
+        echo "Nič som neposlal." >&2
+        exit 1
+    fi
     check="if [ -f $topics_file ] && ! grep -q '^ \"$topic\": {' $topics_file; then sed -n 's/^ \"\\([a-z0-9_]*\\)\": {.*/\\1/p' $topics_file | paste -sd, -; exit 4; fi"
     rc=0
     out="$(on "$check")" || rc=$?
