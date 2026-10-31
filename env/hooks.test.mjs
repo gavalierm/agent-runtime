@@ -39,6 +39,7 @@ PreToolUse|Bash||tasker_root.mjs
 PreToolUse|Bash||web_review.mjs
 PreToolUse|Bash||human_question.mjs
 PreToolUse|Bash||own_mechanism.mjs
+PreToolUse|Bash||review_replay.mjs
 PreToolUse|Bash||task_title.mjs
 PreToolUse|Bash||task_concurrency.mjs
 PreToolUse|Bash||project_branch.mjs
@@ -105,9 +106,9 @@ UserPromptSubmit|||agreement_scope.mjs
 UserPromptSubmit|||rules_delta.mjs
 PreCompact||3|compact_block.mjs`.split("\n");
 
-test("main: dnešných 44 hookov rootu, po udalostiach v dnešnom poradí", () => {
+test("main: dnešných 45 hookov rootu, po udalostiach v dnešnom poradí", () => {
   const got = flat(hooksFor("main", HOOKS, WF));
-  assert.equal(got.length, 44);
+  assert.equal(got.length, 45);
   assert.deepEqual(byEvent(got), byEvent(MAIN));
 });
 
@@ -126,7 +127,7 @@ test("mac: dnešných 20 hookov Macu", () => {
 test("skupiny: Bash hooky rootu sú v jednej skupine, tasker_work s iným timeoutom v inej", () => {
   const pre = hooksFor("main", HOOKS, WF).PreToolUse;
   assert.equal(pre[0].matcher, "Bash");
-  assert.equal(pre[0].hooks.length, 16);
+  assert.equal(pre[0].hooks.length, 17);
   const tw = pre.filter((g) => g.hooks.some((h) => h.command.endsWith("/tasker_work.mjs")));
   assert.deepEqual(tw.map((g) => [g.matcher, g.hooks.find((h) => h.command.endsWith("/tasker_work.mjs")).timeout]), [["^(Agent|Task)$", 3], ["^(Bash|Edit|Write|MultiEdit|NotebookEdit)$", 10]]);
 });

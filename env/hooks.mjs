@@ -63,6 +63,7 @@ export const TABLE = [
   R("web_review.mjs", "PreToolUse", "Bash", null, ["tasker"], ["main"]),
   R("human_question.mjs", "PreToolUse", "Bash", null, ["tasker"], ["main"]),
   R("own_mechanism.mjs", "PreToolUse", "Bash", null, ["tasker"], ["main", "runs"]),
+  R("review_replay.mjs", "PreToolUse", "Bash", null, ["tasker"], ["main"]),
   R("task_title.mjs", "PreToolUse", "Bash", null, ["tasker"], ["main", "runs"]),
   R("task_concurrency.mjs", "PreToolUse", "Bash", null, ["tasker"], ["main", "runs"]),
   R("project_branch.mjs", "PreToolUse", "Bash", null, ["none"], ["main", "runs"]),
