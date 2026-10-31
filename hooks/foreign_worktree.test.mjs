@@ -139,3 +139,24 @@ test("cd na premennú v príkaze so .worktrees zamietne, bez .worktrees pustí (
   assert.equal(run("alfa", `W=${wt}; cd $W && git checkout x`), "deny");
   assert.equal(run("alfa", `cd $HOME/repo && git checkout x`), "");
 });
+
+test("worktree remove a move cudzieho worktree zamietne, vlastný, list a add pustí (posudok Rona k u721 daeb5eb)", () => {
+  assert.equal(run("alfa", `git -C ${wt} worktree remove ${wt}`), "deny");
+  assert.equal(run("alfa", `git -C ${repo} worktree remove --force ${wt}`), "deny");
+  assert.equal(run("alfa", `cd ${base} && git -C ${repo} worktree remove agentic-workflow-u720`), "", "relatívna cesta od -C repo mimo .worktrees");
+  assert.equal(run("alfa", `cd ${base} && git worktree move agentic-workflow-u720 /tmp/x`), "deny");
+  assert.equal(run("beta", `git -C ${repo} worktree remove ${wt}`), "");
+  assert.equal(run("alfa", `git -C ${repo} worktree remove ${join(base, "alfa-review-u720")}`), "");
+  assert.equal(run("alfa", `git -C ${repo} worktree list`), "");
+  assert.equal(run("alfa", `git -C ${repo} worktree add -b n ${join(base, "alfa-n")}`), "");
+});
+
+test("update-ref na vetvu vybranú v cudzom worktree zamietne, inú vetvu a vlastný pustí (posudok Rona k u721 daeb5eb)", () => {
+  assert.equal(run("alfa", `git -C ${repo} update-ref refs/heads/u720 HEAD`), "deny");
+  assert.equal(run("alfa", `git -C ${repo} update-ref -m x refs/heads/u720 HEAD`), "deny");
+  assert.equal(run("alfa", `git -C ${repo} update-ref -d refs/heads/u720`), "deny");
+  assert.equal(run("beta", `git -C ${repo} update-ref refs/heads/u720 HEAD`), "");
+  assert.equal(run("alfa", `git -C ${repo} update-ref refs/heads/r720 HEAD`), "");
+  assert.equal(run("alfa", `git -C ${repo} update-ref refs/heads/nikde HEAD`), "");
+  assert.equal(run("alfa", `git -C ${repo} update-ref refs/tags/u720 HEAD`), "");
+});

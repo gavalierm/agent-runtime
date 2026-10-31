@@ -5,12 +5,14 @@
 // cudzích worktree (`agentic-workflow-u720` a iných), u704 ostal detached
 // s cudzím súborom. Posudok patrí do vlastného worktree.
 //
-// PreToolUse pre Bash: zamietne `git checkout`, `git switch` a `git reset`
+// PreToolUse pre Bash: zamietne podpríkazy z GUARDED (`checkout`, `reset`, `rebase`, `commit` a ďalšie)
 // (akákoľvek forma, aj pod `runuser -u X --` a `sudo -u X`) vo worktree pod
 // `/root/.worktrees/<meno>` alebo `/home/<user>/.worktrees/<meno>`, ktorého
 // vlastník nie je aktuálny agent. Cieľ príkazu: `git -C <dir>`, inak posledné
 // `cd <dir>` pred príkazom, inak cwd hooku. Text v heredocu a v úvodzovkách
-// príkaz nespustí. Mimo `.worktrees` a pri neznámom agente hook pustí, neznámeho
+// príkaz nespustí. Ďalej `git worktree remove|move <cesta>` cudzieho worktree a
+// `git update-ref refs/heads/<B>`, keď je <B> vybraná v cudzom worktree (git
+// sám odmietne len `branch -f`). Mimo `.worktrees` a pri neznámom agente hook pustí, neznámeho
 // vlastníka zamietne.
 // Vlastník worktree: súbor `agent-owner` v admin adresári worktree; bez neho
 // predpona mena `<agent>-`; bez nej autor posledného commitu HEAD (prvé slovo
@@ -135,18 +137,66 @@ export function foreignWorktreeReason(raw, { cwd = null, env = process.env, inpu
   for (const { tokens, cwd: cur, lost } of commands(raw, cwd)) {
     if (!isGit(tokens[0])) continue;
     const { sub, start } = gitTarget(tokens, 0, cur);
+    const refWhy = refReason(tokens, sub, start, me, known, env.FOREIGN_WORKTREE_BASE);
+    if (refWhy) return refWhy;
     if (!GUARDED.has(sub)) continue;
     if (sub === "stash" && READ_STASH.has(unq(tokens[tokens.indexOf("stash") + 1]))) continue;
     // `W=<worktree>; cd $W && git checkout x`: cieľ neurčiteľný a príkaz spomína .worktrees.
     if (!start && lost && /\.worktrees\b/.test(raw)) return `git ${sub} po cd na neurčiteľnú cestu v príkaze so .worktrees, vlastník sa nedá overiť`;
     if (!start) continue;
-    const root = worktreeRoot(start, env.FOREIGN_WORKTREE_BASE);
-    if (!root) continue;
-    const owner = ownerOf(root, known);
-    // Neznámy vlastník zamietne: verejné repo má na každom commite autora
-    // `spravca-agentov`, takže autor vlastníka neurčí (replay u720 na serveri pustil).
-    if (!owner) return `git ${sub} vo worktree ${root} bez súboru ${OWNER_FILE} a bez predpony agenta v mene, vlastník je neznámy`;
-    if (owner !== me) return `git ${sub} vo worktree ${root}, ktorého vlastník je ${owner}, nie ${me}`;
+    const why = ownerReason(worktreeRoot(start, env.FOREIGN_WORKTREE_BASE), `git ${sub}`, me, known);
+    if (why) return why;
+  }
+  return null;
+}
+
+// Dôvod zamietnutia pre koreň worktree alebo null (mimo .worktrees, vlastný).
+function ownerReason(root, what, me, known) {
+  if (!root) return null;
+  const owner = ownerOf(root, known);
+  // Neznámy vlastník zamietne: verejné repo má na každom commite autora
+  // `spravca-agentov`, takže autor vlastníka neurčí (replay u720 na serveri pustil).
+  if (!owner) return `${what} vo worktree ${root} bez súboru ${OWNER_FILE} a bez predpony agenta v mene, vlastník je neznámy`;
+  return owner === me ? null : `${what} vo worktree ${root}, ktorého vlastník je ${owner}, nie ${me}`;
+}
+
+// Pozičné argumenty za podpríkazom, prepínače preskočí, `-m` aj s hodnotou (update-ref).
+function positional(tokens, from) {
+  const out = [];
+  for (let i = from; i < tokens.length; i++) {
+    if (tokens[i] === "-m") i++;
+    else if (!tokens[i].startsWith("-")) out.push(tokens[i]);
+  }
+  return out;
+}
+
+// Koreň worktree, v ktorom je vybraná vetva `refs/heads/<B>`, alebo null.
+function branchWorktree(ref, start, base) {
+  if (!/^refs\/heads\/./.test(ref) || !start) return null;
+  try {
+    const out = execFileSync("git", ["-C", start, "worktree", "list", "--porcelain"], { stdio: ["ignore", "pipe", "ignore"] }).toString();
+    for (const block of out.split(/\n\n+/)) {
+      const wt = /^worktree (.+)$/m.exec(block);
+      if (wt && block.split("\n").includes(`branch ${ref}`)) return worktreeRoot(wt[1], base);
+    }
+  } catch {}
+  return null;
+}
+
+// `git worktree remove|move <cesta>` a `git update-ref refs/heads/<B>` (posudok Rona k u721 daeb5eb).
+function refReason(tokens, sub, start, me, known, base) {
+  if (sub === "worktree") {
+    const i = tokens.indexOf("worktree");
+    const op = unq(tokens[i + 1]);
+    if (op !== "remove" && op !== "move") return null;
+    const p = pathToken(positional(tokens, i + 2)[0]);
+    if (p === null) return null;
+    const dir = p.startsWith("/") ? resolve(p) : start ? resolve(start, p) : null;
+    return ownerReason(worktreeRoot(dir, base), `git worktree ${op}`, me, known);
+  }
+  if (sub === "update-ref") {
+    const ref = unq(positional(tokens, tokens.indexOf("update-ref") + 1)[0]);
+    return ownerReason(branchWorktree(ref, start, base), `git update-ref ${ref}`, me, known);
   }
   return null;
 }
