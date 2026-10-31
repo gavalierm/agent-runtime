@@ -302,6 +302,39 @@ test("718: worktree add, vytvorenie a zrušenie vetvy v nasadenom klone sa zamie
   }
 });
 
+test("718: checkout či switch na cieľ, tag, update-ref a fetch s refspecom vytvoria referenciu", () => {
+  const g = "git -C /opt/agentic-workflow";
+  for (const cmd of [
+    `${g} checkout --track origin/u718`,
+    `${g} checkout -t origin/u718`,
+    `${g} checkout u718`,
+    `${g} switch u718`,
+    `${g} switch --track origin/u718`,
+    `${g} tag x`,
+    `${g} tag -d x`,
+    `${g} update-ref refs/heads/x HEAD`,
+    `${g} fetch origin u718:u718`,
+    `${g} fetch origin +refs/heads/a:refs/heads/b`,
+  ]) {
+    assert.ok(refRoot(cmd), cmd);
+    assert.equal(bash(cmd)?.permissionDecision, "deny", cmd);
+  }
+});
+
+test("718: checkout HEAD, commit, main, cesty a výpis značiek prejdú", () => {
+  const g = "git -C /opt/agentic-workflow";
+  for (const cmd of [
+    `${g} checkout HEAD`, `${g} checkout HEAD~2`, `${g} checkout HEAD^`, `${g} checkout 5694c3c`,
+    `${g} checkout 5694c3c5694c3c5694c3c5694c3c5694c3c5694c`, `${g} checkout main`, `${g} checkout -`,
+    `${g} switch -`, `${g} switch --detach u718`, `${g} checkout -- hooks/a.mjs`, `${g} checkout HEAD -- a`,
+    `${g} tag`, `${g} tag -l`, `${g} tag --list`, `${g} fetch`, `${g} fetch origin`, `${g} fetch origin main`,
+    `${g} merge origin/main`, `${g} log --oneline`, `${g} status`, `${g} worktree list`,
+  ]) {
+    assert.equal(refRoot(cmd), null, cmd);
+    assert.equal(bash(cmd), null, cmd);
+  }
+});
+
 test("718: výpis vetiev, fetch, checkout existujúcej vetvy a worktree z vlastného klonu prejdú", () => {
   for (const cmd of [
     "git -C /opt/agentic-workflow branch --list u718",

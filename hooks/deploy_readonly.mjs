@@ -23,7 +23,8 @@
 //
 // Vetvy a worktree (31. 10. 2026, úloha 718): `git worktree add` z nasadeného klona a commit v ňom
 // zapísal objekty a referencie do klona na čítanie. Hook preto zamietne aj `worktree add`, vytvorenie
-// či zrušenie vetvy (`branch`, `checkout -b/-B`, `switch -c/-C`); výpis vetiev, fetch a merge prejdú.
+// či zrušenie vetvy (`branch`, `checkout -b/-B`, `switch -c/-C`), `checkout` či `switch` na cieľ, z ktorého git vytvorí vetvu
+// (`checkout u718`, `-t`), `tag x`, `update-ref` a `fetch origin a:b`; výpis vetiev, fetch a merge prejdú.
 //
 // Zápis súboru cez Bash (30. 10. 2026, úloha 680): `sed -i ... /root/CLAUDE.md` prešiel,
 // hoci /root/CLAUDE.md je odkaz na env/server/RULES.md v nasadenom klone mozgu a pravidlo
@@ -109,14 +110,31 @@ const BRANCH_WRITE = /^(?:-[a-zA-Z]*[dDmMcCtf][a-zA-Z]*|--delete|--move|--copy|-
 function makesRef(sub, args) {
   const a = args.map(unquote);
   if (sub === "worktree") return a[0] === "add";
-  if (sub === "checkout") return a.some((t) => /^-[a-zA-Z]*[bB]$/.test(t) || t === "--orphan");
-  if (sub === "switch") return a.some((t) => /^-[a-zA-Z]*[cC]$/.test(t) || /^--(?:create|force-create|orphan)(?:=|$)/.test(t));
+  if (sub === "checkout" && a.some((t) => /^-[a-zA-Z]*[bB]$/.test(t) || t === "--orphan")) return true;
+  if (sub === "switch" && a.some((t) => /^-[a-zA-Z]*[cC]$/.test(t) || /^--(?:create|force-create|orphan)(?:=|$)/.test(t))) return true;
+  if (sub === "checkout" || sub === "switch") return switchesToNew(a);
+  if (sub === "update-ref") return true;
+  if (sub === "tag") return a.length > 0 && !a.some((t) => /^(?:-l|-n\d*|--list|-v|--verify)$/.test(t));
+  if (sub === "fetch") return operands(a).slice(1).some((t) => t.includes(":"));
   if (sub === "branch") {
     if (a.some((t) => BRANCH_WRITE.test(t) && !/^-[alrv]+$/.test(t))) return true;
     if (a.some((t) => LIST_FLAGS.test(t))) return false;
     return a.some((t) => !t.startsWith("-"));
   }
   return false;
+}
+
+// checkout či switch na cieľ, z ktorého DWIM vytvorí lokálnu vetvu (`checkout u718`), alebo so
+// sledovaním (`-t`, `--track`). Povolené: HEAD (aj HEAD~n, HEAD^), commit (7 až 40 hex), `main`, `-`,
+// `--detach <x>` a všetko za `--` (cesty).
+function switchesToNew(a) {
+  const i = a.indexOf("--");
+  const head = i < 0 ? a : a.slice(0, i);
+  if (head.some((t) => /^(?:-t|--track(?:=.*)?)$/.test(t))) return true;
+  if (head.includes("--detach")) return false;
+  const target = operands(head)[0];
+  if (target === undefined) return false;
+  return !/^(?:HEAD(?:[~^]\d*)*|[0-9a-fA-F]{7,40}|main|-)$/.test(target);
 }
 
 function gitRoot(raw, cwd, deny) {
