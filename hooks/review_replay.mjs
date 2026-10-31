@@ -31,23 +31,26 @@ const E = String.raw`(?![\p{L}\p{N}_])`;
 const re = (src) => new RegExp(`${B}(?:${src})${E}`, "iu");
 
 export const POSUDOK = re(String.raw`posud(?:ok|k\p{L}*)`);
-// Len určitý tvar slovesa (3. osoba prítomného alebo budúceho času) je tvrdenie o účinku.
+// Určitý tvar slovesa (3. osoba prítomného či budúceho času, minulý čas, voliteľne so záporom `ne`,
+// ktorý nesie alternácia, lebo ľavá hranica B blokuje písmeno pred slovom) je tvrdenie o účinku.
 // Príčastie a podstatné meno (zmazaný, odstránenie, nahradené, zamietnutie) opisuje stav alebo
 // nález, prehranie v posudkoch z Taskera 31. 10. 2026 pri nich dávalo falošné zamietnutia.
 export const EFFECT = re(
-  [
-    String.raw`zma[žz](?:e|ú)`,
-    String.raw`odstr[aá]ni(?:a)?`,
-    String.raw`vyhod(?:í|ia)|vyhadzuj(?:e|ú)`,
-    String.raw`prep[íi]š(?:e|u)|prepisuj(?:e|ú)`,
-    String.raw`nahrad(?:í|ia)|nahrádz(?:a|ajú)`,
-    String.raw`ponech(?:á|ajú)`,
-    String.raw`zachov(?:á|ajú)`,
-    String.raw`ostan(?:e|ú)`,
-    String.raw`zachyt(?:í|ia)`,
-    String.raw`pust(?:í|ia)`,
-    String.raw`zamietn(?:e|u)`,
-  ].join("|"),
+  "(?:ne)?(?:" +
+    [
+      String.raw`zma[žz](?:e|ú)|zmazal[aio]?|ma[žz](?:e|ú)`,
+      String.raw`odstr[aá]ni(?:a)?|odstránil[aio]?|odstraňuj(?:e|ú)`,
+      String.raw`vyhod(?:í|ia)|vyhodil[aio]?|vyhadzuj(?:e|ú)`,
+      String.raw`prep[íi]š(?:e|u)|prepísal[aio]?|prepisuj(?:e|ú)`,
+      String.raw`nahrad(?:í|ia)|nahradil[aio]?|nahrádz(?:a|ajú)`,
+      String.raw`ponech(?:á|ajú)|ponechal[aio]?`,
+      String.raw`zachov(?:á|ajú)|zachoval[aio]?`,
+      String.raw`ostan(?:e|ú)|ostal[ai]?`,
+      String.raw`zachyt(?:í|ia)|zachytil[aio]?`,
+      String.raw`pust(?:í|ia)|pustil[aio]?|púšť(?:a|ajú)`,
+      String.raw`zamietn(?:e|u)|zamiet(?:ol|la|li|lo)|zamiet(?:a|ajú)`,
+    ].join("|") +
+    ")",
 );
 export const REPLAY = re(String.raw`replay\p{L}*|prehr[aá]l\p{L}*|prehran\p{L}*|na\s+kópii`);
 

@@ -80,3 +80,10 @@ test("príčastie a podstatné meno nie sú tvrdenie o účinku", () => {
   for (const w of ["odstránenie CONFIG", "pravidlo je nahradené", "falošné zamietnutie", "bod zmazaný", "allow ostalo"])
     assert.equal(reviewReplayReason(`${TK} comment 5 --body "Posudok u704: ${w}"`), null, w);
 });
+
+test("minulý čas, nedokonavý vid a záporné tvary sú tvrdenie o účinku", () => {
+  for (const w of ["hook zmazal súbor.", "hook to nezamietne.", "nezachytí to.", "odstraňuje záznam.", "hook odstránil riadok.", "zamietla to.", "nezmazal nič."]) {
+    assert.match(reviewReplayReason(`${TK} comment 5 --body "Posudok: ${w}"`) ?? "", /./, w);
+    assert.equal(reviewReplayReason(`${TK} comment 5 --body "Posudok: ${w} Replay na kópii: ok"`), null, w);
+  }
+});
