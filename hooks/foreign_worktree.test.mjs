@@ -125,3 +125,17 @@ test("PostToolUse bez git worktree add alebo bez agenta nič nezapíše", () => 
   run("", `git worktree add ${nw}`, "PostToolUse");
   assert.equal(existsSync(join(admin, "agent-owner")), false);
 });
+
+test("rebase, merge, restore, stash, commit, clean a pull v cudzom worktree zamietne, stash list pustí (posudok k u721)", () => {
+  for (const c of ["git rebase origin/main", "git merge x", "git restore .", "git stash", "git commit -m x -- a", "git cherry-pick y", "git clean -fd", "git pull"]) {
+    assert.equal(run("alfa", `cd ${wt} && ${c}`), "deny", c);
+    assert.equal(run("beta", `cd ${wt} && ${c}`), "", c);
+  }
+  assert.equal(run("alfa", `cd ${wt} && git stash list`), "");
+  assert.equal(run("alfa", `git -C ${wt} log --oneline -3`), "");
+});
+
+test("cd na premennú v príkaze so .worktrees zamietne, bez .worktrees pustí (posudok k u721)", () => {
+  assert.equal(run("alfa", `W=${wt}; cd $W && git checkout x`), "deny");
+  assert.equal(run("alfa", `cd $HOME/repo && git checkout x`), "");
+});

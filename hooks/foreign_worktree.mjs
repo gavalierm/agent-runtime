@@ -32,7 +32,9 @@ import { stripData, cmdStart, gitTarget } from "./foreign_git.mjs";
 import { denyTool } from "../lib/deny.mjs";
 import { agentName, HOMES_DIR } from "../lib/agent_name.mjs";
 
-const GUARDED = new Set(["checkout", "switch", "reset"]);
+// Podpríkazy, ktoré menia HEAD, index alebo pracovný strom (posudok Rona k u721).
+const GUARDED = new Set(["checkout", "switch", "reset", "rebase", "merge", "restore", "stash", "commit", "cherry-pick", "revert", "clean", "pull", "am", "apply", "add", "rm", "mv"]);
+const READ_STASH = new Set(["list", "show"]);
 const OWNER_FILE = "agent-owner";
 const unq = (t) => (t || "").replace(/^['"]+|['"]+$/g, "");
 
@@ -60,6 +62,7 @@ function unwrap(tokens) {
 // Príkazy z textu: [{tokens, cwd}], cwd po sledovaní `cd` (null = neurčiteľné).
 export function commands(raw, cwd) {
   let cur = cwd && cwd.startsWith("/") ? cwd : null;
+  let lost = false; // `cd $W`: cieľ po cd neurčiteľný
   const out = [];
   const flat = stripData(stripHeredocs(raw)).replace(/\b(?:ba|da|z)?sh\s+(?:-\S+\s+)*?-\w*c\s+['"]/g, "");
   for (const seg of flat.split(/[;&|\n`()]+/)) {
@@ -68,9 +71,10 @@ export function commands(raw, cwd) {
     if (unq(tokens[0]) === "cd") {
       const p = pathToken(tokens.filter((t) => !/^-[LPe@]+$/.test(t))[1]);
       cur = p === null ? null : p.startsWith("/") ? resolve(p) : cur === null ? null : resolve(cur, p);
+      lost = cur === null;
       continue;
     }
-    out.push({ tokens, cwd: cur });
+    out.push({ tokens, cwd: cur, lost });
   }
   return out;
 }
@@ -128,10 +132,14 @@ export function foreignWorktreeReason(raw, { cwd = null, env = process.env, inpu
   if (!me) return null;
   const known = knownAgents(env);
   if (!known.includes(me)) return null;
-  for (const { tokens, cwd: cur } of commands(raw, cwd)) {
+  for (const { tokens, cwd: cur, lost } of commands(raw, cwd)) {
     if (!isGit(tokens[0])) continue;
     const { sub, start } = gitTarget(tokens, 0, cur);
-    if (!GUARDED.has(sub) || !start) continue;
+    if (!GUARDED.has(sub)) continue;
+    if (sub === "stash" && READ_STASH.has(unq(tokens[tokens.indexOf("stash") + 1]))) continue;
+    // `W=<worktree>; cd $W && git checkout x`: cieľ neurčiteľný a príkaz spomína .worktrees.
+    if (!start && lost && /\.worktrees\b/.test(raw)) return `git ${sub} po cd na neurčiteľnú cestu v príkaze so .worktrees, vlastník sa nedá overiť`;
+    if (!start) continue;
     const root = worktreeRoot(start, env.FOREIGN_WORKTREE_BASE);
     if (!root) continue;
     const owner = ownerOf(root, known);
