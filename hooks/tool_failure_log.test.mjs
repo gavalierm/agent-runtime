@@ -118,6 +118,8 @@ test("všeobecná predpona chyby a jeden segment nechajú chybu pri programe, tk
   const e = { env: { AR_ENV_KEY: ENV } };
   assert.equal(registerLine(fail("git log --frobnicate", "Exit code 129\nerror: unknown option `frobnicate'"), e).split("\t")[2], "git");
   assert.equal(registerLine(fail("foo -x", "Exit code 1\nError: boom"), e).split("\t")[2], "foo");
-  assert.equal(registerLine(fail("ls && git log --frobnicate", "Exit code 129\nfatal: bad"), e).split("\t")[2], "ls");
+  assert.equal(registerLine(fail("ls && git log --frobnicate", "Exit code 129\nfatal: bad"), e), null);
+  assert.equal(registerLine(fail("cat /tmp/a.md && git log --frobnicate", "Exit code 129\nerror: unknown option `frobnicate'"), e), null);
+  assert.equal(registerLine(fail("cat a && git frob", "Exit code 1\ngit: 'frob' is not a git command"), e).split("\t")[2], "git");
   assert.equal(registerLine(fail("cat a && tk comment 1 --body-file a", "Exit code 1\ntasker: unknown option --body-file"), e).split("\t")[2], "tk");
 });
