@@ -7,7 +7,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ownMechanismReason, MECHANISM, POSTUP } from "./own_mechanism.mjs";
+import { ownMechanismReason, MECHANISM, POSTUP, EXISTING } from "./own_mechanism.mjs";
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), "own_mechanism.mjs");
 const TK = "AGENT_NAME=adam /opt/agentic-workflow/bin/tk";
@@ -129,4 +129,111 @@ test("jednoriadkové telo: Nástroj overený za medzerou alebo interpunkciou pre
 test("meno jednotky s príponou .timer v hlásení výstupu nie je mechanizmus (úloha 622)", () => {
   assert.equal(chk(`tk comment 622 --body "systemctl disable --now agent-morning.timer: Removed /etc/systemd/system/timers.target.wants/agent-morning.timer. is-enabled -> disabled"`), null);
   assert.ok(chk(`tk comment 622 --body "pridaj timer na ranný súhrn"`));
+});
+
+// Úloha 707, rozhodnutie D0207 (31. 10. 2026): rozhodni.sh a načítanie na štarte relácie.
+const RZ = `/opt/agentic-workflow/bin/rozhodni.sh --nazov "Text šablóny" --kluc k --rozsah pravidla --agenti adam --rozhodol oskar --moc operator --zdroj z`;
+const D0207 = "README a každý text šablóny hovorí ľudsky, čo mu to dáva. Chybu asistenta musí mozog načítať na štarte každej relácie s jedným riadkom, čo nerobiť, inak sa opakuje.";
+const NEROBI = "Existujúci mechanizmus zoznam skillov v aplikácii to nerobí, lebo ukazuje len opisy skillov.";
+const heredoc = (body, cmd = RZ) => `${cmd} <<'EOF'\n${body}\nEOF`;
+const withTmp = (fn) => {
+  const dir = mkdtempSync(join(tmpdir(), "own-mech-"));
+  try { fn(dir); } finally { rmSync(dir, { recursive: true, force: true }); }
+};
+
+test("rozhodni.sh: replay D0207 sa zamietne, hook dá Správny postup a vetu nerobí, lebo", () => {
+  const cmd = heredoc(D0207);
+  assert.match(chk(cmd), /rozhodnutie `rozhodni\.sh` nesie mechanizmus \(načítanie na štarte relácie\)/);
+  const out = run(cmd);
+  assert.equal(out.permissionDecision, "deny");
+  assert.ok(out.permissionDecisionReason.includes("Správny postup:"));
+  assert.ok(out.permissionDecisionReason.includes("nerobí, lebo"));
+  assert.ok(out.permissionDecisionReason.includes("D0207"));
+});
+
+test("rozhodni.sh: veta existujúci mechanizmus nerobí, lebo alebo riadok Nástroj overený kryje príkaz", () => {
+  assert.equal(chk(heredoc(`${D0207} ${NEROBI}`)), null);
+  assert.equal(chk(heredoc(`${D0207}\n${NEROBI}`)), null);
+  assert.equal(chk(heredoc(`${D0207}\n${OVERENY}`)), null);
+  assert.equal(run(heredoc(`${D0207} ${NEROBI}`)), null);
+  // Veta v jednom texte kryje mechanizmus v inom (nadpis, ktorý nesie mechanizmus).
+  assert.equal(chk(heredoc(NEROBI, RZ.replace("Text šablóny", "nový hook pre budík"))), null);
+  // Veta bez obsahu za "lebo", bez "nerobí" alebo na dvoch riadkoch nestačí.
+  assert.ok(chk(heredoc(`${D0207} Existujúci mechanizmus zoznam skillov to nerobí, lebo`)));
+  assert.ok(chk(heredoc(`${D0207} Existujúci mechanizmus zoznam skillov to robí, lebo ukazuje opisy.`)));
+  assert.ok(chk(heredoc(`${D0207} Existujúci mechanizmus zoznam skillov\nto nerobí, lebo ukazuje opisy.`)));
+  assert.ok(chk(heredoc(`${D0207} Existujúci nástroj zoznam skillov to nerobí, lebo ukazuje opisy.`)));
+});
+
+test("EXISTING: tvar vety", () => {
+  assert.ok(EXISTING.test("existujúci mechanizmus X to nerobí, lebo Y"));
+  assert.ok(EXISTING.test("Existujúci mechanizmus zoznam skillov v aplikácii to nerobí, lebo ukazuje len opisy."));
+  assert.ok(!EXISTING.test("existujúci mechanizmus X to nerobí, lebo"));
+  assert.ok(!EXISTING.test("existujúci mechanizmus X to nerobí, lebo   \n"));
+  assert.ok(!EXISTING.test("existujúci mechanizmus X\nto nerobí, lebo Y"));
+});
+
+test("rozhodni.sh: < súbor a rúra cat súbor | rozhodni.sh sa posudzujú, chýbajúci súbor prejde", () => {
+  withTmp((dir) => {
+    const f = join(dir, "d.md");
+    writeFileSync(f, "SessionStart hook vloží zoznam\n");
+    assert.match(chk(`${RZ} < ${f}`), /rozhodnutie `rozhodni\.sh` nesie mechanizmus \(načítanie na štarte relácie\)/);
+    assert.ok(chk(`cat ${f} | AGENT_NAME=x /opt/agentic-workflow/bin/rozhodni.sh --nazov n --kluc k`));
+    assert.ok(chk(`cat '${f}' | bash /opt/agentic-workflow/bin/rozhodni.sh --nazov n --dry-run`));
+    assert.equal(run(`cat ${f} | AGENT_NAME=x /opt/agentic-workflow/bin/rozhodni.sh --nazov n --kluc k`).permissionDecision, "deny");
+    // Chýbajúci súbor, rúra do iného príkazu a cat bez rúry sa nesúdia.
+    assert.equal(chk(`cat ${join(dir, "nie-je.md")} | AGENT_NAME=x /opt/agentic-workflow/bin/rozhodni.sh --nazov n`), null);
+    assert.equal(chk(`cat ${f} | grep SessionStart`), null);
+    assert.equal(chk(`cat ${f}; /opt/agentic-workflow/bin/rozhodni.sh --nazov n`), null);
+    // Veta v súbore kryje príkaz.
+    writeFileSync(f, `SessionStart hook vloží zoznam\n${NEROBI}\n`);
+    assert.equal(chk(`${RZ} < ${f}`), null);
+    assert.equal(chk(`cat ${f} | AGENT_NAME=x /opt/agentic-workflow/bin/rozhodni.sh --nazov n`), null);
+  });
+});
+
+test("rozhodni.sh: nadpis --nazov nesie mechanizmus, aj s --dry-run a --nazov=", () => {
+  const neutral = "Téma vlákna je presná.";
+  assert.match(chk(heredoc(neutral, RZ.replace("Text šablóny", "nový hook pre budík"))), /rozhodnutie `rozhodni\.sh` nesie mechanizmus \(nový hook\)/);
+  assert.ok(chk(heredoc(neutral, `${RZ} --dry-run`.replace("Text šablóny", "vlastný install.sh"))));
+  assert.ok(chk(heredoc(neutral, `/opt/agentic-workflow/bin/rozhodni.sh --nazov="nová kontrola štartu" --kluc k`)));
+  assert.ok(chk(heredoc(D0207, `${RZ} --dry-run`)));
+  assert.equal(chk(heredoc(neutral)), null);
+});
+
+test("rozhodni.sh: rozhodnutie bez slov mechanizmu prejde", () => {
+  const telo = "Téma vlákna je presná, hook route.mjs novú tému bežiacemu vláknu nepustí.";
+  assert.equal(chk(heredoc(telo)), null);
+  assert.equal(run(heredoc(telo)), null);
+  assert.equal(chk(heredoc(telo, `AGENT_NAME=adam ${RZ}`)), null);
+  assert.equal(chk(`/opt/agentic-workflow/bin/rozhodni.sh --zrus D0007 --dovod "dôvod" --dry-run`), null);
+});
+
+test("nové slová: načítanie na štarte relácie, nový hook, nová kontrola, vlastný mechanizmus", () => {
+  const c = (t) => chk(`tk comment 1 --body ${sq(t)}`);
+  assert.match(c("nová kontrola X zastaví chybu"), /komentár nesie mechanizmus \(nová kontrola\)/);
+  assert.equal(c("kontrola prešla"), null);
+  assert.equal(c("jeho vlastné skripty správ"), null);
+  assert.equal(c("vlastné kontroly a hooky"), null);
+  assert.ok(c("vlastný install.sh prepisuje settings.json"));
+  assert.ok(c("pri štarte relácie načítaj register"));
+  // Zmienka v negácii sa neposudzuje, rozhoduje riadok alebo veta (zdokumentované v hlavičke).
+  assert.ok(c("nikdy na štarte relácie"));
+  for (const t of ["na štarte relácie", "Na štarte každej relácie", "pri štarte novej relácie", "pri štarte tejto relácie", "na\nštarte relácie", "SessionStart", "sessionstart hook", "nový hook", "nového hooku", "novým hookom", "novú kontrolu", "nové kontroly", "vlastný skript", "vlastného skriptu", "vlastným hookom", "vlastnú kontrolu", "vlastná kontrola", "vlastnou kontrolou", "vlastný mechanizmus", "vlastný install.sh"]) {
+    assert.ok(c(`navrhujem ${t} na to`), t);
+  }
+  for (const t of ["SessionStarter", "hook route.mjs", "nový test", "starý hook", "kontrolu hooku", "vlastné skripty", "vlastné mechanizmy", "štart relácie"]) {
+    assert.equal(c(`navrhujem ${t} na to`), null, t);
+  }
+  assert.equal(c(`pri štarte relácie načítaj register. ${NEROBI}`), null);
+  assert.ok(MECHANISM.length >= 15);
+  for (const n of ["načítanie na štarte relácie", "nový hook", "nová kontrola", "vlastný mechanizmus"]) assert.ok(MECHANISM.some(([name]) => name === n), n);
+});
+
+test("echo a grep so slovom o štarte relácie nie sú zadanie", () => {
+  assert.equal(chk(`echo "na štarte relácie"`), null);
+  assert.equal(chk("grep SessionStart hooks/*.mjs"), null);
+  assert.equal(chk(`git commit -m "nový hook na štarte relácie" -- x`), null);
+  assert.equal(run(`echo "na štarte relácie"`), null);
+  assert.equal(run("grep SessionStart hooks/*.mjs"), null);
 });

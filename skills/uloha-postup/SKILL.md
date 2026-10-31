@@ -26,8 +26,11 @@ pre úlohu s viac krokmi.
   `--mockup <id>` schválenej úlohy dizajnéra (done, komentár `Mockup schválený:`
   od iného autora ako dizajnér), inak `--bez-mockupu "<dôvod>"` (zmena bez nového
   vzhľadu alebo priamy pokyn operátora).
-- Zadanie s novým mechanizmom (systemd, timer, slučka, nový skript) nesie
-  riadok `Nástroj overený: <príkaz a výstup>` (`own_mechanism.mjs`).
+- Zadanie s novým mechanizmom (systemd, timer, slučka, nový skript, nový hook,
+  nová kontrola, načítanie na štarte relácie) nesie riadok `Nástroj overený:
+  <príkaz a výstup>` alebo vetu `Existujúci mechanizmus X to nerobí, lebo Y`.
+  Hook posudzuje `task add`, `comment`, `ask_agent.sh` a text rozhodnutia pre
+  `rozhodni.sh` (`own_mechanism.mjs`).
 - Agentovi, ktorý v tom istom projekte už má bežiaci beh, zakladaj úlohu
   s `--blocked-by` a `--reason`, inak ju dispečer spustí súbežne v tom istom
   klone. Vedomé súbežné zadanie je `TK_PARALLEL=1` pred príkazom
