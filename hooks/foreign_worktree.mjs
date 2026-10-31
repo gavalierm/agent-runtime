@@ -10,7 +10,8 @@
 // `/root/.worktrees/<meno>` alebo `/home/<user>/.worktrees/<meno>`, ktorého
 // vlastník nie je aktuálny agent. Cieľ príkazu: `git -C <dir>`, inak posledné
 // `cd <dir>` pred príkazom, inak cwd hooku. Text v heredocu a v úvodzovkách
-// príkaz nespustí. Mimo `.worktrees` a pri neznámom agente alebo vlastníkovi hook pustí.
+// príkaz nespustí. Mimo `.worktrees` a pri neznámom agente hook pustí, neznámeho
+// vlastníka zamietne.
 // Vlastník worktree: súbor `agent-owner` v admin adresári worktree; bez neho
 // predpona mena `<agent>-`; bez nej autor posledného commitu HEAD (prvé slovo
 // malými, musí to byť známy agent, napr. `Beta (stroj)` -> beta).
@@ -134,7 +135,10 @@ export function foreignWorktreeReason(raw, { cwd = null, env = process.env, inpu
     const root = worktreeRoot(start, env.FOREIGN_WORKTREE_BASE);
     if (!root) continue;
     const owner = ownerOf(root, known);
-    if (owner && owner !== me) return `git ${sub} vo worktree ${root}, ktorého vlastník je ${owner}, nie ${me}`;
+    // Neznámy vlastník zamietne: verejné repo má na každom commite autora
+    // `spravca-agentov`, takže autor vlastníka neurčí (replay u720 na serveri pustil).
+    if (!owner) return `git ${sub} vo worktree ${root} bez súboru ${OWNER_FILE} a bez predpony agenta v mene, vlastník je neznámy`;
+    if (owner !== me) return `git ${sub} vo worktree ${root}, ktorého vlastník je ${owner}, nie ${me}`;
   }
   return null;
 }
@@ -178,7 +182,8 @@ export const MESSAGE =
 
 export const POSTUP =
   "vlastný worktree na posudok: `git worktree add /root/.worktrees/<agent>-review-u<úloha> origin/<vetva>` " +
-  "(vetvu stiahne `git fetch origin`), cudzí worktree len čítaj (`git -C <cesta> log`, `show`, `diff`).";
+  "(vetvu stiahne `git fetch origin`), cudzí worktree len čítaj (`git -C <cesta> log`, `show`, `diff`); " +
+  "vlastný worktree bez vlastníka označí jeho tvorca: `echo <agent> > \"$(git -C <cesta> rev-parse --absolute-git-dir)/agent-owner\"`.";
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let input = {};

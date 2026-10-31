@@ -84,8 +84,9 @@ test("text v úvodzovkách a heredocu, čítanie a iné podpríkazy pustí", () 
   assert.equal(run("alfa", `git -C ${wt} diff`), "");
 });
 
-test("autor bez agenta (spravca-agentov) je neznámy vlastník, hook pustí; neznámy agent tiež", () => {
-  assert.equal(run("alfa", `git -C ${join(base, "spravca-u720")} checkout x`), "");
+test("autor bez agenta (spravca-agentov) je neznámy vlastník, hook zamietne; neznámy agent pustí", () => {
+  assert.match(run("alfa", `git -C ${join(base, "spravca-u720")} checkout cfb8af4`), /deny/);
+  assert.match(run("beta", `git -C ${join(base, "spravca-u720")} reset --hard`), /deny/);
   assert.equal(run("", `git -C ${wt} checkout x`), "");
   assert.equal(run("niktoprazdny", `git -C ${wt} checkout x`), "");
 });
