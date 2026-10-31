@@ -8,7 +8,7 @@ import { mkdtempSync, symlinkSync, rmSync, realpathSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { protectedRoot, commitRoot } from "./deploy_readonly.mjs";
+import { protectedRoot, commitRoot, refRoot } from "./deploy_readonly.mjs";
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), "deploy_readonly.mjs");
 
@@ -279,4 +279,45 @@ test("680 replay: sed -i na /root/CLAUDE.md s AR_READONLY_DIRS=/opt/agentic-brai
   assert.equal(r?.permissionDecision, "deny");
   assert.ok(r.permissionDecisionReason.includes("/root/CLAUDE.md"));
   assert.ok(r.permissionDecisionReason.includes(target));
+});
+
+// Úloha 718 (31. 10. 2026): worktree a vetvy v nasadenom klone. Len reťazce, git sa nespúšťa.
+test("718: worktree add, vytvorenie a zrušenie vetvy v nasadenom klone sa zamietne", () => {
+  for (const cmd of [
+    "git -C /opt/agentic-workflow worktree add /root/.worktrees/x -b u1 origin/main",
+    "cd /opt/agentic-workflow && git switch -c x",
+    "cd /opt/agentic-brain-global && git worktree add ../w",
+    "git -C /opt/agentic-workflow branch nova",
+    "git -C /opt/agentic-workflow branch -D stara",
+    "git -C /opt/agentic-workflow branch -d stara",
+    "git -C /opt/agentic-workflow checkout -b x",
+    "git -C /opt/agentic-workflow checkout -B x origin/main",
+    "git -C /opt/agentic-workflow switch -C x",
+    "runuser -u x -- git -C /opt/agentic-workflow worktree add /tmp/w",
+  ]) {
+    assert.ok(refRoot(cmd), cmd);
+    const r = bash(cmd);
+    assert.equal(r?.permissionDecision, "deny", cmd);
+    assert.match(r.permissionDecisionReason, /\/root\/agent-runtime.*\/root\/agent-rules.*nikdy z \/opt/);
+  }
+});
+
+test("718: výpis vetiev, fetch, checkout existujúcej vetvy a worktree z vlastného klonu prejdú", () => {
+  for (const cmd of [
+    "git -C /opt/agentic-workflow branch --list u718",
+    "git -C /opt/agentic-workflow branch",
+    "git -C /opt/agentic-workflow branch -a",
+    "git -C /opt/agentic-workflow branch -v",
+    "git -C /opt/agentic-workflow branch --show-current",
+    "git -C /opt/agentic-workflow checkout main",
+    "git -C /opt/agentic-workflow switch main",
+    "git -C /opt/agentic-workflow worktree list",
+    "git -C /opt/agentic-workflow fetch origin",
+    "git -C /root/agent-runtime worktree add /root/.worktrees/y -b u2 origin/main",
+    "cd /root/agent-rules && git switch -c x",
+    "git -C /root/agent-runtime branch -D u2",
+  ]) {
+    assert.equal(refRoot(cmd), null, cmd);
+    assert.equal(bash(cmd), null, cmd);
+  }
 });

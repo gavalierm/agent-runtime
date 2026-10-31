@@ -21,6 +21,10 @@
 // a v heredoci (správa commitu) hook nečíta. Cieľ, ktorý sa nedá určiť (premenná,
 // `$(...)`), prejde. Test: hooks/deploy_readonly.test.mjs.
 //
+// Vetvy a worktree (31. 10. 2026, úloha 718): `git worktree add` z nasadeného klona a commit v ňom
+// zapísal objekty a referencie do klona na čítanie. Hook preto zamietne aj `worktree add`, vytvorenie
+// či zrušenie vetvy (`branch`, `checkout -b/-B`, `switch -c/-C`); výpis vetiev, fetch a merge prejdú.
+//
 // Zápis súboru cez Bash (30. 10. 2026, úloha 680): `sed -i ... /root/CLAUDE.md` prešiel,
 // hoci /root/CLAUDE.md je odkaz na env/server/RULES.md v nasadenom klone mozgu a pravidlo
 // v klone sa pri ďalšom stiahnutí stratí alebo zablokuje fetch. Preto Bash zamietne aj
@@ -90,6 +94,32 @@ function pathToken(t) {
 
 // Chránený koreň, v ktorom príkaz Bash robí `git commit`, alebo null.
 export function commitRoot(raw, cwd = null) {
+  return gitRoot(raw, cwd, (sub) => sub === "commit");
+}
+
+// Chránený koreň, v ktorom príkaz Bash vytvára alebo ruší vetvu, worktree, alebo null.
+export function refRoot(raw, cwd = null) {
+  return gitRoot(raw, cwd, makesRef);
+}
+
+const LIST_FLAGS = /^(?:-[alrv]+|--list|--all|--remotes|--verbose|--show-current|--contains|--no-contains|--merged|--no-merged|--points-at|--sort|--format|--column|--no-column)(?:=|$)/;
+const BRANCH_WRITE = /^(?:-[a-zA-Z]*[dDmMcCtf][a-zA-Z]*|--delete|--move|--copy|--force|--track|--create-reflog)(?:=|$)/;
+
+// Podpríkaz git s argumentmi (bez volieb pred ním), ktorý vytvorí alebo zruší vetvu či worktree.
+function makesRef(sub, args) {
+  const a = args.map(unquote);
+  if (sub === "worktree") return a[0] === "add";
+  if (sub === "checkout") return a.some((t) => /^-[a-zA-Z]*[bB]$/.test(t) || t === "--orphan");
+  if (sub === "switch") return a.some((t) => /^-[a-zA-Z]*[cC]$/.test(t) || /^--(?:create|force-create|orphan)(?:=|$)/.test(t));
+  if (sub === "branch") {
+    if (a.some((t) => BRANCH_WRITE.test(t) && !/^-[alrv]+$/.test(t))) return true;
+    if (a.some((t) => LIST_FLAGS.test(t))) return false;
+    return a.some((t) => !t.startsWith("-"));
+  }
+  return false;
+}
+
+function gitRoot(raw, cwd, deny) {
   let cur = cwd && cwd.startsWith("/") ? cwd : null;
   const flat = stripData(stripHeredocs(String(raw))).replace(/\b(?:ba|da|z)?sh\s+(?:-\S+\s+)*?-\w*c\s+['"]/g, "");
   for (const seg of flat.split(/[;&|\n`()]+/)) {
@@ -106,7 +136,9 @@ export function commitRoot(raw, cwd = null) {
     else if (s < 0 || /^(?:runuser|sudo|su)$/.test(head)) gi = tokens.findIndex((t) => /^['"]?(?:\S*\/)?git['"]?$/.test(t));
     if (gi < 0) continue;
     const { sub, start } = gitTarget(tokens, gi, cur);
-    if (sub !== "commit" || start === null) continue;
+    if (start === null || !sub) continue;
+    const si = tokens.findIndex((t, i) => i > gi && unquote(t) === sub);
+    if (!deny(sub, si < 0 ? [] : tokens.slice(si + 1))) continue;
     const root = protectedRoot(start);
     if (root) return root;
   }
@@ -217,6 +249,10 @@ export const MESSAGE =
   "/opt/tasker je nasadenie správcu servera a nasadené klony kódu a spoločného mozgu sú kópia na čítanie, ktorú obnovuje časovač: v nich nikto nič nemení ani necommituje (D0052). " +
   "Zmena tam sa pri ďalšom nasadení stratí alebo zablokuje fetch.";
 
+export const MESSAGE_REF =
+  "v nasadenom klone sa nevytvára vetva ani worktree, ich objekty a referencie by skončili v klone na čítanie (úloha 718). " +
+  "Worktree zakladaj z vlastného klonu na zápis (kód /root/agent-runtime, spoločný mozog /root/agent-rules), nikdy z /opt.";
+
 export const POSTUP =
   "kód Taskera mení jeho vývojár v klone /root/tasker, pravidlá a kód správca agentov vo vlastnom klone a pushne; " +
   "nasadenie robí správca servera (`git -C /opt/tasker fetch` a `checkout`, nasadené klony obnoví časovač).";
@@ -234,10 +270,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const cwd = typeof input.cwd === "string" ? input.cwd : null;
   let why = null;
   let write = false;
+  let ref_ = false;
   if (input.tool_name === "Bash") {
     const root = commitRoot(String(ti.command || ""), cwd);
+    const ref = root ? null : refRoot(String(ti.command || ""), cwd);
     if (root) why = `git commit v ${root}`;
-    else {
+    else if (ref) {
+      why = `vetva alebo worktree v ${ref}`;
+      ref_ = true;
+    } else {
       const w = writeRoot(String(ti.command || ""), cwd);
       if (w) {
         why = `zápis do ${w.target}${w.resolved !== w.target ? ` (rozložené na ${w.resolved})` : ""}, chránený koreň ${w.root}`;
@@ -249,5 +290,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const root = protectedRoot(p, cwd);
     if (root) why = `zápis ${p} v ${root}`;
   }
-  if (why) denyTool(`${MESSAGE} (${why})`, write ? POSTUP_WRITE : POSTUP);
+  if (why) denyTool(`${ref_ ? MESSAGE_REF : MESSAGE} (${why})`, write ? POSTUP_WRITE : POSTUP);
 }
