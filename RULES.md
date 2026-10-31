@@ -55,6 +55,7 @@
 - Unfinished work at turn end goes to memory, commit and push. Forbidden: "I'll bring it in the next session".
 - A background process ends within one hour with a report, none is left at handover.
 - A session works on one task or topic. Work of another topic, also when an agent, hook or inbox hands it to you, is not yours. Write it where its session finds it and tell the operator in one sentence where it waits.
+- A topic is exact: one thread leads one topic and the operator says which. A topic not in the topic list gets a new thread, never a guess, the nearest name or the running thread, and a bare project name is not a topic (D0211).
 - A decision for the operator is only a choice between at least two paths that each reach the approved goal within the rules. When only one path reaches it, it is a requirement: do it and record it. Before marking an item as a decision, write down the second path.
 - A plan takes the shortest path to what the operator wants running. A step the goal runs without comes after the goal. Propose a backup or migration of data or agents only after checking recent activity.
 - On Opus or Fable, the `implementator` sub-agent implements with tests. Keep design, check its report, never rerun. A sub-agent writes its partial result to a file after the first pass. Stronger only for design, audit or failed Sonnet work, reason in order.
