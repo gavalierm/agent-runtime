@@ -31,7 +31,8 @@
 // tému (D0211, chyba 28. 10. 2026: `remember` zapísal novú tému
 // agentic_brain bežiacemu vláknu iného zadania). Zápis robí len výslovné
 // `topic set` z vlákna témy: odmietne hlavné vlákno, holý názov projektu
-// Taskera a vlákno, ktoré už vedie inú tému (bez `--force "<dôvod>"`).
+// Taskera, tému, ktorú už vedie iné vlákno, a vlákno, ktoré už vedie inú
+// tému (obe bez `--force "<dôvod>"`; s ním sa vypíše staré aj nové vlákno).
 // `remember` tému nezapisuje, pre tému mimo zoznamu vypíše, že treba nové
 // vlákno T3. Nová téma dostane nové vlákno, `hooks/topic_task.mjs` ho dá
 // vláknu bez témy pri prvej založenej úlohe. Formát je plochý objekt
@@ -315,15 +316,22 @@ async function topicCmd(cfg, sub, args) {
     process.stderr.write(`route: téma ${topic} je holý názov projektu Taskera, tému som nezapísal. Správny postup: tému pomenuj podľa práce vlákna (napríklad ${topic}_<predmet>), holý projekt by presmeroval správy všetkých jeho úloh do jedného vlákna (D0211).\n`);
     return 1;
   }
-  const led = topicsOfThread(readTopics(file), thread).filter((x) => x !== topic);
+  const topics = readTopics(file);
+  const led = topicsOfThread(topics, thread).filter((x) => x !== topic);
+  const owner = topics[topic]?.thread && topics[topic].thread !== thread ? topics[topic].thread : null;
   const force = rest.includes("--force");
   if (force && !String(opt("--force") ?? "").trim()) { process.stderr.write(`route: --force chce dôvod: --force "<dôvod>"\n`); return 2; }
+  if (owner && !force) {
+    process.stderr.write(`route: tému ${topic} vedie vlákno ${owner}, tému som nezapísal. Správny postup: tému ${topic} vedie vlákno ${owner}, píš o nej tam; prevzatie s dôvodom dovolí --force "<dôvod>" (D0211).\n`);
+    return 1;
+  }
   if (led.length && !force) {
     process.stderr.write(`route: vlákno ${thread} už vedie tému ${led.join(", ")}, tému ${topic} som nezapísal. Správny postup: založ pre tému ${topic} nové vlákno T3 a z neho spusti route.mjs topic set ${topic}; výnimku s dôvodom dovolí --force "<dôvod>" (D0211).\n`);
     return 1;
   }
   setTopic(cfg, topic, thread);
   process.stdout.write(`route: téma ${topic} -> ${thread}\n`);
+  if (owner) process.stdout.write(`route: tému ${topic} som prevzal od vlákna ${owner} (staré vlákno ${owner}, nové vlákno ${thread}, --force: ${opt("--force")})\n`);
   if (led.length) process.stdout.write(`route: vlákno ${thread} teraz vedie témy ${[...led, topic].join(", ")} (--force: ${opt("--force")})\n`);
   return 0;
 }

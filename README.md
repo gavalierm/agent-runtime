@@ -254,7 +254,9 @@ klonov (úloha 2 v Taskeri, 19. 10. 2026).
    ako trasa (`CLAUDE_CODE_SESSION_ID`) a odmietne kódom 1 hlavné vlákno
    (tému nevedie), tému, ktorá je holým názvom projektu Taskera (zoznam
    projektov z `lib/tasker_read.mjs`, bez Taskera alebo pri chybe čítania
-   kontrola mlčí), a vlákno, ktoré už vedie inú tému, bez `--force "<dôvod>"`.
+   kontrola mlčí), tému, ktorú podľa zoznamu už vedie iné vlákno, a vlákno,
+   ktoré už vedie inú tému, bez `--force "<dôvod>"`. S `--force` zápis prejde
+   a vypíše staré aj nové vlákno témy.
    Správa odmietnutia nesie riadok "Správny postup:". `route.mjs remember`
    (`ask_agent.sh`, `reply.sh`) tému nezapisuje, zapíše len trasu správy,
    a keď téma v zozname nie je, vypíše, že pre ňu treba nové vlákno T3.

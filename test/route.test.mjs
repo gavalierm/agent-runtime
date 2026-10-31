@@ -474,10 +474,11 @@ test("chyba 28. 10. 2026: remember správy s novou témou bežiacemu vláknu té
   assert.equal(routeFor(cfg, name, name).thread, "thr-A", "trasa správy je zapísaná");
 });
 
-test("route.mjs topic set: holý projekt Taskera, druhá téma vlákna bez --force a s --force (D0211)", async (t) => {
+test("route.mjs topic set: holý projekt Taskera, druhá téma vlákna a téma iného vlákna bez --force a s --force (D0211)", async (t) => {
   const t3 = await startFakeT3();
   t.after(() => t3.close());
   t3.addThread("thr-A", { _providerThreads: [{ nativeThreadRef: { nativeId: "sid-A" } }] });
+  t3.addThread("thr-B", { _providerThreads: [{ nativeThreadRef: { nativeId: "sid-B" } }] });
   const { root, cfg, box, state } = setup(t3);
   const tokenFile = join(root, "t3_token");
   writeFileSync(tokenFile, t3.token);
@@ -514,6 +515,16 @@ test("route.mjs topic set: holý projekt Taskera, druhá téma vlákna bez --for
   assert.equal(r.status, 1, "vlákno vedie už aj agenti_9e4abe");
   r = await run("route.mjs", ["topic", "set", "tretia_tema"], { env: noTasker });
   assert.equal(r.status, 1);
+  // Téma, ktorú vedie iné vlákno: odmietnutie bez --force, prevzatie s --force vypíše staré aj nové vlákno.
+  const envB = { ...noTasker, CLAUDE_CODE_SESSION_ID: "sid-B" };
+  r = await run("route.mjs", ["topic", "set", "agenti_9e4abe"], { env: envB });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /Správny postup: tému agenti_9e4abe vedie vlákno thr-A, píš o nej tam; prevzatie s dôvodom dovolí --force/);
+  assert.equal(readTopics(topicsPath(cfg)).agenti_9e4abe.thread, "thr-A", "téma ostala vláknu A");
+  r = await run("route.mjs", ["topic", "set", "agenti_9e4abe", "--force", "vlákno A skončilo"], { env: envB });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /tému agenti_9e4abe som prevzal od vlákna thr-A \(staré vlákno thr-A, nové vlákno thr-B/);
+  assert.equal(readTopics(topicsPath(cfg)).agenti_9e4abe.thread, "thr-B");
 });
 
 test("ask_agent.sh: nová správa s témou mimo zoznamu odosielateľa alebo z cudzieho vlákna sa neodošle (chyba 28. 10. 2026, D0211)", { skip: SKIP_ASK }, async (t) => {
