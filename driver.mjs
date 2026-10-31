@@ -38,7 +38,8 @@
 //    Správa Taskera, na ktorej úlohe agent po jej zápise sám zapísal nečinnú
 //    (quiet 0) udalosť, nebudí a ide na vedomie (chyba 24. 10. 2026, úloha 499).
 //    Dávka odíde až po tichom okne AGENT_BATCH_WAIT_S od poslednej
-//    budiacej správy, najviac AGENT_BATCH_MAX_WAIT_S od prvej.
+//    budiacej správy, najviac AGENT_BATCH_MAX_WAIT_S od prvej. 0 okno vypne
+//    (mtime môže byť o zlomok ms nad now, úloha 716).
 //    Správa s trasou (route.mjs, odpoveď na správu z vlákna témy) ide do
 //    vlákna z trasy, zaniknuté vlákno nahradí hlavné s poznámkou. Správa
 //    od tasker bez trasy s telom "Tasker: úloha #N" ide do nearchivovaného
@@ -394,7 +395,7 @@ export async function tick(cfgIn, client, { now = Date.now() } = {}) {
       if (g.wake.length) {
         const newest = Math.max(...g.wake.map((e) => e.mtime));
         const oldest = Math.min(...g.wake.map((e) => e.mtime));
-        if (now - newest < cfg.batchWaitMs && now - oldest < cfg.batchMaxWaitMs) {
+        if (cfg.batchWaitMs > 0 && now - newest < cfg.batchWaitMs && now - oldest < cfg.batchMaxWaitMs) {
           reasons.push(label(g, `tiché okno, ${g.wake.length} správ čaká na dávku`));
           continue;
         }

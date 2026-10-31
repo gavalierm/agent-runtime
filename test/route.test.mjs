@@ -4,10 +4,11 @@ import { chmodSync, mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, readdir
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 import { startFakeT3 } from "./fake_t3.mjs";
+import { fakeClaude } from "./fake_claude.mjs";
 import { T3Client } from "../lib.mjs";
 import { callerThread, routeKey, rememberRoute, routeFor, threadForSession, sessionIds, waitingFor, setTopic, removeTopic, readTopics, topicsPath, messageTopic } from "../route.mjs";
 import { tick, classify, renderMessage } from "../driver.mjs";
@@ -155,11 +156,10 @@ test("threadForSession: holé UUID vlákno sa nájde, sub-agent a potomok s rodi
   assert.equal(await find(["b"]), "thread:project:y");
 });
 
-// Proces claude, ktorého príkazový riadok nesie dané prepínače (T3 0.1.5 ide s --session-id).
+// Proces claude, ktorého príkazový riadok nesie dané prepínače (T3 0.1.5 ide s --session-id); fakeClaude čaká na cmdline, lebo po "spawn" je ešte chvíľu prázdny (úloha 716).
 async function claudeLike(t, ...flags) {
-  const child = spawn(process.execPath, ["-e", "setTimeout(()=>{}, 20000)", "--", ...flags], { stdio: "ignore" });
+  const child = await fakeClaude(...flags);
   t.after(() => child.kill("SIGKILL"));
-  await new Promise((r) => child.once("spawn", r));
   return child;
 }
 

@@ -301,6 +301,18 @@ test("tiché okno: správy tesne za sebou idú jednou dávkou, najviac po maxim�
   assert.match(r.reason, /držím 1/);
 });
 
+// Úloha 716: mtime súboru na tmpfs (hrubé hodiny jadra) býva o zlomok ms nad celočíselným
+// Date.now(), `0` okno vypne, takže now starší než mtime nesmie dať "tiché okno".
+test("tiché okno: batchWaitMs 0 okno vypne aj pri mtime nad now (úloha 716)", async (t) => {
+  const t3 = await startFakeT3();
+  t.after(() => t3.close());
+  t3.addThread("thr-adam");
+  const { cfg, client, box } = setup(t3);
+  writeFileSync(join(box, "inbox", "cyril-a-20261019-100000-1.md"), "odpoveď: čakám\nbudiaca\n");
+  const r = await tick({ ...cfg, batchWaitMs: 0 }, client, { now: Date.now() - 1000 });
+  assert.equal(r.sent, 1, r.reason);
+});
+
 test("dve vlákna: držanie platí na vlákno z trasy", async (t) => {
   const t3 = await startFakeT3();
   t.after(() => t3.close());
