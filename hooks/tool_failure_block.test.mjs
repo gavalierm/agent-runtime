@@ -186,3 +186,12 @@ test("starý riadok registra s chybou iného programu neblokuje cat (úloha 720,
   assert.ok(blockReason("gh pr list", opts));
   rmSync(dir, { recursive: true, force: true });
 });
+
+test("starý riadok s všeobecnou predponou chyby ďalej blokuje (úloha 720, posudok)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tfb720b-"));
+  const reg = join(dir, "nastroje.tsv");
+  writeFileSync(reg, "2026-10-31T02:00:00Z\troot@testhost\tgit\tlog\t--frobnicate\terror: unknown option `frobnicate'\tgit log --frobnicate\n");
+  const opts = { env: "root@testhost", registerFile: reg, knownFile: join(dir, "none.tsv") };
+  assert.ok(blockReason("git log --frobnicate", opts));
+  rmSync(dir, { recursive: true, force: true });
+});

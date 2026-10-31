@@ -111,5 +111,13 @@ test("tool_shape: missingTool", () => {
 
 test("chyba iného programu sa nepripíše prvému segmentu (úloha 720, replay)", () => {
   const line = registerLine(fail("cat > /tmp/k.md <<'EOF'\nPosudok\nEOF\n/opt/agentic-workflow/bin/tk comment 714 --body-file /tmp/k.md", "Exit code 1\ntasker: unknown option --body-file"), { env: { AR_ENV_KEY: ENV } });
-  assert.equal(line, null);
+  assert.equal(line.split("\t")[2], "tk");
+});
+
+test("všeobecná predpona chyby a jeden segment nechajú chybu pri programe, tk hlási tasker (úloha 720, posudok)", () => {
+  const e = { env: { AR_ENV_KEY: ENV } };
+  assert.equal(registerLine(fail("git log --frobnicate", "Exit code 129\nerror: unknown option `frobnicate'"), e).split("\t")[2], "git");
+  assert.equal(registerLine(fail("foo -x", "Exit code 1\nError: boom"), e).split("\t")[2], "foo");
+  assert.equal(registerLine(fail("ls && git log --frobnicate", "Exit code 129\nfatal: bad"), e).split("\t")[2], "ls");
+  assert.equal(registerLine(fail("cat a && tk comment 1 --body-file a", "Exit code 1\ntasker: unknown option --body-file"), e).split("\t")[2], "tk");
 });

@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { denyTool } from "../lib/deny.mjs";
 import { brainGlobalDir } from "../lib/paths.mjs";
-import { envKey, errorProgram, missingTool, shapeOf } from "../lib/tool_shape.mjs";
+import { ALIAS, envKey, errorProgram, missingTool, shapeOf } from "../lib/tool_shape.mjs";
 import { registerPath } from "./tool_failure_log.mjs";
 
 export const DEFAULT_POSTUP =
@@ -47,7 +47,7 @@ export function blockReason(command, { env = envKey(), registerFile, knownFile }
     if (e !== env) continue;
     // Starý riadok, ktorý chybu iného programu pripísal tomuto (úloha 720), neblokuje.
     const by = errorProgram(err);
-    if (by && by !== program && !NEUTRAL_ERR.has(by)) continue;
+    if (by && by !== program && ALIAS[program] !== by && !NEUTRAL_ERR.has(by)) continue;
     for (const s of shapes) {
       if (s.program !== program || s.sub !== sub || s.flags.join(" ") !== flags || !missingTool(err, program)) continue;
       return { reason: `Príkaz \`${label(s)}\` v prostredí ${env} už zlyhal (${err}).`, postup: DEFAULT_POSTUP };
