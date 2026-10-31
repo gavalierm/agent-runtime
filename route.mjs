@@ -18,10 +18,12 @@
 // odosielateľa s tou istou témou), ide podľa témy: boris-pravidla-<čas>.md
 // do vlákna, ktoré naposledy písalo agentovi boris s témou pravidla.
 //
-// Vlákno odosielateľa: vlákno T3, ktorého providerThreads majú
-// nativeThreadRef.nativeId rovné id relácie claude (CLAUDE_CODE_SESSION_ID
-// v prostredí vlákna; po /clear má proces novú reláciu, vtedy platí
-// --resume=<id> z príkazového riadku procesu CLAUDE_PID).
+// Vlákno odosielateľa: najprv T3CODE_THREAD_ID z prostredia (T3 ho dáva
+// procesu claude, dedí sa do hookov a Bash), inak vlákno T3, ktorého
+// providerThreads majú nativeThreadRef.nativeId rovné id relácie claude
+// (CLAUDE_CODE_SESSION_ID v prostredí vlákna; po /clear má proces novú
+// reláciu, vtedy platí --resume alebo --session-id z príkazového riadku
+// procesu CLAUDE_PID, T3 0.1.5 spúšťa claude s --session-id).
 //
 // Zoznam tém: $AGENT_BOX/topics.json (na serveri /var/lib/<agent>/topics.json,
 // mimo gitu, skupina schránky ho číta) mapuje meno témy na vlákno T3, ktoré
@@ -218,8 +220,8 @@ export function sessionIds(env = process.env) {
   if (env.CLAUDE_CODE_SESSION_ID) ids.push(env.CLAUDE_CODE_SESSION_ID);
   if (env.CLAUDE_PID) {
     try {
-      const m = readFileSync(`/proc/${env.CLAUDE_PID}/cmdline`, "utf8").match(/--resume[=\0]([0-9a-f-]{36})/);
-      if (m && !ids.includes(m[1])) ids.push(m[1]);
+      const cmd = readFileSync(`/proc/${env.CLAUDE_PID}/cmdline`, "utf8");
+      for (const m of cmd.matchAll(/--(?:resume|session-id)[=\0]([0-9a-f-]{36})(?![0-9a-f-])/g)) if (!ids.includes(m[1])) ids.push(m[1]);
     } catch {}
   }
   return ids;
@@ -236,9 +238,11 @@ export async function threadForSession(cfg, client, ids, now = Date.now()) {
   return found.threadId;
 }
 
-// Vlákno volajúceho podľa relácie claude. Vráti { thread } alebo { fail }.
-async function callerThread(cfg) {
-  const ids = sessionIds();
+// Vlákno volajúceho. T3CODE_THREAD_ID z prostredia platí bez volania T3,
+// inak podľa relácie claude. Vráti { thread } alebo { fail }.
+export async function callerThread(cfg, env = process.env) {
+  if (typeof env.T3CODE_THREAD_ID === "string" && env.T3CODE_THREAD_ID.trim()) return { thread: env.T3CODE_THREAD_ID.trim() };
+  const ids = sessionIds(env);
   if (ids.length === 0) return { fail: "bez CLAUDE_CODE_SESSION_ID" };
   try {
     const thread = await threadForSession(cfg, T3Client.fromConfig(cfg), ids);

@@ -4,12 +4,12 @@ import { chmodSync, mkdtempSync as mkdtempRaw, mkdirSync, writeFileSync, readdir
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 import { startFakeT3 } from "./fake_t3.mjs";
 import { T3Client } from "../lib.mjs";
-import { routeKey, rememberRoute, routeFor, threadForSession, sessionIds, waitingFor, setTopic, removeTopic, readTopics, topicsPath, messageTopic } from "../route.mjs";
+import { callerThread, routeKey, rememberRoute, routeFor, threadForSession, sessionIds, waitingFor, setTopic, removeTopic, readTopics, topicsPath, messageTopic } from "../route.mjs";
 import { tick, classify, renderMessage } from "../driver.mjs";
 
 // Dočasné priečinky testu sa na konci zmažú (úloha 701).
@@ -153,6 +153,77 @@ test("threadForSession: holé UUID vlákno sa nájde, sub-agent a potomok s rodi
   assert.equal(await find(["a"]), null, "sub-agent patrí rodičovi");
   assert.equal(await find(["c"]), null, "potomok s parentThreadId");
   assert.equal(await find(["b"]), "thread:project:y");
+});
+
+// Proces claude, ktorého príkazový riadok nesie dané prepínače (T3 0.1.5 ide s --session-id).
+async function claudeLike(t, ...flags) {
+  const child = spawn(process.execPath, ["-e", "setTimeout(()=>{}, 20000)", "--", ...flags], { stdio: "ignore" });
+  t.after(() => child.kill("SIGKILL"));
+  await new Promise((r) => child.once("spawn", r));
+  return child;
+}
+
+test("sessionIds a threadForSession: po /clear nájde vlákno cez --session-id z príkazového riadku (chyba 31. 10. 2026)", async (t) => {
+  const t3 = await startFakeT3();
+  t.after(() => t3.close());
+  const NATIVE = "7d391009-1ca8-464c-a5a3-b01230b8a2fe";
+  const CLEARED = "555dc9f2-8713-4eed-93d0-bda23c94b623";
+  t3.addThread("ae961f07-2ff5-4441-8556-bd2ba48b5968", { _providerThreads: [{ nativeThreadRef: { nativeId: NATIVE } }] });
+  const find = async (env) => threadForSession(setup(t3).cfg, new T3Client({ url: t3.url, token: t3.token, timeoutMs: 3000 }), sessionIds(env));
+  for (const flags of [[`--session-id=${NATIVE}`], ["--session-id", NATIVE]]) {
+    const child = await claudeLike(t, ...flags);
+    const env = { CLAUDE_CODE_SESSION_ID: CLEARED, CLAUDE_PID: String(child.pid) };
+    assert.deepEqual(sessionIds(env), [CLEARED, NATIVE], flags.join(" "));
+    assert.equal(await find(env), "ae961f07-2ff5-4441-8556-bd2ba48b5968", flags.join(" "));
+  }
+  // --resume ďalej funguje, obe tvary.
+  for (const flags of [[`--resume=${NATIVE}`], ["--resume", NATIVE]]) {
+    const child = await claudeLike(t, ...flags);
+    const env = { CLAUDE_CODE_SESSION_ID: CLEARED, CLAUDE_PID: String(child.pid) };
+    assert.deepEqual(sessionIds(env), [CLEARED, NATIVE], flags.join(" "));
+    assert.equal(await find(env), "ae961f07-2ff5-4441-8556-bd2ba48b5968", flags.join(" "));
+  }
+  // Oba prepínače naraz, bez duplicít; id prostredia ostáva prvé.
+  const OTHER = "11111111-2222-4333-8444-555555555555";
+  const both = await claudeLike(t, `--resume=${OTHER}`, `--session-id=${NATIVE}`, `--resume=${OTHER}`);
+  assert.deepEqual(sessionIds({ CLAUDE_CODE_SESSION_ID: NATIVE, CLAUDE_PID: String(both.pid) }), [NATIVE, OTHER]);
+  assert.deepEqual(sessionIds({ CLAUDE_PID: "999999999" }), [], "neexistujúci proces");
+});
+
+test("callerThread: T3CODE_THREAD_ID platí bez volania T3, prázdne ide cez reláciu", async (t) => {
+  const t3 = await startFakeT3();
+  t.after(() => t3.close());
+  const { root, cfg } = setup(t3);
+  cfg.t3TokenFile = join(root, "t3_token");
+  writeFileSync(cfg.t3TokenFile, t3.token);
+  const before = t3.state.httpCalls.length;
+  assert.deepEqual(await callerThread(cfg, { T3CODE_THREAD_ID: "thread:project:p1:tema", CLAUDE_CODE_SESSION_ID: "nezname" }), { thread: "thread:project:p1:tema" });
+  assert.deepEqual(await callerThread(cfg, { T3CODE_THREAD_ID: "mcp:tema" }), { thread: "mcp:tema" }, "aj bez relácie");
+  assert.equal(t3.state.httpCalls.length, before, "bez volania T3");
+  const r = await callerThread(cfg, { T3CODE_THREAD_ID: "", CLAUDE_CODE_SESSION_ID: "nezname" });
+  assert.match(r.fail, /vlákno pre reláciu nezname som v T3 nenašiel/);
+  assert.deepEqual(await callerThread(cfg, { T3CODE_THREAD_ID: "" }), { fail: "bez CLAUDE_CODE_SESSION_ID" });
+});
+
+test("route.mjs remember: T3CODE_THREAD_ID zapíše trasu, aj keď relácia v T3 nie je", async (t) => {
+  const t3 = await startFakeT3();
+  t.after(() => t3.close());
+  const { root, cfg, box, state } = setup(t3);
+  const tokenFile = join(root, "t3_token");
+  writeFileSync(tokenFile, t3.token);
+  const env = { PATH: process.env.PATH, HOME: root, AGENT_NAME: "adam", AGENT_BOX: box, AGENT_STATE: state, AGENT_ENV_FILE: "/nie/je",
+    T3_URL: t3.url, T3_TOKEN_FILE: tokenFile, CLAUDE_PID: "", CLAUDE_CODE_SESSION_ID: "nie-je-v-t3", T3CODE_THREAD_ID: "thread:project:p1:tema" };
+  const name = "adam-pravidla-20261031-010101-1.md";
+  let r = await run("route.mjs", ["remember", name, "--peer", "boris"], { env });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /-> thread:project:p1:tema/);
+  assert.equal(routeFor(cfg, `boris-${name}`, name).thread, "thread:project:p1:tema");
+  // Bez T3CODE_THREAD_ID a s reláciou mimo T3 trasa nevznikne.
+  const name2 = "adam-pravidla-20261031-010102-2.md";
+  r = await run("route.mjs", ["remember", name2, "--peer", "boris"], { env: { ...env, T3CODE_THREAD_ID: "" } });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /vlákno pre reláciu nie-je-v-t3 som v T3 nenašiel/);
+  assert.equal(routeFor(cfg, `boris-${name2}`, name2), null);
 });
 
 test("budič: správa s trasou ide do vlákna témy, zaneprázdnené vlákno témy hlavné nezdrží", async (t) => {

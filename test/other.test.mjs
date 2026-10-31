@@ -196,7 +196,7 @@ test("reply.sh: odpoveď odosielateľovi z AGENT_INBOX_ONLY ide len do jeho schr
   // Server: /var/lib/cyril je schránka agenta na Macu, odpoveď preň ide len tam.
   const cyrilInbox = join(root, "var/cyril/inbox");
   mkdirSync(cyrilInbox, { recursive: true });
-  const env = { ...process.env, AGENT_NAME: "adam", AGENT_BOX: box, AGENT_INBOX_ONLY: "cyril", ASK_VAR_LIB: join(root, "var"), AGENT_STATE: join(root, "state"), AGENT_ENV_FILE: "/nie/je", CLAUDE_CODE_SESSION_ID: "", CLAUDE_PID: "" };
+  const env = { ...process.env, AGENT_NAME: "adam", AGENT_BOX: box, AGENT_INBOX_ONLY: "cyril", ASK_VAR_LIB: join(root, "var"), AGENT_STATE: join(root, "state"), AGENT_ENV_FILE: "/nie/je", CLAUDE_CODE_SESSION_ID: "", CLAUDE_PID: "", T3CODE_THREAD_ID: "" };
   const name = "cyril-adam_server-20261018-120000-1.md";
   const borisInbox = join(root, "boris_inbox");
   mkdirSync(borisInbox);
