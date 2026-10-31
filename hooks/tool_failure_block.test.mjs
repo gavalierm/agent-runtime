@@ -174,3 +174,15 @@ test("pokazený vstup a iný nástroj než Bash prejdú", () => {
     rmSync(sb.dir, { recursive: true, force: true });
   }
 });
+
+test("starý riadok registra s chybou iného programu neblokuje cat (úloha 720, replay)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tfb720-"));
+  const reg = join(dir, "nastroje.tsv");
+  writeFileSync(reg, "2026-10-31T02:00:00Z\troot@testhost\tcat\t\t\ttasker: unknown option --body-file\tcat > f <<'EOF'\n");
+  const opts = { env: "root@testhost", registerFile: reg, knownFile: join(dir, "none.tsv") };
+  assert.equal(blockReason("cat .git", opts), null);
+  assert.equal(blockReason("cat > /tmp/x.txt <<'EOF'\nfixtura\nEOF", opts), null);
+  writeFileSync(reg, "2026-10-31T02:00:00Z\troot@testhost\tgh\t\t\tbash: line 1: gh: command not found\tgh pr list\n");
+  assert.ok(blockReason("gh pr list", opts));
+  rmSync(dir, { recursive: true, force: true });
+});

@@ -108,3 +108,8 @@ test("tool_shape: missingTool", () => {
   assert.equal(missingTool("python3: can't open file 'x.py': [Errno 2] No such file or directory", "python3"), false);
   assert.equal(missingTool("bash: line 1: ./x.sh: No such file or directory", "x.sh"), true);
 });
+
+test("chyba iného programu sa nepripíše prvému segmentu (úloha 720, replay)", () => {
+  const line = registerLine(fail("cat > /tmp/k.md <<'EOF'\nPosudok\nEOF\n/opt/agentic-workflow/bin/tk comment 714 --body-file /tmp/k.md", "Exit code 1\ntasker: unknown option --body-file"), { env: { AR_ENV_KEY: ENV } });
+  assert.equal(line, null);
+});

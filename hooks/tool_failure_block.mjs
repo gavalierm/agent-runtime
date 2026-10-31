@@ -19,13 +19,15 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { denyTool } from "../lib/deny.mjs";
 import { brainGlobalDir } from "../lib/paths.mjs";
-import { envKey, missingTool, shapeOf } from "../lib/tool_shape.mjs";
+import { envKey, errorProgram, missingTool, shapeOf } from "../lib/tool_shape.mjs";
 import { registerPath } from "./tool_failure_log.mjs";
 
 export const DEFAULT_POSTUP =
   "použi iný nástroj alebo tvar; keď nový tvar prejde, pridaj do env/server/nastroje.tsv spoločného mozgu riadok s náhradou";
 
 const rows = (file) => (file && existsSync(file) ? readFileSync(file, "utf8").split("\n").filter((l) => l.trim() && !l.startsWith("#")).map((l) => l.split("\t")) : []);
+// Shell hlási chybu programu, ktorý spustil (`bash: gh: command not found`).
+const NEUTRAL_ERR = new Set(["bash", "sh", "zsh", "env", "sudo", "runuser"]);
 const label = (s) => [s.program, s.sub, ...s.flags].filter(Boolean).join(" ");
 
 // Dôvod a postup zamietnutia alebo null.
@@ -43,6 +45,9 @@ export function blockReason(command, { env = envKey(), registerFile, knownFile }
   }
   for (const [, e, program, sub, flags = "", err = ""] of rows(registerFile)) {
     if (e !== env) continue;
+    // Starý riadok, ktorý chybu iného programu pripísal tomuto (úloha 720), neblokuje.
+    const by = errorProgram(err);
+    if (by && by !== program && !NEUTRAL_ERR.has(by)) continue;
     for (const s of shapes) {
       if (s.program !== program || s.sub !== sub || s.flags.join(" ") !== flags || !missingTool(err, program)) continue;
       return { reason: `Príkaz \`${label(s)}\` v prostredí ${env} už zlyhal (${err}).`, postup: DEFAULT_POSTUP };
