@@ -227,6 +227,26 @@ test("isOurs pozná naše príkazy v oboch tvaroch a cudzie nie", () => {
   assert.ok(!isOurs("node /x/check.mjs"));
 });
 
+test("mergeSettings: vyradený guard.mjs z Macu (agent-rules) apply odstráni, cudzí hook ostane", () => {
+  const existing = {
+    hooks: {
+      PreToolUse: [
+        { matcher: "Bash", hooks: [{ type: "command", command: 'node "$HOME/Work/agent-rules/hooks/guard.mjs"' }] },
+        { matcher: "Bash", hooks: [{ type: "command", command: "node /x/hooks/cudzi.mjs" }] },
+      ],
+    },
+  };
+  const out = mergeSettings(withBase(existing, {}), "mac", HOOKS, WF);
+  const cmds = out.hooks.PreToolUse.flatMap((g) => g.hooks.map((c) => c.command));
+  const bare = cmds.filter((c) => /(^|[\s/"])guard\.mjs/.test(c));
+  assert.deepEqual(bare, [], "guard.mjs nesmie ostať");
+  assert.ok(cmds.some((c) => c.includes("repeat_guard.mjs")), "repeat_guard.mjs ostáva");
+  assert.ok(cmds.some((c) => c.includes("cudzi.mjs")), "cudzí hook ostáva");
+  assert.ok(isOurs('node "$HOME/Work/agent-rules/hooks/guard.mjs"'));
+  assert.ok(isOurs("node /opt/agentic-workflow/hooks/guard.mjs --x"));
+  assert.ok(!isOurs("node /x/hooks/cudzi.mjs"));
+});
+
 test("applySettings píše do súboru a base dopĺňa len chýbajúce kľúče", () => {
   const dir = mkdtempSync(join(tmpdir(), "hooks-test-"));
   try {

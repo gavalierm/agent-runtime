@@ -159,10 +159,13 @@ export function settingsFor(kind, hooksDir, workflowDir, opts = {}) {
 // Meno súboru hooku z príkazu `node <cesta>/hooks/<meno>.mjs ...`, `check.mjs`
 // alebo cesty od koreňa klonu z tabuľky (`brain/bin/repeat_guard.mjs`). Pred
 // `brain/` stojí lomka, takže samostatná kópia `agentic-brain/bin/...` nie je naša.
+// Vyradené hooky, ktoré už nie sú v TABLE. hooks/guard.mjs vyradil f124ba1 (D0206).
+// Starý záznam z ľubovoľného klonu, aj agent-rules, apply odstráni.
+const RETIRED = ["guard"];
 const rx = (f) => f.replace(".mjs", "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const names = (pred) => [...new Set(TABLE.map((r) => r.file).filter(pred))].map(rx).join("|");
 const OURS = new RegExp(
-  `^node\\s+"?\\S*/(?:hooks/(${names((f) => !fromRoot(f))})\\.mjs|(check)\\.mjs"?\\s+--quiet|(${names((f) => f.includes("/"))})\\.mjs)"?(\\s.*)?$`,
+  `^node\\s+"?\\S*/(?:hooks/(${[names((f) => !fromRoot(f)), ...RETIRED.map(rx)].join("|")})\\.mjs|(check)\\.mjs"?\\s+--quiet|(${names((f) => f.includes("/"))})\\.mjs)"?(\\s.*)?$`,
 );
 export const isOurs = (command) => OURS.test(String(command ?? ""));
 
@@ -170,6 +173,7 @@ const clone = (v) => structuredClone(v);
 
 // Zlúči vygenerované kľúče do existujúceho objektu settings. Skupiny s naším
 // hookom (z ľubovoľnej cesty, napríklad zo starého klonu) nahradí, cudzie ostanú.
+// Skupiny s vyradeným hookom (RETIRED, napríklad guard.mjs) odstráni bez náhrady.
 export function mergeSettings(existing, kind, hooksDir, workflowDir, opts = {}) {
   const gen = settingsFor(kind, hooksDir, workflowDir, opts);
   const d = clone(existing ?? {});
